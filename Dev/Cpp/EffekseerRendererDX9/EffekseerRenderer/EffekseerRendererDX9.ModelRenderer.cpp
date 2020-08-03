@@ -21,33 +21,43 @@ namespace EffekseerRendererDX9
 
 #ifdef __EFFEKSEER_BUILD_VERSION16__
 
-namespace ShaderLightingTextureNormal_
+namespace ShaderLightingTextureNormal_VS
 {
 static
-#include "Shader/EffekseerRenderer.ModelRenderer.ShaderLightingTextureNormal_VS.h"
+#include "ShaderHeader/EffekseerRenderer.ModelRenderer.ShaderLightingTextureNormal_VS.h"
+} // namespace ShaderLightingTextureNormal_VS
 
-	static
-#include "Shader/EffekseerRenderer.ModelRenderer.ShaderLightingTextureNormal_PS.h"
-
-} // namespace ShaderLightingTextureNormal_
-
-namespace ShaderTexture_
+namespace ShaderLightingTextureNormal_PS
 {
 static
-#include "Shader/EffekseerRenderer.ModelRenderer.ShaderTexture_VS.h"
+#include "ShaderHeader/EffekseerRenderer.ModelRenderer.ShaderLightingTextureNormal_PS.h"
 
-	static
-#include "Shader/EffekseerRenderer.ModelRenderer.ShaderTexture_PS.h"
-} // namespace ShaderTexture_
+} // namespace ShaderLightingTextureNormal_PS
 
-namespace ShaderDistortionTexture_
+namespace ShaderTexture_VS
 {
 static
-#include "Shader/EffekseerRenderer.ModelRenderer.ShaderDistortion_VS.h"
+#include "ShaderHeader/EffekseerRenderer.ModelRenderer.ShaderTexture_VS.h"
+} // namespace ShaderTexture_VS
 
-	static
-#include "Shader/EffekseerRenderer.ModelRenderer.ShaderDistortionTexture_PS.h"
-} // namespace ShaderDistortionTexture_
+namespace ShaderTexture_PS
+{
+static
+#include "ShaderHeader/EffekseerRenderer.ModelRenderer.ShaderTexture_PS.h"
+} // namespace ShaderTexture_PS
+
+namespace ShaderDistortionTexture_VS
+{
+static
+#include "ShaderHeader/EffekseerRenderer.ModelRenderer.ShaderDistortion_VS.h"
+} // namespace ShaderDistortionTexture_VS
+
+namespace ShaderDistortionTexture_PS
+{
+static
+#include "ShaderHeader/EffekseerRenderer.ModelRenderer.ShaderDistortion_PS.h"
+} // namespace ShaderDistortionTexture_PS
+
 
 #else
 
@@ -152,31 +162,6 @@ ModelRenderer* ModelRenderer::Create(RendererImplemented* renderer)
 								{0, 60, D3DDECLTYPE_UBYTE4, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 6},
 								D3DDECL_END()};
 
-#ifdef __EFFEKSEER_BUILD_VERSION16__
-	Shader* shader_lighting_texture_normal = Shader::Create(renderer,
-															ShaderLightingTextureNormal_::g_vs30_VS,
-															sizeof(ShaderLightingTextureNormal_::g_vs30_VS),
-															ShaderLightingTextureNormal_::g_ps30_PS,
-															sizeof(ShaderLightingTextureNormal_::g_ps30_PS),
-															"ModelRendererLightingTextureNormal",
-															decl);
-
-	Shader* shader_texture = Shader::Create(renderer,
-											ShaderTexture_::g_vs30_VS,
-											sizeof(ShaderTexture_::g_vs30_VS),
-											ShaderTexture_::g_ps30_PS,
-											sizeof(ShaderTexture_::g_ps30_PS),
-											"ModelRendererTexture",
-											decl);
-
-	auto shader_distortion_texture = Shader::Create(renderer,
-													ShaderDistortionTexture_::g_vs30_VS,
-													sizeof(ShaderDistortionTexture_::g_vs30_VS),
-													ShaderDistortionTexture_::g_ps30_PS,
-													sizeof(ShaderDistortionTexture_::g_ps30_PS),
-													"ModelRendererDistortionTexture",
-													decl);
-#else
 	Shader* shader_lighting_texture_normal = Shader::Create(renderer,
 															ShaderLightingTextureNormal_VS::g_vs30_main,
 															sizeof(ShaderLightingTextureNormal_VS::g_vs30_main),
@@ -200,7 +185,6 @@ ModelRenderer* ModelRenderer::Create(RendererImplemented* renderer)
 													sizeof(ShaderDistortionTexture_PS::g_ps30_main),
 													"ModelRendererDistortionTexture",
 													decl);
-#endif
 
 	if (shader_lighting_texture_normal == NULL || shader_texture == NULL || shader_distortion_texture == NULL)
 	{

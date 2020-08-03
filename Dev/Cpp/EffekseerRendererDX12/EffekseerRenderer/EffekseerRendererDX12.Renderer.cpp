@@ -9,63 +9,76 @@
 namespace Standard_VS
 {
 static
-#include "Shader/EffekseerRenderer.Standard_VS.h"
+#include "ShaderHeader/EffekseerRenderer.Standard_VS.h"
 } // namespace Standard_VS
 
 namespace Standard_PS
 {
 static
-#include "Shader/EffekseerRenderer.Standard_PS.h"
+#include "ShaderHeader/EffekseerRenderer.Standard_PS.h"
 } // namespace Standard_PS
 
 namespace Standard_Distortion_VS
 {
 static
-#include "Shader/EffekseerRenderer.Standard_Distortion_VS.h"
+#include "ShaderHeader/EffekseerRenderer.Standard_Distortion_VS.h"
 } // namespace Standard_Distortion_VS
 
 namespace Standard_Distortion_PS
 {
 static
-#include "Shader/EffekseerRenderer.Standard_Distortion_PS.h"
+#include "ShaderHeader/EffekseerRenderer.Standard_Distortion_PS.h"
 } // namespace Standard_Distortion_PS
 
-namespace ShaderLightingTextureNormal_
+namespace ShaderLightingTextureNormal_VS
 {
 static
-#include "Shader/EffekseerRenderer.ModelRenderer.ShaderLightingTextureNormal_VS.h"
+#include "ShaderHeader/EffekseerRenderer.ModelRenderer.ShaderLightingTextureNormal_VS.h"
+} // namespace ShaderLightingTextureNormal_VS
 
-	static
-#include "Shader/EffekseerRenderer.ModelRenderer.ShaderLightingTextureNormal_PS.h"
-
-} // namespace ShaderLightingTextureNormal_
-
-namespace ShaderTexture_
+namespace ShaderLightingTextureNormal_PS
 {
 static
-#include "Shader/EffekseerRenderer.ModelRenderer.ShaderTexture_VS.h"
+#include "ShaderHeader/EffekseerRenderer.ModelRenderer.ShaderLightingTextureNormal_PS.h"
 
-	static
-#include "Shader/EffekseerRenderer.ModelRenderer.ShaderTexture_PS.h"
-} // namespace ShaderTexture_
+} // namespace ShaderLightingTextureNormal_PS
 
-namespace ShaderDistortionTexture_
+namespace ShaderTexture_VS
 {
 static
-#include "Shader/EffekseerRenderer.ModelRenderer.ShaderDistortion_VS.h"
+#include "ShaderHeader/EffekseerRenderer.ModelRenderer.ShaderTexture_VS.h"
+} // namespace ShaderTexture_VS
 
-	static
-#include "Shader/EffekseerRenderer.ModelRenderer.ShaderDistortion_PS.h"
-} // namespace ShaderDistortionTexture_
-
-namespace ShaderStandardLighting_
+namespace ShaderTexture_PS
 {
 static
-#include "Shader/EffekseerRenderer.Standard_Lighting_VS.h"
+#include "ShaderHeader/EffekseerRenderer.ModelRenderer.ShaderTexture_PS.h"
+} // namespace ShaderTexture_PS
 
-	static
-#include "Shader/EffekseerRenderer.Standard_Lighting_PS.h"
+namespace ShaderDistortionTexture_VS
+{
+static
+#include "ShaderHeader/EffekseerRenderer.ModelRenderer.ShaderDistortion_VS.h"
+} // namespace ShaderDistortionTexture_VS
+
+namespace ShaderDistortionTexture_PS
+{
+static
+#include "ShaderHeader/EffekseerRenderer.ModelRenderer.ShaderDistortion_PS.h"
+} // namespace ShaderDistortionTexture_PS
+
+namespace ShaderStandardLighting_VS
+{
+static
+#include "ShaderHeader/EffekseerRenderer.Standard_Lighting_VS.h"
+} // namespace ShaderStandardLighting_VS
+
+namespace ShaderStandardLighting_PS
+{
+static
+#include "ShaderHeader/EffekseerRenderer.Standard_Lighting_PS.h"
 } // namespace ShaderStandardLighting_
+
 
 #else
 

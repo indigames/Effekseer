@@ -34,42 +34,43 @@
 namespace EffekseerRendererDX9
 {
 
+
 #ifdef __EFFEKSEER_BUILD_VERSION16__
 
 namespace Standard_VS
 {
 static
-#include "Shader/EffekseerRenderer.Standard_VS.h"
+#include "ShaderHeader/EffekseerRenderer.Standard_VS.h"
 } // namespace Standard_VS
 
 namespace Standard_PS
 {
 static
-#include "Shader/EffekseerRenderer.Standard_PS.h"
+#include "ShaderHeader/EffekseerRenderer.Standard_PS.h"
 } // namespace Standard_PS
 
 namespace Standard_Distortion_VS
 {
 static
-#include "Shader/EffekseerRenderer.Standard_Distortion_VS.h"
+#include "ShaderHeader/EffekseerRenderer.Standard_Distortion_VS.h"
 } // namespace Standard_Distortion_VS
 
 namespace Standard_Distortion_PS
 {
 static
-#include "Shader/EffekseerRenderer.Standard_Distortion_PS.h"
+#include "ShaderHeader/EffekseerRenderer.Standard_Distortion_PS.h"
 } // namespace Standard_Distortion_PS
 
 namespace Standard_Lighting_VS
 {
 static
-#include "Shader/EffekseerRenderer.Standard_Lighting_VS.h"
+#include "ShaderHeader/EffekseerRenderer.Standard_Lighting_VS.h"
 } // namespace Standard_Lighting_VS
 
 namespace Standard_Lighting_PS
 {
 static
-#include "Shader/EffekseerRenderer.Standard_Lighting_PS.h"
+#include "ShaderHeader/EffekseerRenderer.Standard_Lighting_PS.h"
 } // namespace Standard_Lighting_PS
 
 #else
@@ -355,30 +356,6 @@ bool RendererImplemented::Initialize(LPDIRECT3DDEVICE9 device)
 #endif
 		D3DDECL_END()};
 
-#ifdef __EFFEKSEER_BUILD_VERSION16__
-	m_shader = Shader::Create(this,
-							  Standard_VS::g_vs30_VS,
-							  sizeof(Standard_VS::g_vs30_VS),
-							  Standard_PS::g_ps30_PS,
-							  sizeof(Standard_PS::g_ps30_PS),
-							  "StandardRenderer",
-							  decl);
-	if (m_shader == NULL)
-		return false;
-
-	// 参照カウントの調整
-	Release();
-
-	m_shader_distortion = Shader::Create(this,
-										 Standard_Distortion_VS::g_vs30_VS,
-										 sizeof(Standard_Distortion_VS::g_vs30_VS),
-										 Standard_Distortion_PS::g_ps30_PS,
-										 sizeof(Standard_Distortion_PS::g_ps30_PS),
-										 "StandardRenderer Distortion",
-										 decl_distortion);
-	if (m_shader_distortion == NULL)
-		return false;
-#else
 	m_shader = Shader::Create(this,
 							  Standard_VS::g_vs30_main,
 							  sizeof(Standard_VS::g_vs30_main),
@@ -401,7 +378,6 @@ bool RendererImplemented::Initialize(LPDIRECT3DDEVICE9 device)
 										 decl_distortion);
 	if (m_shader_distortion == NULL)
 		return false;
-#endif
 
 	// 参照カウントの調整
 	Release();
@@ -444,16 +420,6 @@ bool RendererImplemented::Initialize(LPDIRECT3DDEVICE9 device)
 #endif
 		D3DDECL_END()};
 
-#ifdef __EFFEKSEER_BUILD_VERSION16__
-	m_shader_lighting = Shader::Create(this,
-									   Standard_Lighting_VS::g_vs30_VS,
-									   sizeof(Standard_Lighting_VS::g_vs30_VS),
-									   Standard_Lighting_PS::g_ps30_PS,
-									   sizeof(Standard_Lighting_PS::g_ps30_PS),
-									   "StandardRenderer Lighting",
-									   decl_lighting);
-
-#else
 	m_shader_lighting = Shader::Create(this,
 									   Standard_Lighting_VS::g_vs30_main,
 									   sizeof(Standard_Lighting_VS::g_vs30_main),
@@ -461,7 +427,6 @@ bool RendererImplemented::Initialize(LPDIRECT3DDEVICE9 device)
 									   sizeof(Standard_Lighting_PS::g_ps30_main),
 									   "StandardRenderer Lighting",
 									   decl_lighting);
-#endif
 	if (m_shader_lighting == NULL)
 		return false;
 
