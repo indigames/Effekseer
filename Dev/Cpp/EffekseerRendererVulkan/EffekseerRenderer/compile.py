@@ -13,8 +13,8 @@ root_path = 'Shader/'
 dst_path = 'ShaderHeader/'
 
 for fx in verts:
-    subprocess.call(["glslangValidator", "-V", "--vn", fx, "-o", dst_path + fx + '.h', root_path + fx + '.vert'])
+    subprocess.call(["glslangValidator", "-V", "--vn", fx, "-o", dst_path + fx + '.h', root_path + fx + '.fx.vert'])
 
 for fx in frags:
-    subprocess.call(["glslangValidator", "-V", "--vn", fx, "-o", dst_path + fx + '.h', root_path + fx + '.frag'])
+    subprocess.call(["glslangValidator", "-V", "--vn", fx, "-o", dst_path + fx + '.h', root_path + fx + '.fx.frag'])
 

@@ -71,11 +71,11 @@ for f in (frags):
 # Vulkan
 for f in (verts):
     print('Converting {}'.format(f))
-    subprocess.call(['ShaderTranspiler', '--vert', '-V', '--input', f, '--output', vulkan_root_path + os.path.basename(f)] + llgi_common_flags)
+    subprocess.call(['ShaderTranspiler', '--vert', '-V', '--input', f, '--output', vulkan_root_path + os.path.basename(f) + '.vert'] + llgi_common_flags)
 
 for f in (frags):
     print('Converting {}'.format(f))
-    subprocess.call(['ShaderTranspiler', '--frag', '-V', '--input', f, '--output', vulkan_root_path + os.path.basename(f)] + llgi_common_flags)
+    subprocess.call(['ShaderTranspiler', '--frag', '-V', '--input', f, '--output', vulkan_root_path + os.path.basename(f) + '.frag'] + llgi_common_flags)
 
 # OpenGL
 for f in (verts):
