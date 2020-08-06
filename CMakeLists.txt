@@ -23,9 +23,14 @@ option(BUILD_VULKAN "Build vulkan modules" OFF)
 
 if (WIN32 AND NOT FROM_CI)
     option(BUILD_DX12 "Build DirectX12 modules" ON)
+    option(BUILD_DX11 "Build DirectX11 modules" ON)
+    option(BUILD_DX9 "Build DirectX9 modules" ON)
 else()
     option(BUILD_DX12 "Build DirectX12 modules" OFF)
+    option(BUILD_DX11 "Build DirectX11 modules" OFF)
+    option(BUILD_DX9 "Build DirectX9 modules" OFF)
 endif()
+
 
 
 if (APPLE)
