@@ -6,21 +6,21 @@
 #include "EffekseerRendererGL.GLExtension.h"
 #include "EffekseerRendererGL.Renderer.h"
 
-#ifdef __ANDROID__
-
-#ifdef __ANDROID__DEBUG__
-#include "android/log.h"
-#define LOG(s) __android_log_print(ANDROID_LOG_DEBUG, "Tag", "%s", s)
-#else
-#define LOG(s) printf("%s", s)
-#endif
-
-#elif defined(_WIN32)
-#include <windows.h>
-#define LOG(s) OutputDebugStringA(s)
-#else
-#define LOG(s) printf("%s", s)
-#endif
+//#ifdef __ANDROID__
+//
+//#ifdef __ANDROID__DEBUG__
+//#include "android/log.h"
+//#define LOG(s) __android_log_print(ANDROID_LOG_DEBUG, "Tag", "%s", s)
+//#else
+//#define LOG(s) printf("%s", s)
+//#endif
+//
+//#elif defined(_WIN32)
+//#include <windows.h>
+//#define LOG(s) OutputDebugStringA(s)
+//#else
+//#define LOG(s) printf("%s", s)
+//#endif
 
 //-----------------------------------------------------------------------------------
 //
@@ -152,6 +152,7 @@ bool Shader::CompileShader(OpenGLDeviceType deviceType,
 	// compile a vertex shader
 	if (addHeader)
 	{
+		LOG(std::to_string((int)deviceType).c_str());
 		if (deviceType == OpenGLDeviceType::OpenGL3)
 			src_data[0] = g_header_vs_gl3_src;
 		if (deviceType == OpenGLDeviceType::OpenGL2)

@@ -56,6 +56,17 @@ class RibbonRenderer;
 
 class TextureLoader;
 
+#ifdef NDEBUG
+    #define LOG(s)
+#else
+    #ifdef __ANDROID__
+        #include "android/log.h"
+        #define LOG(s) __android_log_print(ANDROID_LOG_DEBUG, "Effekseer", "%s --- filename = %s func = %s line = %d", s, __FILE__, __FUNCTION__, __LINE__)
+    #else
+        #define LOG(s) printf("%s --- filename = %s func = %s line = %d\n", s, __FILE__, __FUNCTION__, __LINE__)
+    #endif
+#endif
+
 #if _WIN32
 #pragma comment(lib, "glu32.lib")
 #ifndef NDEBUG

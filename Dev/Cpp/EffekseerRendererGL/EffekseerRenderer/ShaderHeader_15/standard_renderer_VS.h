@@ -1,5 +1,4 @@
-static const char standard_renderer_VS_gl2[] = R"(
-#version 120
+static const char standard_renderer_VS_gl2[] = R"(#version 120
 #ifdef GL_ARB_shading_language_420pack
 #extension GL_ARB_shading_language_420pack : require
 #endif
@@ -62,8 +61,7 @@ void main()
 
 )";
 
-static const char standard_renderer_VS_gl3[] = R"(
-#version 330
+static const char standard_renderer_VS_gl3[] = R"(#version 330
 #ifdef GL_ARB_shading_language_420pack
 #extension GL_ARB_shading_language_420pack : require
 #endif
@@ -187,8 +185,7 @@ void main()
 
 )";
 
-static const char standard_renderer_VS_gles3[] = R"(
-#version 300 es
+static const char standard_renderer_VS_gles3[] = R"(#version 300 es
 
 struct VS_Input
 {
