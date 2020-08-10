@@ -695,7 +695,8 @@ void* glMapBufferRange(GLenum target, GLintptr offset, GLsizeiptr length, GLbitf
 
 #if defined(__APPLE__)
 
-#if defined(GL_ARB_map_buffer_range)
+//#if defined(GL_ARB_map_buffer_range)
+#if defined(__EFFEKSEER_RENDERER_GLES3__)
 	return ::glMapBufferRange(target, offset, length, access);
 #else
 	return nullptr;
