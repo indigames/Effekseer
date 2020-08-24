@@ -152,7 +152,6 @@ bool Shader::CompileShader(OpenGLDeviceType deviceType,
 	// compile a vertex shader
 	if (addHeader)
 	{
-		LOG(std::to_string((int)deviceType).c_str());
 		if (deviceType == OpenGLDeviceType::OpenGL3)
 			src_data[0] = g_header_vs_gl3_src;
 		if (deviceType == OpenGLDeviceType::OpenGL2)
