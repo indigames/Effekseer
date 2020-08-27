@@ -86,10 +86,8 @@ class ModelLoader;
 
 class Model;
 
-#if __EFFEKSEER_BUILD_VERSION16__
 class CurveLoader;
 class Curve;
-#endif
 
 typedef int Handle;
 
@@ -733,13 +731,12 @@ struct NodeRendererBasicParameter
 	RendererMaterialType MaterialType = RendererMaterialType::Default;
 	int32_t Texture1Index = -1;
 	int32_t Texture2Index = -1;
-#ifdef __EFFEKSEER_BUILD_VERSION16__
 	int32_t Texture3Index = -1;
 	int32_t Texture4Index = -1;
 	int32_t Texture5Index = -1;
 	int32_t Texture6Index = -1;
 	int32_t Texture7Index = -1;
-#endif
+
 	float DistortionIntensity = 0.0f;
 	MaterialParameter* MaterialParameterPtr = nullptr;
 	AlphaBlendType AlphaBlend = AlphaBlendType::Blend;
@@ -748,7 +745,6 @@ struct NodeRendererBasicParameter
 	TextureWrapType TextureWrap1 = TextureWrapType::Repeat;
 	TextureFilterType TextureFilter2 = TextureFilterType::Nearest;
 	TextureWrapType TextureWrap2 = TextureWrapType::Repeat;
-#ifdef __EFFEKSEER_BUILD_VERSION16__
 	TextureFilterType TextureFilter3 = TextureFilterType::Nearest;
 	TextureWrapType TextureWrap3 = TextureWrapType::Repeat;
 
@@ -766,7 +762,7 @@ struct NodeRendererBasicParameter
 
 	float UVDistortionIntensity = 1.0f;
 
-	int32_t TextureBlendType = 0;
+	int32_t TextureBlendType = -1;
 
 	float BlendUVDistortionIntensity = 1.0f;
 
@@ -781,7 +777,9 @@ struct NodeRendererBasicParameter
 	float EdgeThreshold = 0.0f;
 	uint8_t EdgeColor[4] = { 0 };
 	int32_t EdgeColorScaling = 1;
-#endif
+
+	//! copy from alphacutoff
+	bool IsAlphaCutoffEnabled = false;
 };
 
 //----------------------------------------------------------------------------------
@@ -898,11 +896,11 @@ struct CustomAllocator
 
 	T* allocate(std::size_t n)
 	{
-		return reinterpret_cast<T*>(GetMallocFunc()(sizeof(T) * n));
+		return reinterpret_cast<T*>(GetMallocFunc()(sizeof(T) * static_cast<uint32_t>(n)));
 	}
 	void deallocate(T* p, std::size_t n)
 	{
-		GetFreeFunc()(p, sizeof(T) * n);
+		GetFreeFunc()(p, sizeof(T) * static_cast<uint32_t>(n));
 	}
 };
 
@@ -922,11 +920,11 @@ struct CustomAlignedAllocator
 
 	T* allocate(std::size_t n)
 	{
-		return reinterpret_cast<T*>(GetAlignedMallocFunc()(sizeof(T) * n, 16));
+		return reinterpret_cast<T*>(GetAlignedMallocFunc()(sizeof(T) * static_cast<uint32_t>(n), 16));
 	}
 	void deallocate(T* p, std::size_t n)
 	{
-		GetAlignedFreeFunc()(p, sizeof(T) * n);
+		GetAlignedFreeFunc()(p, sizeof(T) * static_cast<uint32_t>(n));
 	}
 };
 
@@ -952,6 +950,7 @@ template <class T>
 using CustomSet = std::set<T, std::less<T>, CustomAllocator<T>>;
 template <class T, class U>
 using CustomMap = std::map<T, U, std::less<T>, CustomAllocator<std::pair<const T, U>>>;
+template <class T, class U> using CustomAlignedMap = std::map<T, U, std::less<T>, CustomAlignedAllocator<std::pair<const T, U>>>;
 
 } // namespace Effekseer
 
@@ -1902,14 +1901,12 @@ public:
 	*/
 	void SetMaterial(Effect* effect, int32_t index, MaterialData* data);
 
-#if __EFFEKSEER_BUILD_VERSION16__
 	/**
 	@brief
 	\~English set curve data into specified index
 	\~Japanese	指定されたインデックスにカーブを設定する。
 	*/
 	void SetCurve(Effect* effect, int32_t index, void* data);
-#endif
 
 	/**
 	@brief
@@ -2171,7 +2168,6 @@ public:
 	*/
 	virtual const EFK_CHAR* GetMaterialPath(int n) const = 0;
 
-#if __EFFEKSEER_BUILD_VERSION16__
 	/**
 	@brief	\~English	Get a curve's pointer
 	\~Japanese	格納されているカーブのポインタを取得する。
@@ -2189,7 +2185,6 @@ public:
 	\~Japanese	カーブのパスを取得する。
 	*/
 	virtual const EFK_CHAR* GetCurvePath(int n) const = 0;
-#endif
 
 	/**
 		@brief
@@ -2220,14 +2215,12 @@ public:
 	*/
 	virtual void SetMaterial(int32_t index, MaterialData* data) = 0;
 
-#if __EFFEKSEER_BUILD_VERSION16__
 	/**
 		@brief
 		\~English set curve data into specified index
 		\~Japanese	指定されたインデックスにカーブを設定する。
 	*/
 	virtual void SetCurve(int32_t index, void* data) = 0;
-#endif
 
 	/**
 		@brief
@@ -2392,7 +2385,7 @@ public:
 struct EffectBasicRenderParameter
 {
 	int32_t ColorTextureIndex;
-#ifdef __EFFEKSEER_BUILD_VERSION16__
+
 	int32_t AlphaTextureIndex;
 	TextureWrapType AlphaTexWrapType;
 
@@ -2430,7 +2423,7 @@ struct EffectBasicRenderParameter
 		int32_t ColorBlendType;
 		float BeginColor[4];
 		float EndColor[4];
-		int32_t Pow = 1;
+		float Pow = 1.0f;
 	} FalloffParam;
 
 	int32_t EmissiveScaling;
@@ -2442,7 +2435,6 @@ struct EffectBasicRenderParameter
 		int32_t ColorScaling;
 	} EdgeParam;
 
-#endif
 	AlphaBlendType AlphaBlend;
 	TextureFilterType FilterType;
 	TextureWrapType WrapType;
@@ -2838,7 +2830,6 @@ public:
 	*/
 	virtual void SetMaterialLoader(MaterialLoader* loader) = 0;
 
-#if __EFFEKSEER_BUILD_VERSION16__
 	/**
 		@brief
 		\~English get a curve loader
@@ -2858,7 +2849,6 @@ public:
 		\~Japanese ローダー
 	*/
 	virtual void SetCurveLoader(CurveLoader* loader) = 0;
-#endif
 
 	/**
 		@brief	エフェクトを停止する。
@@ -4601,9 +4591,7 @@ private:
 	SoundLoader* m_soundLoader;
 	ModelLoader* m_modelLoader;
 	MaterialLoader* m_materialLoader = nullptr;
-#if __EFFEKSEER_BUILD_VERSION16__
 	CurveLoader* m_curveLoader = nullptr;
-#endif
 
 	std::vector<EffectFactory*> effectFactories;
 
@@ -4707,7 +4695,6 @@ public:
 		*/
 	void SetMaterialLoader(MaterialLoader* loader);
 
-#if __EFFEKSEER_BUILD_VERSION16__
 	/**
 		@brief
 		\~English get a curve loader
@@ -4727,7 +4714,6 @@ public:
 		\~Japanese ローダー
 	*/
 	void SetCurveLoader(CurveLoader* loader);
-#endif
 
 	/**
 		@brief

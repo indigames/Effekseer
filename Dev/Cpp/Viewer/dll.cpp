@@ -525,9 +525,7 @@ bool Native::CreateWindow_Effekseer(void* pHandle, int width, int height, bool i
 				// TODO : refactor
 				setting_->SetModelLoader(new ModelLoader(graphics_));
 
-#if __EFFEKSEER_BUILD_VERSION16__
 				setting_->SetCurveLoader(new ::Effekseer::CurveLoader());
-#endif
 			}
 
 			//manager_->SetSetting(setting_);
@@ -845,6 +843,7 @@ void* Native::RenderView(int32_t width, int32_t height)
 	mainScreenConfig_.DrawParameter = drawParameter;
 	mainScreenConfig_.CameraMatrix = viewPointCtrl_.GetCameraMatrix();
 	mainScreenConfig_.ProjectionMatrix = viewPointCtrl_.GetProjectionMatrix();
+	mainScreenConfig_.RenderMode = viewPointCtrl_.RenderingMode;
 	mainScreen_->SetConfig(mainScreenConfig_);
 	mainScreen_->Resize(Effekseer::Tool::Vector2DI(width, height));
 	mainScreen_->Render();

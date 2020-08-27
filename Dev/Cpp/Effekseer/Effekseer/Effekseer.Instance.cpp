@@ -12,9 +12,7 @@
 #include "Effekseer.Manager.h"
 #include "Effekseer.ManagerImplemented.h"
 #include "Effekseer.Model.h"
-#if __EFFEKSEER_BUILD_VERSION16__
 #include "Effekseer.Curve.h"
-#endif
 
 //----------------------------------------------------------------------------------
 //
@@ -173,10 +171,8 @@ Instance::Instance(Manager* pManager, EffectNode* pEffectNode, InstanceContainer
 	, m_ParentMatrix43Calculated(false)
 	, is_time_step_allowed(false)
 	, m_sequenceNumber(0)
-#ifdef __EFFEKSEER_BUILD_VERSION16__
 	, m_flipbookIndexAndNextRate(0)
 	, m_AlphaThreshold(0.0f)
-#endif
 {
 	m_generatedChildrenCount = m_fixedGeneratedChildrenCount;
 	maxGenerationChildrenCount = fixedMaxGenerationChildrenCount_;
@@ -191,24 +187,30 @@ Instance::Instance(Manager* pManager, EffectNode* pEffectNode, InstanceContainer
 	{
 		InstanceContainer* childContainer = m_pContainer->GetChild(i);
 
+		auto allocated = childContainer->CreateInstanceGroup();
+
+		// Lack of memory
+		if (allocated == nullptr)
+		{
+			break;
+		}
+	
 		if (group != NULL)
 		{
-			group->NextUsedByInstance = childContainer->CreateInstanceGroup();
-			group = group->NextUsedByInstance;
+			group->NextUsedByInstance = allocated;
+			group = allocated;
 		}
 		else
 		{
-			group = childContainer->CreateInstanceGroup();
+			group = allocated;
 			childrenGroups_ = group;
 		}
 	}
 
-#ifdef __EFFEKSEER_BUILD_VERSION16__
 	for (auto& it : uvTimeOffsets)
 	{
 		it = 0;
 	}
-#endif
 }
 
 //----------------------------------------------------------------------------------
@@ -256,7 +258,12 @@ void Instance::GenerateChildrenInRequired()
 	for (int32_t i = 0; i < parameter->GetChildrenCount(); i++, group = group->NextUsedByInstance)
 	{
 		auto node = (EffectNodeImplemented*)parameter->GetChild(i);
-		assert(group != NULL);
+
+		// Lack of memory
+		if (group == nullptr)
+		{
+			return;
+		}
 
 		while (true)
 		{
@@ -412,7 +419,7 @@ void Instance::FirstUpdate()
 		{
 			auto maxGene = static_cast<float>(pNode->CommonValues.MaxGeneration);
 			ApplyEq(maxGene, effect, instanceGlobal, &rand, pNode->CommonValues.RefEqMaxGeneration, maxGene);
-			maxGenerationChildrenCount[i] = maxGene;
+			maxGenerationChildrenCount[i] = static_cast<int32_t>(maxGene);
 		}
 		else
 		{
@@ -463,9 +470,7 @@ void Instance::FirstUpdate()
 
 	// 親の初期化
 	if (parameter->CommonValues.TranslationBindType == BindType::WhenCreating ||
-#ifdef __EFFEKSEER_BUILD_VERSION16__
 		parameter->CommonValues.TranslationBindType == TranslationParentBindType::WhenCreating_FollowParent ||
-#endif
 		parameter->CommonValues.RotationBindType == BindType::WhenCreating ||
 		parameter->CommonValues.ScalingBindType == BindType::WhenCreating)
 	{
@@ -483,7 +488,6 @@ void Instance::FirstUpdate()
 		ColorParent = m_pParent->ColorInheritance;
 	}
 
-#ifdef __EFFEKSEER_BUILD_VERSION16__
 	steeringVec_ = Vec3f(0, 0, 0);
 
 	if (m_pEffectNode->CommonValues.TranslationBindType == TranslationParentBindType::NotBind_FollowParent ||
@@ -492,7 +496,6 @@ void Instance::FirstUpdate()
 		followParentParam.maxFollowSpeed = m_pEffectNode->SteeringBehaviorParam.MaxFollowSpeed.getValue(rand);
 		followParentParam.steeringSpeed = m_pEffectNode->SteeringBehaviorParam.SteeringSpeed.getValue(rand) / 100.0f;
 	}
-#endif
 
 	// Translation
 	if (m_pEffectNode->TranslationType == ParameterTranslationType_Fixed)
@@ -533,9 +536,7 @@ void Instance::FirstUpdate()
 
 		prevPosition_ = translation_values.random.location;
 
-#ifdef __EFFEKSEER_BUILD_VERSION16__
 		steeringVec_ = translation_values.random.velocity;
-#endif
 	}
 	else if (m_pEffectNode->TranslationType == ParameterTranslationType_Easing)
 	{
@@ -567,7 +568,6 @@ void Instance::FirstUpdate()
 
 		prevPosition_ = translation_values.fcruve.offset + m_pEffectNode->TranslationFCurve->GetValues(m_LivingTime, m_LivedTime);
 	}
-#ifdef __EFFEKSEER_BUILD_VERSION16__
 	else if (m_pEffectNode->TranslationType == ParameterTranslationType_NurbsCurve)
 	{
 		// TODO refactoring
@@ -610,7 +610,6 @@ void Instance::FirstUpdate()
 		translation_values.view_offset.distance = m_pEffectNode->TranslationViewOffset.distance.getValue(rand);
 		prevPosition_ = {0, 0, 0};
 	}
-#endif
 
 	// Rotation
 	if (m_pEffectNode->RotationType == ParameterRotationType_Fixed)
@@ -979,7 +978,6 @@ void Instance::FirstUpdate()
 	}
 
 	// UV
-#ifdef __EFFEKSEER_BUILD_VERSION16__
 	for (int32_t i = 0; i < ParameterRendererCommon::UVParameterNum; i++)
 	{
 		const auto& UVType = m_pEffectNode->RendererCommon.UVTypes[i];
@@ -1031,10 +1029,10 @@ void Instance::FirstUpdate()
 		auto& nodeAlphaCutoffValue = m_pEffectNode->AlphaCutoff.FourPointInterpolation;
 
 		fpiValue.begin_threshold = nodeAlphaCutoffValue.BeginThreshold.getValue(rand);
-		fpiValue.transition_frame = nodeAlphaCutoffValue.TransitionFrameNum.getValue(rand);
+		fpiValue.transition_frame = static_cast<int32_t>(nodeAlphaCutoffValue.TransitionFrameNum.getValue(rand));
 		fpiValue.no2_threshold = nodeAlphaCutoffValue.No2Threshold.getValue(rand);
 		fpiValue.no3_threshold = nodeAlphaCutoffValue.No3Threshold.getValue(rand);
-		fpiValue.transition_frame2 = nodeAlphaCutoffValue.TransitionFrameNum2.getValue(rand);
+		fpiValue.transition_frame2 = static_cast<int32_t>(nodeAlphaCutoffValue.TransitionFrameNum2.getValue(rand));
 		fpiValue.end_threshold = nodeAlphaCutoffValue.EndThreshold.getValue(rand);
 	}
 	else if (m_pEffectNode->AlphaCutoff.Type == ParameterAlphaCutoff::EType::EASING)
@@ -1052,34 +1050,6 @@ void Instance::FirstUpdate()
 
 		fcurveValue.offset = nodeAlphaCutoffValue.Threshold->GetOffsets(rand);
 	}
-#else
-	if (m_pEffectNode->RendererCommon.UVType == ParameterRendererCommon::UV_ANIMATION)
-	{
-		uvTimeOffset = (int32_t)m_pEffectNode->RendererCommon.UV.Animation.StartFrame.getValue(rand);
-		uvTimeOffset *= m_pEffectNode->RendererCommon.UV.Animation.FrameLength;
-	}
-
-	if (m_pEffectNode->RendererCommon.UVType == ParameterRendererCommon::UV_SCROLL)
-	{
-		auto xy = m_pEffectNode->RendererCommon.UV.Scroll.Position.getValue(rand);
-		auto zw = m_pEffectNode->RendererCommon.UV.Scroll.Size.getValue(rand);
-
-		uvAreaOffset.X = xy.GetX();
-		uvAreaOffset.Y = xy.GetY();
-		uvAreaOffset.Width = zw.GetX();
-		uvAreaOffset.Height = zw.GetY();
-
-		uvScrollSpeed = m_pEffectNode->RendererCommon.UV.Scroll.Speed.getValue(rand);
-	}
-
-	if (m_pEffectNode->RendererCommon.UVType == ParameterRendererCommon::UV_FCURVE)
-	{
-		uvAreaOffset.X = m_pEffectNode->RendererCommon.UV.FCurve.Position->X.GetOffset(rand);
-		uvAreaOffset.Y = m_pEffectNode->RendererCommon.UV.FCurve.Position->Y.GetOffset(rand);
-		uvAreaOffset.Width = m_pEffectNode->RendererCommon.UV.FCurve.Size->X.GetOffset(rand);
-		uvAreaOffset.Height = m_pEffectNode->RendererCommon.UV.FCurve.Size->Y.GetOffset(rand);
-	}
-#endif
 
 	// CustomData
 	for (int32_t index = 0; index < 2; index++)
@@ -1253,7 +1223,6 @@ void Instance::Update(float deltaFrame, bool shown)
 		}
 	}
 
-#ifdef __EFFEKSEER_BUILD_VERSION16__
 	{
 		auto& CommonValue = m_pEffectNode->RendererCommon;
 		auto& UV = CommonValue.UVs[0];
@@ -1361,7 +1330,6 @@ void Instance::Update(float deltaFrame, bool shown)
 			m_AlphaThreshold /= 100.0f;
 		}
 	}
-#endif
 
 	if (killed)
 	{
@@ -1443,7 +1411,6 @@ void Instance::CalculateMatrix(float deltaFrame)
 			auto fcurve = m_pEffectNode->TranslationFCurve->GetValues(m_LivingTime, m_LivedTime);
 			localPosition = fcurve + translation_values.fcruve.offset;
 		}
-#if __EFFEKSEER_BUILD_VERSION16__
 		else if (m_pEffectNode->TranslationType == ParameterTranslationType_NurbsCurve)
 		{
 			auto& NurbsCurveParam = m_pEffectNode->TranslationNurbsCurve;
@@ -1484,7 +1451,7 @@ void Instance::CalculateMatrix(float deltaFrame)
 		{
 			localPosition = {0, 0, 0};
 		}
-#endif
+
 		// Velocitty
 		Vec3f localVelocity = Vec3f(0, 0, 0);
 		if (m_pEffectNode->LocalForceField.HasValue)
@@ -1492,7 +1459,6 @@ void Instance::CalculateMatrix(float deltaFrame)
 			localVelocity = localPosition - prevPosition_;
 		}
 
-#ifdef __EFFEKSEER_BUILD_VERSION16__
 		if (m_pEffectNode->CommonValues.TranslationBindType == TranslationParentBindType::NotBind_FollowParent ||
 			m_pEffectNode->CommonValues.TranslationBindType == TranslationParentBindType::WhenCreating_FollowParent)
 		{
@@ -1521,7 +1487,6 @@ void Instance::CalculateMatrix(float deltaFrame)
 			Vec3f followVelocity = steeringVec_ * deltaFrame * m_pEffectNode->m_effect->GetMaginification();
 			localPosition += followVelocity;
 		}
-#endif
 
 		prevPosition_ = localPosition;
 
@@ -1691,16 +1656,11 @@ void Instance::CalculateMatrix(float deltaFrame)
 			assert(m_GlobalMatrix43.IsValid());
 		}
 
-#ifdef __EFFEKSEER_BUILD_VERSION16__
 		if (m_pEffectNode->TranslationType != ParameterTranslationType_ViewOffset)
 		{
 			m_GlobalMatrix43 *= m_ParentMatrix;
 			assert(m_GlobalMatrix43.IsValid());
 		}
-#else
-		m_GlobalMatrix43 *= m_ParentMatrix;
-		assert(m_GlobalMatrix43.IsValid());
-#endif
 
 		if (m_pEffectNode->LocationAbs.type != LocationAbsType::None)
 		{
@@ -1726,24 +1686,16 @@ void Instance::CalculateParentMatrix(float deltaFrame)
 	// 親の行列を計算
 	m_pParent->CalculateMatrix(deltaFrame);
 
-#ifdef __EFFEKSEER_BUILD_VERSION16__
 	parentPosition_ = m_pParent->GetGlobalMatrix43().GetTranslation();
-#endif
 
 	if (m_pEffectNode->GetType() != EFFECT_NODE_TYPE_ROOT)
 	{
-#ifdef __EFFEKSEER_BUILD_VERSION16__
 		TranslationParentBindType tType = m_pEffectNode->CommonValues.TranslationBindType;
-#else
-		BindType tType = m_pEffectNode->CommonValues.TranslationBindType;
-#endif
 		BindType rType = m_pEffectNode->CommonValues.RotationBindType;
 		BindType sType = m_pEffectNode->CommonValues.ScalingBindType;
 
 		if (tType == BindType::WhenCreating 
-#ifdef __EFFEKSEER_BUILD_VERSION16__
 			|| tType == TranslationParentBindType::WhenCreating_FollowParent
-#endif
 			&& rType == BindType::WhenCreating && sType == BindType::WhenCreating)
 		{
 			// do not do anything
@@ -1759,9 +1711,7 @@ void Instance::CalculateParentMatrix(float deltaFrame)
 			Mat43f r;
 
 			if (tType == BindType::WhenCreating
-#ifdef __EFFEKSEER_BUILD_VERSION16__
 				|| tType == TranslationParentBindType::WhenCreating_FollowParent
-#endif
 				)
 				t = m_ParentMatrix.GetTranslation();
 			else
@@ -1924,7 +1874,6 @@ void Instance::Kill()
 //----------------------------------------------------------------------------------
 //
 //----------------------------------------------------------------------------------
-#ifdef __EFFEKSEER_BUILD_VERSION16__
 RectF Instance::GetUV(const int32_t index) const
 {
 	RectF uv(0.0f, 0.0f, 1.0f, 1.0f);
@@ -2030,107 +1979,6 @@ RectF Instance::GetUV(const int32_t index) const
 
 	return uv;
 }
-#else
-RectF Instance::GetUV() const
-{
-	RectF uv(0.0f, 0.0f, 1.0f, 1.0f);
-
-	if (m_pEffectNode->RendererCommon.UVType == ParameterRendererCommon::UV_DEFAULT)
-	{
-		return RectF(0.0f, 0.0f, 1.0f, 1.0f);
-	}
-	else if (m_pEffectNode->RendererCommon.UVType == ParameterRendererCommon::UV_FIXED)
-	{
-		uv = RectF(m_pEffectNode->RendererCommon.UV.Fixed.Position.x,
-				   m_pEffectNode->RendererCommon.UV.Fixed.Position.y,
-				   m_pEffectNode->RendererCommon.UV.Fixed.Position.w,
-				   m_pEffectNode->RendererCommon.UV.Fixed.Position.h);
-	}
-	else if (m_pEffectNode->RendererCommon.UVType == ParameterRendererCommon::UV_ANIMATION)
-	{
-		auto time = m_LivingTime + uvTimeOffset;
-
-		int32_t frameNum = (int32_t)(time / m_pEffectNode->RendererCommon.UV.Animation.FrameLength);
-		int32_t frameCount =
-			m_pEffectNode->RendererCommon.UV.Animation.FrameCountX * m_pEffectNode->RendererCommon.UV.Animation.FrameCountY;
-
-		if (m_pEffectNode->RendererCommon.UV.Animation.LoopType == m_pEffectNode->RendererCommon.UV.Animation.LOOPTYPE_ONCE)
-		{
-			if (frameNum >= frameCount)
-			{
-				frameNum = frameCount - 1;
-			}
-		}
-		else if (m_pEffectNode->RendererCommon.UV.Animation.LoopType == m_pEffectNode->RendererCommon.UV.Animation.LOOPTYPE_LOOP)
-		{
-			frameNum %= frameCount;
-		}
-		else if (m_pEffectNode->RendererCommon.UV.Animation.LoopType == m_pEffectNode->RendererCommon.UV.Animation.LOOPTYPE_REVERSELOOP)
-		{
-			bool rev = (frameNum / frameCount) % 2 == 1;
-			frameNum %= frameCount;
-			if (rev)
-			{
-				frameNum = frameCount - 1 - frameNum;
-			}
-		}
-
-		int32_t frameX = frameNum % m_pEffectNode->RendererCommon.UV.Animation.FrameCountX;
-		int32_t frameY = frameNum / m_pEffectNode->RendererCommon.UV.Animation.FrameCountX;
-
-		uv = RectF(m_pEffectNode->RendererCommon.UV.Animation.Position.x + m_pEffectNode->RendererCommon.UV.Animation.Position.w * frameX,
-				   m_pEffectNode->RendererCommon.UV.Animation.Position.y + m_pEffectNode->RendererCommon.UV.Animation.Position.h * frameY,
-				   m_pEffectNode->RendererCommon.UV.Animation.Position.w,
-				   m_pEffectNode->RendererCommon.UV.Animation.Position.h);
-	}
-	else if (m_pEffectNode->RendererCommon.UVType == ParameterRendererCommon::UV_SCROLL)
-	{
-		auto time = (int32_t)m_LivingTime;
-
-		uv = RectF(uvAreaOffset.X + uvScrollSpeed.GetX() * time,
-				   uvAreaOffset.Y + uvScrollSpeed.GetY() * time,
-				   uvAreaOffset.Width,
-				   uvAreaOffset.Height);
-	}
-	else if (m_pEffectNode->RendererCommon.UVType == ParameterRendererCommon::UV_FCURVE)
-	{
-		auto time = (int32_t)m_LivingTime;
-
-		auto fcurvePos = m_pEffectNode->RendererCommon.UV.FCurve.Position->GetValues(m_LivingTime, m_LivedTime);
-		auto fcurveSize = m_pEffectNode->RendererCommon.UV.FCurve.Size->GetValues(m_LivingTime, m_LivedTime);
-
-		uv = RectF(uvAreaOffset.X + fcurvePos.GetX(),
-				   uvAreaOffset.Y + fcurvePos.GetY(),
-				   uvAreaOffset.Width + fcurveSize.GetX(),
-				   uvAreaOffset.Height + fcurveSize.GetY());
-	}
-
-	// For webgl bug (it makes slow if sampling points are too far on WebGL)
-	float far = 4.0;
-
-	if (uv.X < -far && uv.X + uv.Width < -far)
-	{
-		uv.X += (-static_cast<int32_t>(uv.X) - far);
-	}
-
-	if (uv.X > far && uv.X + uv.Width > far)
-	{
-		uv.X -= (static_cast<int32_t>(uv.X) - far);
-	}
-
-	if (uv.Y < -far && uv.Y + uv.Height < -far)
-	{
-		uv.Y += (-static_cast<int32_t>(uv.Y) - far);
-	}
-
-	if (uv.Y > far && uv.Y + uv.Height > far)
-	{
-		uv.Y -= (static_cast<int32_t>(uv.Y) - far);
-	}
-
-	return uv;
-}
-#endif
 
 std::array<float, 4> Instance::GetCustomData(int32_t index) const
 {

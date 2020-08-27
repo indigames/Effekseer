@@ -861,10 +861,8 @@ namespace Effekseer.Data
 				Color_Easing = new ColorEasingParamater();
 				Color_FCurve = new ColorFCurveParameter();
 
-#if __EFFEKSEER_BUILD_VERSION16__
 				EnableFalloff = new Value.Boolean(false);
 				FalloffParam = new FalloffParameter();
-#endif
 			}
 
 			[Selector(ID = 0)]
@@ -885,7 +883,6 @@ namespace Effekseer.Data
 			[IO(Export = true)]
 			public ColorFCurveParameter Color_FCurve { get; private set; }
 
-#if __EFFEKSEER_BUILD_VERSION16__
 			[Selector(ID = 100)]
 			[IO(Export = true)]
 			[Key(key = "ModelParameter_EnableFalloff")]
@@ -911,14 +908,14 @@ namespace Effekseer.Data
 
 				[IO(Export = true)]
 				[Key(key = "FalloffParameter_Pow")]
-				public Value.Int Pow { get; private set; }
+				public Value.Float Pow { get; private set; }
 
 				public FalloffParameter()
 				{
 					ColorBlendType = new Value.Enum<BlendType>(BlendType.Add);
 					BeginColor = new Value.Color(0, 0, 0, 255);
 					EndColor = new Value.Color(255, 255, 255, 255);
-					Pow = new Value.Int(1, 100, 1);
+					Pow = new Value.Float(1, 100, 1);
 				}
 
 				public enum BlendType : int
@@ -934,7 +931,6 @@ namespace Effekseer.Data
 				}
 
 			}
-#endif
 		}
 
 		public class TrackParameter

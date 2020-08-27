@@ -102,9 +102,8 @@ void EffectNodeTrack::BeginRendering(int32_t count, Manager* manager)
 		m_nodeParameter.BasicParameterPtr = &RendererCommon.BasicParameter;
 		m_nodeParameter.TextureUVTypeParameterPtr = &TextureUVType;
 		m_nodeParameter.IsRightHand = manager->GetCoordinateSystem() == CoordinateSystem::RH;
-#ifdef __EFFEKSEER_BUILD_VERSION16__
 		m_nodeParameter.EnableViewOffset = (TranslationType == ParameterTranslationType_ViewOffset);
-#endif
+
 		renderer->BeginRendering(m_nodeParameter, count, m_userData);
 	}
 }
@@ -124,7 +123,6 @@ void EffectNodeTrack::BeginRenderingGroup(InstanceGroup* group, Manager* manager
 
 		if (group->GetFirst() != nullptr)
 		{
-#ifdef __EFFEKSEER_BUILD_VERSION16__
 			Instance* groupFirst = group->GetFirst();
 			m_instanceParameter.UV = groupFirst->GetUV(0);
 			m_instanceParameter.AlphaUV = groupFirst->GetUV(1);
@@ -141,9 +139,7 @@ void EffectNodeTrack::BeginRenderingGroup(InstanceGroup* group, Manager* manager
 			{
 				m_instanceParameter.ViewOffsetDistance = groupFirst->translation_values.view_offset.distance;
 			}
-#else
-			m_instanceParameter.UV = group->GetFirst()->GetUV();
-#endif
+
 			CalcCustomData(group->GetFirst(), m_instanceParameter.CustomData1, m_instanceParameter.CustomData2);
 		}
 
@@ -321,7 +317,7 @@ void EffectNodeTrack::SetValues(
 	}
 	else if (param.type == StandardColorParameter::FCurve_RGBA)
 	{
-		auto fcurveColors = param.fcurve_rgba.FCurve->GetValues(time, livedTime);
+		auto fcurveColors = param.fcurve_rgba.FCurve->GetValues(static_cast<float>(time), static_cast<float>(livedTime));
 		c.R = (uint8_t)Clamp((value.color.fcurve_rgba.offset[0] + fcurveColors[0]), 255, 0);
 		c.G = (uint8_t)Clamp((value.color.fcurve_rgba.offset[1] + fcurveColors[1]), 255, 0);
 		c.B = (uint8_t)Clamp((value.color.fcurve_rgba.offset[2] + fcurveColors[2]), 255, 0);

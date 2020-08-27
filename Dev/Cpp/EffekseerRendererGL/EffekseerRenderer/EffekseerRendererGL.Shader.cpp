@@ -6,6 +6,8 @@
 #include "EffekseerRendererGL.GLExtension.h"
 #include "EffekseerRendererGL.Renderer.h"
 
+#define __INTERNAL_DEBUG__
+
 #ifdef __ANDROID__
 
 #ifdef __ANDROID__DEBUG__
@@ -217,7 +219,7 @@ bool Shader::CompileShader(OpenGLDeviceType deviceType,
 	GLExt::glGetProgramiv(program, GL_LINK_STATUS, &res_link);
 
 #ifndef NDEBUG
-    if (res_link == GL_FALSE)
+	if (res_link == GL_FALSE)
 	{
 		// output errors
 		char log[512];
@@ -340,7 +342,17 @@ Shader::Shader(GraphicsDevice* graphicsDevice,
 //-----------------------------------------------------------------------------------
 GLint Shader::GetAttribId(const char* name) const
 {
-	return GLExt::glGetAttribLocation(m_program, name);
+	auto ret = GLExt::glGetAttribLocation(m_program, name);
+
+#ifdef __INTERNAL_DEBUG__
+	if (ret < 0)
+	{
+		std::string message = "Unused : " + name_ + " : " + std::string(name) + "\n";
+		LOG(message.c_str());
+	}
+#endif
+
+	return ret;
 }
 
 //-----------------------------------------------------------------------------------
@@ -348,7 +360,17 @@ GLint Shader::GetAttribId(const char* name) const
 //-----------------------------------------------------------------------------------
 GLint Shader::GetUniformId(const char* name) const
 {
-	return GLExt::glGetUniformLocation(m_program, name);
+	auto ret = GLExt::glGetUniformLocation(m_program, name);
+
+#ifdef __INTERNAL_DEBUG__
+	if (ret < 0)
+	{
+		std::string message = "Unused : " + name_ + " : " + std::string(name) + "\n";
+		LOG(message.c_str());
+	}
+#endif
+
+	return ret;
 }
 
 //-----------------------------------------------------------------------------------
@@ -421,6 +443,8 @@ void Shader::GetAttribIdList(int count, const ShaderAttribInfo* info)
 
 	m_aid.clear();
 
+	m_vertexSize = 0;
+
 	if (info != nullptr)
 	{
 		for (int i = 0; i < count; i++)
@@ -445,6 +469,18 @@ void Shader::GetAttribIdList(int count, const ShaderAttribInfo* info)
 			attribs[i].type = info[i].type;
 			attribs[i].offset = info[i].offset;
 			attribs[i].count = info[i].count;
+
+			int elementSize = 0;
+			if (attribs[i].type == GL_FLOAT)
+			{
+				elementSize = sizeof(float);
+			}
+			if (attribs[i].type == GL_UNSIGNED_BYTE)
+			{
+				elementSize = sizeof(uint8_t);
+			}
+
+			m_vertexSize = Effekseer::Max(m_vertexSize, attribs[i].offset + elementSize * attribs[i].count);
 		}
 	}
 	else
@@ -525,11 +561,6 @@ void Shader::SetVertex()
 										 (uint8_t*)vertices + m_layout[i].offset);
 		}
 	}
-}
-
-void Shader::SetVertexSize(int32_t vertexSize)
-{
-	m_vertexSize = vertexSize;
 }
 
 //-----------------------------------------------------------------------------------
@@ -653,16 +684,19 @@ void Shader::SetConstantBuffer()
 //-----------------------------------------------------------------------------------
 //
 //-----------------------------------------------------------------------------------
-void Shader::SetTextureSlot(int32_t index, GLuint value)
+void Shader::SetTextureSlot(int32_t index, GLint value)
 {
-	m_textureSlots[index] = value;
-	m_textureSlotEnables[index] = true;
+	if (value >= 0)
+	{
+		m_textureSlots[index] = value;
+		m_textureSlotEnables[index] = true;	
+	}
 }
 
 //-----------------------------------------------------------------------------------
 //
 //-----------------------------------------------------------------------------------
-GLuint Shader::GetTextureSlot(int32_t index)
+GLint Shader::GetTextureSlot(int32_t index)
 {
 	return m_textureSlots[index];
 }

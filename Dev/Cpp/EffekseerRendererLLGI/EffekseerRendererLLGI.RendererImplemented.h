@@ -65,14 +65,19 @@ protected:
 	IndexBuffer* m_indexBufferForWireframe = nullptr;
 	int32_t m_squareMaxCount;
 
-	Shader* m_shader = nullptr;
-	Shader* m_shader_lighting = nullptr;
-	Shader* m_shader_distortion = nullptr;
+	Shader* shader_ = nullptr;
+	Shader* shader_lit_ = nullptr;
+	Shader* shader_unlit_ = nullptr;
+
+	Shader* shader_ad_unlit_ = nullptr;
+	Shader* shader_ad_lit_ = nullptr;
+	Shader* shader_ad_distortion_ = nullptr;
+
 	Shader* currentShader = nullptr;
 
 	bool isReversedDepth_ = false;
 
-	EffekseerRenderer::StandardRenderer<RendererImplemented, Shader, Vertex, VertexDistortion>* m_standardRenderer;
+	EffekseerRenderer::StandardRenderer<RendererImplemented, Shader>* m_standardRenderer;
 
 	::Effekseer::CoordinateSystem m_coordinateSystem;
 
@@ -206,7 +211,7 @@ public:
 
 	void SetDistortingCallback(EffekseerRenderer::DistortingCallback* callback) override;
 
-	EffekseerRenderer::StandardRenderer<RendererImplemented, Shader, Vertex, VertexDistortion>* GetStandardRenderer()
+	EffekseerRenderer::StandardRenderer<RendererImplemented, Shader>* GetStandardRenderer()
 	{
 		return m_standardRenderer;
 	}
@@ -220,7 +225,7 @@ public:
 	void DrawSprites(int32_t spriteCount, int32_t vertexOffset);
 	void DrawPolygon(int32_t vertexCount, int32_t indexCount);
 
-	Shader* GetShader(bool useTexture, ::Effekseer::RendererMaterialType materialType) const;
+	Shader* GetShader(::EffekseerRenderer::StandardRendererShaderType type) const;
 	void BeginShader(Shader* shader);
 	void EndShader(Shader* shader);
 

@@ -85,9 +85,13 @@ private:
 	Shader* m_shader = nullptr;
 	Shader* m_shader_distortion = nullptr;
 	Shader* m_shader_lighting = nullptr;
+	Shader* m_shader_advanced = nullptr;
+	Shader* m_shader_advanced_distortion = nullptr;
+	Shader* m_shader_advanced_lighting = nullptr;
+
 	Shader* currentShader = nullptr;
 
-	EffekseerRenderer::StandardRenderer<RendererImplemented, Shader, Vertex, VertexDistortion>* m_standardRenderer;
+	EffekseerRenderer::StandardRenderer<RendererImplemented, Shader>* m_standardRenderer;
 
 	// 座標系
 	::Effekseer::CoordinateSystem m_coordinateSystem;
@@ -218,7 +222,7 @@ public:
 
 	void SetDistortingCallback(EffekseerRenderer::DistortingCallback* callback) override;
 
-	EffekseerRenderer::StandardRenderer<RendererImplemented, Shader, Vertex, VertexDistortion>* GetStandardRenderer()
+	EffekseerRenderer::StandardRenderer<RendererImplemented, Shader>* GetStandardRenderer()
 	{
 		return m_standardRenderer;
 	}
@@ -232,7 +236,7 @@ public:
 	void DrawSprites(int32_t spriteCount, int32_t vertexOffset);
 	void DrawPolygon(int32_t vertexCount, int32_t indexCount);
 
-	Shader* GetShader(bool useTexture, ::Effekseer::RendererMaterialType materialType) const;
+	Shader* GetShader(::EffekseerRenderer::StandardRendererShaderType type) const;
 	void BeginShader(Shader* shader);
 	void EndShader(Shader* shader);
 

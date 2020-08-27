@@ -113,7 +113,8 @@ MaterialLoader ::~MaterialLoader()
 									binary->GetPixelShaderSize(shaderTypes[st]),
 									"MaterialStandardRenderer",
 									decl,
-									ARRAYSIZE(decl));
+									ARRAYSIZE(decl),
+									true);
 		}
 		else
 		{
@@ -142,6 +143,9 @@ MaterialLoader ::~MaterialLoader()
 					return DXGI_FORMAT_R32G32B32_FLOAT;
 				if (i == 4)
 					return DXGI_FORMAT_R32G32B32A32_FLOAT;
+
+				assert(0);
+				return DXGI_FORMAT_R32_FLOAT;
 			};
 			if (material.GetCustomData1Count() > 0)
 			{
@@ -171,7 +175,8 @@ MaterialLoader ::~MaterialLoader()
 									binary->GetPixelShaderSize(shaderTypes[st]),
 									"MaterialStandardRenderer",
 									decl,
-									count);
+									count,
+									true);
 		}
 
 		if (shader == nullptr)
@@ -181,10 +186,7 @@ MaterialLoader ::~MaterialLoader()
 		auto pixelUniformSize = parameterGenerator.PixelShaderUniformBufferSize;
 
 		shader->SetVertexConstantBufferSize(vertexUniformSize);
-		shader->SetVertexRegisterCount(vertexUniformSize / (sizeof(float) * 4));
-
 		shader->SetPixelConstantBufferSize(pixelUniformSize);
-		shader->SetPixelRegisterCount(pixelUniformSize / (sizeof(float) * 4));
 
 		materialData->TextureCount = material.GetTextureCount();
 		materialData->UniformCount = material.GetUniformCount();
@@ -223,7 +225,8 @@ MaterialLoader ::~MaterialLoader()
 									 binary->GetPixelShaderSize(shaderTypesModel[st]),
 									 "MaterialStandardModelRenderer",
 									 decl,
-									 ARRAYSIZE(decl));
+									 ARRAYSIZE(decl),
+									 true);
 		if (shader == nullptr)
 			return false;
 
@@ -231,10 +234,7 @@ MaterialLoader ::~MaterialLoader()
 		auto pixelUniformSize = parameterGenerator.PixelShaderUniformBufferSize;
 
 		shader->SetVertexConstantBufferSize(vertexUniformSize);
-		shader->SetVertexRegisterCount(vertexUniformSize / (sizeof(float) * 4));
-
 		shader->SetPixelConstantBufferSize(pixelUniformSize);
-		shader->SetPixelRegisterCount(pixelUniformSize / (sizeof(float) * 4));
 
 		if (st == 0)
 		{

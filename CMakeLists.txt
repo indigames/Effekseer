@@ -13,7 +13,7 @@ option(BUILD_VIEWER "Build viewer" OFF)
 option(BUILD_EDITOR "Build editor" OFF)
 option(BUILD_TEST "Build test" OFF)
 option(BUILD_EXAMPLES "Build examples" ON)
-option(BUILD_VERSION16 "is built as version1.6" OFF)
+option(BUILD_VERSION17 "is built as version1.7" OFF)
 option(BUILD_UNITYPLUGIN "is built as unity plugin" OFF)
 option(FROM_CI "from ci" OFF)
 option(SANITIZE_ENABLED "is sanitizer enabled" OFF)
@@ -71,7 +71,7 @@ if (BUILD_DX12)
 endif()
 
 if (BUILD_VERSION16)
-    add_definitions(-D__EFFEKSEER_BUILD_VERSION16__)
+    add_definitions(-D__EFFEKSEER_BUILD_VERSION17__)
 endif()
 
 # for linux
@@ -320,6 +320,9 @@ include(FilterFolder)
 add_subdirectory(Dev)
 
 if(BUILD_EXAMPLES)
+    # To use glfw in OpenGL projects
+    add_dependencies(EffekseerRendererGL ExternalProject_glfw)
+
     set(EFK_RUNTIME_ROOT ${CMAKE_CURRENT_LIST_DIR}/Dev/Cpp)
     add_subdirectory(Examples)
 endif()
