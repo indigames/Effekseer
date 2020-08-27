@@ -27,7 +27,8 @@ struct DynamicVertex
 	//! packed vector
 	VertexColor Tangent;
 
-	union {
+	union
+	{
 		//! UV1 (for template)
 		float UV[2];
 		float UV1[2];
@@ -63,9 +64,22 @@ struct DynamicVertex
 	{
 	}
 
-	void SetColor(const VertexColor& color)
+	void SetColor(const VertexColor& color, bool flipRGB)
 	{
 		Col = color;
+
+		if (flipRGB)
+		{
+			std::swap(Col.R, Col.B);
+		}
+	}
+
+	void SetTangent(const VertexFloat3& tangent)
+	{
+	}
+
+	void SetBinormal(const VertexFloat3& binormal)
+	{
 	}
 
 	void SetPackedNormal(const VertexColor& normal)
@@ -101,7 +115,8 @@ struct LightingVertex
 	//! packed vector
 	VertexColor Tangent;
 
-	union {
+	union
+	{
 		//! UV1 (for template)
 		float UV[2];
 		float UV1[2];
@@ -109,48 +124,44 @@ struct LightingVertex
 
 	float UV2[2];
 
-#ifdef __EFFEKSEER_BUILD_VERSION16__
-	float AlphaUV[2];
-	float UVDistortionUV[2];
-	float BlendUV[2];
-	float BlendAlphaUV[2];
-	float BlendUVDistortionUV[2];
-	float FlipbookIndexAndNextRate;
-	float AlphaThreshold;
-
 	void SetAlphaUV(float value, int index)
 	{
-		AlphaUV[index] = value;
 	}
 	void SetUVDistortionUV(float value, int index)
 	{
-		UVDistortionUV[index] = value;
 	}
 	void SetBlendUV(float value, int index)
 	{
-		BlendUV[index] = value;
 	}
 	void SetBlendAlphaUV(float value, int index)
 	{
-		BlendAlphaUV[index] = value;
 	}
 	void SetBlendUVDistortionUV(float value, int index)
 	{
-		BlendUVDistortionUV[index] = value;
 	}
 	void SetFlipbookIndexAndNextRate(float value)
 	{
-		FlipbookIndexAndNextRate = value;
 	}
 	void SetAlphaThreshold(float value)
 	{
-		AlphaThreshold = value;
 	}
-#endif
 
-	void SetColor(const VertexColor& color)
+	void SetColor(const VertexColor& color, bool flipRGB)
 	{
 		Col = color;
+
+		if (flipRGB)
+		{
+			std::swap(Col.R, Col.B);
+		}
+	}
+
+	void SetTangent(const VertexFloat3& tangent)
+	{
+	}
+
+	void SetBinormal(const VertexFloat3& binormal)
+	{
 	}
 
 	void SetPackedNormal(const VertexColor& normal)
@@ -173,130 +184,53 @@ struct LightingVertex
 struct SimpleVertex
 {
 	VertexFloat3 Pos;
-	uint8_t Col[4];
+	VertexColor Col;
 
-	union {
+	union
+	{
 		float UV[2];
 		//! dummy for template
 		float UV2[2];
 	};
 
-#ifdef __EFFEKSEER_BUILD_VERSION16__
-	float AlphaUV[2];
-	float UVDistortionUV[2];
-	float BlendUV[2];
-	float BlendAlphaUV[2];
-	float BlendUVDistortionUV[2];
-	float FlipbookIndexAndNextRate;
-	float AlphaThreshold;
-
 	void SetAlphaUV(float value, int index)
 	{
-		AlphaUV[index] = value;
 	}
 	void SetUVDistortionUV(float value, int index)
 	{
-		UVDistortionUV[index] = value;
 	}
 	void SetBlendUV(float value, int index)
 	{
-		BlendUV[index] = value;
 	}
 	void SetBlendAlphaUV(float value, int index)
 	{
-		BlendAlphaUV[index] = value;
 	}
 	void SetBlendUVDistortionUV(float value, int index)
 	{
-		BlendUVDistortionUV[index] = value;
 	}
 	void SetFlipbookIndexAndNextRate(float value)
 	{
-		FlipbookIndexAndNextRate = value;
 	}
 	void SetAlphaThreshold(float value)
 	{
-		AlphaThreshold = value;
 	}
-#endif
 
-	void SetColor(const ::Effekseer::Color& color)
+	void SetColor(const VertexColor& color, bool flipRGB)
 	{
-		Col[0] = color.R;
-		Col[1] = color.G;
-		Col[2] = color.B;
-		Col[3] = color.A;
+		Col = color;
+
+		if (flipRGB)
+		{
+			std::swap(Col.R, Col.B);
+		}
 	}
 
-	void SetPackedNormal(const VertexColor& normal)
-	{
-	}
-
-	void SetPackedTangent(const VertexColor& tangent)
+	void SetTangent(const VertexFloat3& tangent)
 	{
 	}
 
-	void SetUV2(float u, float v)
+	void SetBinormal(const VertexFloat3& binormal)
 	{
-	}
-};
-
-struct SimpleVertexDX9
-{
-	VertexFloat3 Pos;
-	uint8_t Col[4];
-
-	union {
-		float UV[2];
-		//! dummy for template
-		float UV2[2];
-	};
-
-#ifdef __EFFEKSEER_BUILD_VERSION16__
-	float AlphaUV[2];
-	float UVDistortionUV[2];
-	float BlendUV[2];
-	float BlendAlphaUV[2];
-	float BlendUVDistortionUV[2];
-	float FlipbookIndexAndNextRate;
-	float AlphaThreshold;
-
-	void SetAlphaUV(float value, int index)
-	{
-		AlphaUV[index] = value;
-	}
-	void SetUVDistortionUV(float value, int index)
-	{
-		UVDistortionUV[index] = value;
-	}
-	void SetBlendUV(float value, int index)
-	{
-		BlendUV[index] = value;
-	}
-	void SetBlendAlphaUV(float value, int index)
-	{
-		BlendAlphaUV[index] = value;
-	}
-	void SetBlendUVDistortionUV(float value, int index)
-	{
-		BlendUVDistortionUV[index] = value;
-	}
-	void SetFlipbookIndexAndNextRate(float value)
-	{
-		FlipbookIndexAndNextRate = value;
-	}
-	void SetAlphaThreshold(float value)
-	{
-		AlphaThreshold = value;
-	}
-#endif
-
-	void SetColor(const ::Effekseer::Color& color)
-	{
-		Col[0] = color.B;
-		Col[1] = color.G;
-		Col[2] = color.R;
-		Col[3] = color.A;
 	}
 
 	void SetPackedNormal(const VertexColor& normal)
@@ -315,9 +249,10 @@ struct SimpleVertexDX9
 struct VertexDistortion
 {
 	VertexFloat3 Pos;
-	uint8_t Col[4];
+	VertexColor Col;
 
-	union {
+	union
+	{
 		float UV[2];
 		//! dummy for template
 		float UV2[2];
@@ -326,51 +261,46 @@ struct VertexDistortion
 	VertexFloat3 Binormal;
 	VertexFloat3 Tangent;
 
-#ifdef __EFFEKSEER_BUILD_VERSION16__
-	float AlphaUV[2];
-	float UVDistortionUV[2];
-	float BlendUV[2];
-	float BlendAlphaUV[2];
-	float BlendUVDistortionUV[2];
-	float FlipbookIndexAndNextRate;
-	float AlphaThreshold;
-
 	void SetAlphaUV(float value, int index)
 	{
-		AlphaUV[index] = value;
 	}
 	void SetUVDistortionUV(float value, int index)
 	{
-		UVDistortionUV[index] = value;
 	}
 	void SetBlendUV(float value, int index)
 	{
-		BlendUV[index] = value;
 	}
 	void SetBlendAlphaUV(float value, int index)
 	{
-		BlendAlphaUV[index] = value;
 	}
 	void SetBlendUVDistortionUV(float value, int index)
 	{
-		BlendUVDistortionUV[index] = value;
 	}
 	void SetFlipbookIndexAndNextRate(float value)
 	{
-		FlipbookIndexAndNextRate = value;
 	}
 	void SetAlphaThreshold(float value)
 	{
-		AlphaThreshold = value;
 	}
-#endif
 
-	void SetColor(const ::Effekseer::Color& color)
+	void SetColor(const VertexColor& color, bool flipRGB)
 	{
-		Col[0] = color.R;
-		Col[1] = color.G;
-		Col[2] = color.B;
-		Col[3] = color.A;
+		Col = color;
+
+		if (flipRGB)
+		{
+			std::swap(Col.R, Col.B);
+		}
+	}
+
+	void SetTangent(const VertexFloat3& tangent)
+	{
+		Tangent = tangent;
+	}
+
+	void SetBinormal(const VertexFloat3& binormal)
+	{
+		Binormal = binormal;
 	}
 
 	void SetPackedNormal(const VertexColor& normal)
@@ -386,21 +316,24 @@ struct VertexDistortion
 	}
 };
 
-struct VertexDistortionDX9
+struct AdvancedLightingVertex
 {
 	VertexFloat3 Pos;
-	uint8_t Col[4];
+	VertexColor Col;
+	//! packed vector
+	VertexColor Normal;
+	//! packed vector
+	VertexColor Tangent;
 
-	union {
+	union
+	{
+		//! UV1 (for template)
 		float UV[2];
-		//! dummy for template
-		float UV2[2];
+		float UV1[2];
 	};
 
-	VertexFloat3 Binormal;
-	VertexFloat3 Tangent;
+	float UV2[2];
 
-#ifdef __EFFEKSEER_BUILD_VERSION16__
 	float AlphaUV[2];
 	float UVDistortionUV[2];
 	float BlendUV[2];
@@ -437,14 +370,192 @@ struct VertexDistortionDX9
 	{
 		AlphaThreshold = value;
 	}
-#endif
 
-	void SetColor(const ::Effekseer::Color& color)
+	void SetColor(const VertexColor& color, bool flipRGB)
 	{
-		Col[0] = color.B;
-		Col[1] = color.G;
-		Col[2] = color.R;
-		Col[3] = color.A;
+		Col = color;
+
+		if (flipRGB)
+		{
+			std::swap(Col.R, Col.B);
+		}
+	}
+
+	void SetTangent(const VertexFloat3& tangent)
+	{
+	}
+
+	void SetBinormal(const VertexFloat3& binormal)
+	{
+	}
+
+	void SetPackedNormal(const VertexColor& normal)
+	{
+		Normal = normal;
+	}
+
+	void SetPackedTangent(const VertexColor& tangent)
+	{
+		Tangent = tangent;
+	}
+
+	void SetUV2(float u, float v)
+	{
+		UV2[0] = u;
+		UV2[1] = v;
+	}
+};
+
+struct AdvancedSimpleVertex
+{
+	VertexFloat3 Pos;
+	VertexColor Col;
+
+	union
+	{
+		float UV[2];
+		//! dummy for template
+		float UV2[2];
+	};
+
+	float AlphaUV[2];
+	float UVDistortionUV[2];
+	float BlendUV[2];
+	float BlendAlphaUV[2];
+	float BlendUVDistortionUV[2];
+	float FlipbookIndexAndNextRate;
+	float AlphaThreshold;
+
+	void SetAlphaUV(float value, int index)
+	{
+		AlphaUV[index] = value;
+	}
+	void SetUVDistortionUV(float value, int index)
+	{
+		UVDistortionUV[index] = value;
+	}
+	void SetBlendUV(float value, int index)
+	{
+		BlendUV[index] = value;
+	}
+	void SetBlendAlphaUV(float value, int index)
+	{
+		BlendAlphaUV[index] = value;
+	}
+	void SetBlendUVDistortionUV(float value, int index)
+	{
+		BlendUVDistortionUV[index] = value;
+	}
+	void SetFlipbookIndexAndNextRate(float value)
+	{
+		FlipbookIndexAndNextRate = value;
+	}
+	void SetAlphaThreshold(float value)
+	{
+		AlphaThreshold = value;
+	}
+
+	void SetColor(const VertexColor& color, bool flipRGB)
+	{
+		Col = color;
+
+		if (flipRGB)
+		{
+			std::swap(Col.R, Col.B);
+		}
+	}
+
+	void SetTangent(const VertexFloat3& tangent)
+	{
+	}
+
+	void SetBinormal(const VertexFloat3& binormal)
+	{
+	}
+
+	void SetPackedNormal(const VertexColor& normal)
+	{
+	}
+
+	void SetPackedTangent(const VertexColor& tangent)
+	{
+	}
+
+	void SetUV2(float u, float v)
+	{
+	}
+};
+
+struct AdvancedVertexDistortion
+{
+	VertexFloat3 Pos;
+	VertexColor Col;
+
+	union
+	{
+		float UV[2];
+		//! dummy for template
+		float UV2[2];
+	};
+
+	VertexFloat3 Binormal;
+	VertexFloat3 Tangent;
+
+	float AlphaUV[2];
+	float UVDistortionUV[2];
+	float BlendUV[2];
+	float BlendAlphaUV[2];
+	float BlendUVDistortionUV[2];
+	float FlipbookIndexAndNextRate;
+	float AlphaThreshold;
+
+	void SetAlphaUV(float value, int index)
+	{
+		AlphaUV[index] = value;
+	}
+	void SetUVDistortionUV(float value, int index)
+	{
+		UVDistortionUV[index] = value;
+	}
+	void SetBlendUV(float value, int index)
+	{
+		BlendUV[index] = value;
+	}
+	void SetBlendAlphaUV(float value, int index)
+	{
+		BlendAlphaUV[index] = value;
+	}
+	void SetBlendUVDistortionUV(float value, int index)
+	{
+		BlendUVDistortionUV[index] = value;
+	}
+	void SetFlipbookIndexAndNextRate(float value)
+	{
+		FlipbookIndexAndNextRate = value;
+	}
+	void SetAlphaThreshold(float value)
+	{
+		AlphaThreshold = value;
+	}
+
+	void SetColor(const VertexColor& color, bool flipRGB)
+	{
+		Col = color;
+
+		if (flipRGB)
+		{
+			std::swap(Col.R, Col.B);
+		}
+	}
+
+	void SetTangent(const VertexFloat3& tangent)
+	{
+		Tangent = tangent;
+	}
+
+	void SetBinormal(const VertexFloat3& binormal)
+	{
+		Binormal = binormal;
 	}
 
 	void SetPackedNormal(const VertexColor& normal)
@@ -462,11 +573,64 @@ struct VertexDistortionDX9
 
 static int32_t GetMaximumVertexSizeInAllTypes()
 {
-	size_t size = sizeof(SimpleVertex);
+	size_t size = sizeof(DynamicVertexWithCustomData);
 	size = (std::max)(size, sizeof(VertexDistortion));
-	size = (std::max)(size, sizeof(DynamicVertexWithCustomData));
+	size = (std::max)(size, sizeof(SimpleVertex));
+	size = (std::max)(size, sizeof(LightingVertex));
+	size = (std::max)(size, sizeof(AdvancedVertexDistortion));
+	size = (std::max)(size, sizeof(AdvancedSimpleVertex));
+	size = (std::max)(size, sizeof(AdvancedLightingVertex));
+
 	return static_cast<int32_t>(size);
 };
+
+template <typename T>
+inline bool IsDistortionVertex()
+{
+	return false;
+}
+
+template <>
+inline bool IsDistortionVertex<VertexDistortion>()
+{
+	return true;
+}
+
+template <>
+inline bool IsDistortionVertex<AdvancedVertexDistortion>()
+{
+	return true;
+}
+
+template <typename T>
+inline bool IsDynamicVertex()
+{
+	return false;
+}
+
+template <>
+inline bool IsDynamicVertex<DynamicVertex>()
+{
+	return true;
+}
+
+template <typename T>
+inline bool IsLightingVertex()
+{
+	return false;
+}
+
+template <>
+inline bool IsLightingVertex<LightingVertex>()
+{
+	return true;
+}
+
+template <>
+inline bool IsLightingVertex<AdvancedLightingVertex>()
+{
+	return true;
+}
 
 /**
 	@brief	a view class to access an array with a stride
@@ -501,112 +665,6 @@ struct StrideView
 		assert(i + offset_ < elementCount_);
 #endif
 		return *reinterpret_cast<T*>((pointer_ + stride_ * i));
-	}
-
-	StrideView& operator+=(const int& rhs)
-	{
-#ifndef NDEBUG
-		offset_ += rhs;
-#endif
-		pointer_ += stride_ * rhs;
-		return *this;
-	}
-
-	void Reset()
-	{
-#ifndef NDEBUG
-		offset_ = 0;
-#endif
-		pointer_ = pointerOrigin_;
-	}
-};
-
-/**
-	@brief	a view class to access an array with a stride
-*/
-template <>
-struct StrideView<SimpleVertex>
-{
-	static const int32_t stride_ = sizeof(SimpleVertex);
-	uint8_t* pointer_;
-	uint8_t* pointerOrigin_;
-
-#ifndef NDEBUG
-	int32_t offset_;
-	int32_t elementCount_;
-#endif
-
-	StrideView(void* pointer, int32_t stride, int32_t elementCount)
-		: pointer_(reinterpret_cast<uint8_t*>(pointer))
-		, pointerOrigin_(reinterpret_cast<uint8_t*>(pointer))
-#ifndef NDEBUG
-		, offset_(0)
-		, elementCount_(elementCount)
-#endif
-	{
-		assert(stride_ == stride);
-	}
-
-	SimpleVertex& operator[](int i) const
-	{
-#ifndef NDEBUG
-		assert(i >= 0);
-		assert(i + offset_ < elementCount_);
-#endif
-		return *reinterpret_cast<SimpleVertex*>((pointer_ + stride_ * i));
-	}
-
-	StrideView& operator+=(const int& rhs)
-	{
-#ifndef NDEBUG
-		offset_ += rhs;
-#endif
-		pointer_ += stride_ * rhs;
-		return *this;
-	}
-
-	void Reset()
-	{
-#ifndef NDEBUG
-		offset_ = 0;
-#endif
-		pointer_ = pointerOrigin_;
-	}
-};
-
-/**
-	@brief	a view class to access an array with a stride
-*/
-template <>
-struct StrideView<SimpleVertexDX9>
-{
-	static const int32_t stride_ = sizeof(SimpleVertexDX9);
-	uint8_t* pointer_;
-	uint8_t* pointerOrigin_;
-
-#ifndef NDEBUG
-	int32_t offset_;
-	int32_t elementCount_;
-#endif
-
-	StrideView(void* pointer, int32_t stride, int32_t elementCount)
-		: pointer_(reinterpret_cast<uint8_t*>(pointer))
-		, pointerOrigin_(reinterpret_cast<uint8_t*>(pointer))
-#ifndef NDEBUG
-		, offset_(0)
-		, elementCount_(elementCount)
-#endif
-	{
-		assert(stride_ == stride);
-	}
-
-	SimpleVertexDX9& operator[](int i) const
-	{
-#ifndef NDEBUG
-		assert(i >= 0);
-		assert(i + offset_ < elementCount_);
-#endif
-		return *reinterpret_cast<SimpleVertexDX9*>((pointer_ + stride_ * i));
 	}
 
 	StrideView& operator+=(const int& rhs)
@@ -686,7 +744,6 @@ void ApplyDepthParameters(::Effekseer::Mat44f& mat,
 						  ::Effekseer::NodeRendererDepthParameter* depthParameter,
 						  bool isRightHand);
 
-#ifdef __EFFEKSEER_BUILD_VERSION16__
 void ApplyViewOffset(::Effekseer::Mat43f& mat,
 					 const ::Effekseer::Mat44f& camera,
 					 float distance);
@@ -694,7 +751,6 @@ void ApplyViewOffset(::Effekseer::Mat43f& mat,
 void ApplyViewOffset(::Effekseer::Mat44f& mat,
 					 const ::Effekseer::Mat44f& camera,
 					 float distance);
-#endif
 
 template <typename Vertex>
 inline void TransformStandardVertexes(Vertex& vertexes, int32_t count, const ::Effekseer::Mat43f& mat)
@@ -759,17 +815,7 @@ inline void TransformVertexes(StrideView<VertexDistortion>& v, int32_t count, co
 	TransformDistortionVertexes(v, count, mat);
 }
 
-inline void TransformVertexes(StrideView<VertexDistortionDX9>& v, int32_t count, const ::Effekseer::Mat43f& mat)
-{
-	TransformDistortionVertexes(v, count, mat);
-}
-
 inline void TransformVertexes(StrideView<SimpleVertex>& v, int32_t count, const ::Effekseer::Mat43f& mat)
-{
-	TransformStandardVertexes(v, count, mat);
-}
-
-inline void TransformVertexes(StrideView<SimpleVertexDX9>& v, int32_t count, const ::Effekseer::Mat43f& mat)
 {
 	TransformStandardVertexes(v, count, mat);
 }
@@ -780,6 +826,21 @@ inline void TransformVertexes(StrideView<DynamicVertex>& v, int32_t count, const
 }
 
 inline void TransformVertexes(StrideView<LightingVertex>& v, int32_t count, const ::Effekseer::Mat43f& mat)
+{
+	TransformStandardVertexes(v, count, mat);
+}
+
+inline void TransformVertexes(StrideView<AdvancedVertexDistortion>& v, int32_t count, const ::Effekseer::Mat43f& mat)
+{
+	TransformDistortionVertexes(v, count, mat);
+}
+
+inline void TransformVertexes(StrideView<AdvancedSimpleVertex>& v, int32_t count, const ::Effekseer::Mat43f& mat)
+{
+	TransformStandardVertexes(v, count, mat);
+}
+
+inline void TransformVertexes(StrideView<AdvancedLightingVertex>& v, int32_t count, const ::Effekseer::Mat43f& mat)
 {
 	TransformStandardVertexes(v, count, mat);
 }

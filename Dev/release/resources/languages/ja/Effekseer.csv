@@ -4,6 +4,7 @@ AttractionForces,力場(ローカル)
 AutoConnect,切断時、自動接続を一定時間ごとに行う
 BasicRenderSettings,描画共通
 AdvancedRenderSettings,描画共通(高度)
+AdvancedRenderSettings2,描画共通(高度2)
 BasicSettings,共通
 Behavior,振る舞い
 CameraMode,カメラの種類
@@ -278,3 +279,6 @@ FCurve_Desc,Fカーブ
 ,
 Recording_Scale_Name,Scale
 Recording_Scale_Desc,Enlarge the area to record images.
+,
+PermissionError_File,ファイル {0} を読み込めません。アクセス権限がない可能性があります。
+PermissionError_File_Mac,エフェクトに関連するファイルをホームディレクトリにファイルを移動すると解決する場合があります。

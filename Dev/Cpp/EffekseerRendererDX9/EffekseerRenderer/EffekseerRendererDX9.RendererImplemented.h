@@ -19,8 +19,8 @@
 namespace EffekseerRendererDX9
 {
 
-using Vertex = EffekseerRenderer::SimpleVertexDX9;
-using VertexDistortion = EffekseerRenderer::VertexDistortionDX9;
+using Vertex = EffekseerRenderer::SimpleVertex;
+using VertexDistortion = EffekseerRenderer::VertexDistortion;
 
 /**
 	@brief	描画クラス
@@ -42,9 +42,12 @@ private:
 	Shader* m_shader = nullptr;
 	Shader* m_shader_distortion = nullptr;
 	Shader* m_shader_lighting = nullptr;
+	Shader* m_shader_ad = nullptr;
+	Shader* m_shader_ad_distortion = nullptr;
+	Shader* m_shader_ad_lighting = nullptr;
 	Shader* currentShader = nullptr;
 
-	EffekseerRenderer::StandardRenderer<RendererImplemented, Shader, Vertex, VertexDistortion>* m_standardRenderer;
+	EffekseerRenderer::StandardRenderer<RendererImplemented, Shader>* m_standardRenderer;
 
 	::Effekseer::Matrix44 m_proj;
 	::Effekseer::Matrix44 m_camera;
@@ -228,7 +231,7 @@ public:
 
 	void SetDistortingCallback(EffekseerRenderer::DistortingCallback* callback) override;
 
-	EffekseerRenderer::StandardRenderer<RendererImplemented, Shader, Vertex, VertexDistortion>* GetStandardRenderer()
+	EffekseerRenderer::StandardRenderer<RendererImplemented, Shader>* GetStandardRenderer()
 	{
 		return m_standardRenderer;
 	}
@@ -242,7 +245,7 @@ public:
 	void DrawSprites(int32_t spriteCount, int32_t vertexOffset);
 	void DrawPolygon(int32_t vertexCount, int32_t indexCount);
 
-	Shader* GetShader(bool useTexture, ::Effekseer::RendererMaterialType materialType) const;
+	Shader* GetShader(::EffekseerRenderer::StandardRendererShaderType type) const;
 	void BeginShader(Shader* shader);
 	void EndShader(Shader* shader);
 

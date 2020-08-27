@@ -34,83 +34,77 @@
 namespace EffekseerRendererDX9
 {
 
-#ifdef __EFFEKSEER_BUILD_VERSION16__
+namespace Standard_VS_Ad
+{
+static
+#include "ShaderHeader/EffekseerRenderer.Standard_VS.h"
+} // namespace Standard_VS_Ad
+
+namespace Standard_PS_Ad
+{
+static
+#include "ShaderHeader/EffekseerRenderer.Standard_PS.h"
+} // namespace Standard_PS_Ad
+
+namespace Standard_Distortion_VS_Ad
+{
+static
+#include "ShaderHeader/EffekseerRenderer.Standard_Distortion_VS.h"
+} // namespace Standard_Distortion_VS_Ad
+
+namespace Standard_Distortion_PS_Ad
+{
+static
+#include "ShaderHeader/EffekseerRenderer.Standard_Distortion_PS.h"
+} // namespace Standard_Distortion_PS_Ad
+
+namespace Standard_Lighting_VS_Ad
+{
+static
+#include "ShaderHeader/EffekseerRenderer.Standard_Lighting_VS.h"
+} // namespace Standard_Lighting_VS_Ad
+
+namespace Standard_Lighting_PS_Ad
+{
+static
+#include "ShaderHeader/EffekseerRenderer.Standard_Lighting_PS.h"
+} // namespace Standard_Lighting_PS_Ad
 
 namespace Standard_VS
 {
 static
-#include "Shader/EffekseerRenderer.Standard_VS.h"
+#include "ShaderHeader/sprite_unlit_vs.h"
 } // namespace Standard_VS
 
 namespace Standard_PS
 {
 static
-#include "Shader/EffekseerRenderer.Standard_PS.h"
+#include "ShaderHeader/sprite_unlit_ps.h"
 } // namespace Standard_PS
 
 namespace Standard_Distortion_VS
 {
 static
-#include "Shader/EffekseerRenderer.Standard_Distortion_VS.h"
+#include "ShaderHeader/sprite_distortion_vs.h"
 } // namespace Standard_Distortion_VS
 
 namespace Standard_Distortion_PS
 {
 static
-#include "Shader/EffekseerRenderer.Standard_Distortion_PS.h"
+#include "ShaderHeader/sprite_distortion_ps.h"
 } // namespace Standard_Distortion_PS
 
 namespace Standard_Lighting_VS
 {
 static
-#include "Shader/EffekseerRenderer.Standard_Lighting_VS.h"
+#include "ShaderHeader/sprite_lit_vs.h"
 } // namespace Standard_Lighting_VS
 
 namespace Standard_Lighting_PS
 {
 static
-#include "Shader/EffekseerRenderer.Standard_Lighting_PS.h"
+#include "ShaderHeader/sprite_lit_ps.h"
 } // namespace Standard_Lighting_PS
-
-#else
-
-namespace Standard_VS
-{
-static
-#include "ShaderHeader_15/EffekseerRenderer.Standard_VS.h"
-} // namespace Standard_VS
-
-namespace Standard_PS
-{
-static
-#include "ShaderHeader_15/EffekseerRenderer.Standard_PS.h"
-} // namespace Standard_PS
-
-namespace Standard_Distortion_VS
-{
-static
-#include "ShaderHeader_15/EffekseerRenderer.Standard_Distortion_VS.h"
-} // namespace Standard_Distortion_VS
-
-namespace Standard_Distortion_PS
-{
-static
-#include "ShaderHeader_15/EffekseerRenderer.Standard_Distortion_PS.h"
-} // namespace Standard_Distortion_PS
-
-namespace Standard_Lighting_VS
-{
-static
-#include "ShaderHeader_15/EffekseerRenderer.Standard_Lighting_VS.h"
-} // namespace Standard_Lighting_VS
-
-namespace Standard_Lighting_PS
-{
-static
-#include "ShaderHeader_15/EffekseerRenderer.Standard_Lighting_PS.h"
-} // namespace Standard_Lighting_PS
-
-#endif
 
 //-----------------------------------------------------------------------------------
 //
@@ -190,8 +184,12 @@ RendererImplemented::~RendererImplemented()
 	ES_SAFE_RELEASE(p);
 
 	ES_SAFE_DELETE(m_standardRenderer);
-	ES_SAFE_DELETE(m_shader);
 
+	ES_SAFE_DELETE(m_shader_ad);
+	ES_SAFE_DELETE(m_shader_ad_distortion);
+	ES_SAFE_DELETE(m_shader_ad_lighting);
+
+	ES_SAFE_DELETE(m_shader);
 	ES_SAFE_DELETE(m_shader_distortion);
 	ES_SAFE_DELETE(m_shader_lighting);
 
@@ -199,10 +197,6 @@ RendererImplemented::~RendererImplemented()
 	ES_SAFE_DELETE(m_vertexBuffer);
 	ES_SAFE_DELETE(m_indexBuffer);
 	ES_SAFE_DELETE(m_indexBufferForWireframe);
-
-	// ES_SAFE_RELEASE( m_d3d_device );
-
-	assert(GetRef() == -6);
 }
 
 //----------------------------------------------------------------------------------
@@ -295,50 +289,58 @@ bool RendererImplemented::Initialize(LPDIRECT3DDEVICE9 device)
 
 	// generate a vertex buffer
 	{
-		m_vertexBuffer = VertexBuffer::Create(this, EffekseerRenderer::GetMaximumVertexSizeInAllTypes() * m_squareMaxCount * 4, true);
+		m_vertexBuffer = VertexBuffer::Create(this, EffekseerRenderer::GetMaximumVertexSizeInAllTypes() * m_squareMaxCount * 4, true, false);
 		if (m_vertexBuffer == NULL)
 			return false;
 	}
 
-	// 参照カウントの調整
-	Release();
-
 	// generate an index buffer
 	{
-		m_indexBuffer = IndexBuffer::Create(this, m_squareMaxCount * 6, false);
+		m_indexBuffer = IndexBuffer::Create(this, m_squareMaxCount * 6, false, false);
 		if (m_indexBuffer == NULL)
 			return false;
 	}
 
-	// 参照カウントの調整
-	Release();
-
 	// generate an index buffer for a wireframe
 	{
-		m_indexBufferForWireframe = IndexBuffer::Create(this, m_squareMaxCount * 8, false);
+		m_indexBufferForWireframe = IndexBuffer::Create(this, m_squareMaxCount * 8, false, false);
 		if (m_indexBufferForWireframe == NULL)
 			return false;
 	}
-
-	// 参照カウントの調整
-	Release();
 
 	// インデックスデータの生成
 	GenerateIndexData();
 
 	m_renderState = new RenderState(this);
 
-	// 座標(3) 色(1) UV(2)
+	D3DVERTEXELEMENT9 decl_ad[] = {
+		{0, 0, D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 0},
+		{0, 12, D3DDECLTYPE_D3DCOLOR, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 1},
+		{0, 16, D3DDECLTYPE_FLOAT2, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 2},
+		{0, sizeof(float) * 6, D3DDECLTYPE_FLOAT4, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 3},  // AlphaTextureUV + UVDistortionTextureUV
+		{0, sizeof(float) * 10, D3DDECLTYPE_FLOAT2, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 4}, // BlendUV
+		{0, sizeof(float) * 12, D3DDECLTYPE_FLOAT4, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 5}, // BlendAlphaUV + BlendUVDistortionUV
+		{0, sizeof(float) * 16, D3DDECLTYPE_FLOAT1, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 6}, // FlipbookIndexAndNextRate
+		{0, sizeof(float) * 17, D3DDECLTYPE_FLOAT1, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 7}, // AlphaThreshold
+		D3DDECL_END()};
+
+	D3DVERTEXELEMENT9 decl_ad_distortion[] = {
+		{0, 0, D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 0},
+		{0, 12, D3DDECLTYPE_D3DCOLOR, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 1},
+		{0, 16, D3DDECLTYPE_FLOAT2, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 2},
+		{0, 24, D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 3},
+		{0, 36, D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 4},
+		{0, sizeof(float) * 12, D3DDECLTYPE_FLOAT4, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 5}, // AlphaTextureUV + UVDistortionTextureUV
+		{0, sizeof(float) * 16, D3DDECLTYPE_FLOAT2, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 6}, // BlendUV
+		{0, sizeof(float) * 18, D3DDECLTYPE_FLOAT4, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 7}, // BlendAlphaUV + BlendUVDistortionUV
+		{0, sizeof(float) * 22, D3DDECLTYPE_FLOAT1, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 8}, // FlipbookIndexAndNextRate
+		{0, sizeof(float) * 23, D3DDECLTYPE_FLOAT1, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 9}, // AlphaThreshold
+		D3DDECL_END()};
+
 	D3DVERTEXELEMENT9 decl[] = {
 		{0, 0, D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 0},
 		{0, 12, D3DDECLTYPE_D3DCOLOR, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 1},
 		{0, 16, D3DDECLTYPE_FLOAT2, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 2},
-#ifdef __EFFEKSEER_BUILD_VERSION16__
-		{0, sizeof(float) * 6, D3DDECLTYPE_FLOAT2, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 1},  // AlphaTextureUV
-		{0, sizeof(float) * 8, D3DDECLTYPE_FLOAT2, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 2},  // UVDistortionTextureUV
-		{0, sizeof(float) * 10, D3DDECLTYPE_FLOAT1, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 3}, // FlipbookIndexAndNextRate
-		{0, sizeof(float) * 11, D3DDECLTYPE_FLOAT1, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 4}, // AlphaThreshold
-#endif
 		D3DDECL_END()};
 
 	D3DVERTEXELEMENT9 decl_distortion[] = {
@@ -347,50 +349,40 @@ bool RendererImplemented::Initialize(LPDIRECT3DDEVICE9 device)
 		{0, 16, D3DDECLTYPE_FLOAT2, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 2},
 		{0, 24, D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 3},
 		{0, 36, D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 4},
-#ifdef __EFFEKSEER_BUILD_VERSION16__
-		{0, sizeof(float) * 12, D3DDECLTYPE_FLOAT2, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 1}, // AlphaTextureUV
-		{0, sizeof(float) * 14, D3DDECLTYPE_FLOAT2, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 2}, // UVDistortionTextureUV
-		{0, sizeof(float) * 16, D3DDECLTYPE_FLOAT1, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 3}, // FlipbookIndexAndNextRate
-		{0, sizeof(float) * 17, D3DDECLTYPE_FLOAT1, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 4}, // AlphaThreshold
-#endif
 		D3DDECL_END()};
 
-#ifdef __EFFEKSEER_BUILD_VERSION16__
-	m_shader = Shader::Create(this,
-							  Standard_VS::g_vs30_VS,
-							  sizeof(Standard_VS::g_vs30_VS),
-							  Standard_PS::g_ps30_PS,
-							  sizeof(Standard_PS::g_ps30_PS),
-							  "StandardRenderer",
-							  decl);
-	if (m_shader == NULL)
+	m_shader_ad = Shader::Create(this,
+								 Standard_VS_Ad::g_vs30_main,
+								 sizeof(Standard_VS_Ad::g_vs30_main),
+								 Standard_PS_Ad::g_ps30_main,
+								 sizeof(Standard_PS_Ad::g_ps30_main),
+								 "StandardRenderer",
+								 decl_ad,
+								 false);
+	if (m_shader_ad == NULL)
 		return false;
 
-	// 参照カウントの調整
-	Release();
-
-	m_shader_distortion = Shader::Create(this,
-										 Standard_Distortion_VS::g_vs30_VS,
-										 sizeof(Standard_Distortion_VS::g_vs30_VS),
-										 Standard_Distortion_PS::g_ps30_PS,
-										 sizeof(Standard_Distortion_PS::g_ps30_PS),
-										 "StandardRenderer Distortion",
-										 decl_distortion);
-	if (m_shader_distortion == NULL)
-		return false;
-#else
 	m_shader = Shader::Create(this,
 							  Standard_VS::g_vs30_main,
 							  sizeof(Standard_VS::g_vs30_main),
 							  Standard_PS::g_ps30_main,
 							  sizeof(Standard_PS::g_ps30_main),
 							  "StandardRenderer",
-							  decl);
+							  decl,
+							  false);
 	if (m_shader == NULL)
 		return false;
 
-	// 参照カウントの調整
-	Release();
+	m_shader_ad_distortion = Shader::Create(this,
+											Standard_Distortion_VS_Ad::g_vs30_main,
+											sizeof(Standard_Distortion_VS_Ad::g_vs30_main),
+											Standard_Distortion_PS_Ad::g_ps30_main,
+											sizeof(Standard_Distortion_PS_Ad::g_ps30_main),
+											"StandardRenderer Distortion",
+											decl_ad_distortion,
+											false);
+	if (m_shader_ad_distortion == NULL)
+		return false;
 
 	m_shader_distortion = Shader::Create(this,
 										 Standard_Distortion_VS::g_vs30_main,
@@ -398,36 +390,22 @@ bool RendererImplemented::Initialize(LPDIRECT3DDEVICE9 device)
 										 Standard_Distortion_PS::g_ps30_main,
 										 sizeof(Standard_Distortion_PS::g_ps30_main),
 										 "StandardRenderer Distortion",
-										 decl_distortion);
+										 decl_distortion,
+										 false);
 	if (m_shader_distortion == NULL)
 		return false;
-#endif
 
-	// 参照カウントの調整
-	Release();
-
-#ifdef __EFFEKSEER_BUILD_VERSION16__
 	m_shader->SetVertexConstantBufferSize(sizeof(Effekseer::Matrix44) * 2 + sizeof(float) * 4 + sizeof(float) * 4);
-	m_shader->SetVertexRegisterCount(8 + 1 + 1);
-
-	m_shader->SetPixelConstantBufferSize(sizeof(float) * 4 * 2);
-	m_shader->SetPixelRegisterCount(2);
+	m_shader->SetPixelConstantBufferSize(sizeof(float) * 4 * 6);
 
 	m_shader_distortion->SetVertexConstantBufferSize(sizeof(Effekseer::Matrix44) * 2 + sizeof(float) * 4 + sizeof(float) * 4);
-	m_shader_distortion->SetVertexRegisterCount(8 + 1 + 1);
+	m_shader_distortion->SetPixelConstantBufferSize(sizeof(float) * 4 * 5);
 
-	m_shader_distortion->SetPixelConstantBufferSize(sizeof(float) * 4 * 4);
-	m_shader_distortion->SetPixelRegisterCount(4);
-#else
-	m_shader->SetVertexConstantBufferSize(sizeof(Effekseer::Matrix44) * 2 + sizeof(float) * 4);
-	m_shader->SetVertexRegisterCount(8 + 1);
+	m_shader_ad->SetVertexConstantBufferSize(sizeof(Effekseer::Matrix44) * 2 + sizeof(float) * 4 + sizeof(float) * 4);
+	m_shader_ad->SetPixelConstantBufferSize(sizeof(float) * 4 * 6);
 
-	m_shader_distortion->SetVertexConstantBufferSize(sizeof(Effekseer::Matrix44) * 2 + sizeof(float) * 4);
-	m_shader_distortion->SetVertexRegisterCount(8 + 1);
-
-	m_shader_distortion->SetPixelConstantBufferSize(sizeof(float) * 4 + sizeof(float) * 4);
-	m_shader_distortion->SetPixelRegisterCount(1 + 1);
-#endif
+	m_shader_ad_distortion->SetVertexConstantBufferSize(sizeof(Effekseer::Matrix44) * 2 + sizeof(float) * 4 + sizeof(float) * 4);
+	m_shader_ad_distortion->SetPixelConstantBufferSize(sizeof(float) * 4 * 5);
 
 	D3DVERTEXELEMENT9 decl_lighting[] = {
 		{0, 0, D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 0},
@@ -436,53 +414,52 @@ bool RendererImplemented::Initialize(LPDIRECT3DDEVICE9 device)
 		{0, 20, D3DDECLTYPE_D3DCOLOR, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 3},
 		{0, 24, D3DDECLTYPE_FLOAT2, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 4},
 		{0, 32, D3DDECLTYPE_FLOAT2, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 5},
-#ifdef __EFFEKSEER_BUILD_VERSION16__
-		{0, sizeof(float) * 10, D3DDECLTYPE_FLOAT2, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 2}, // AlphaTextureUVs
-		{0, sizeof(float) * 12, D3DDECLTYPE_FLOAT2, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 3}, // UVDistortionTextureUV
-		{0, sizeof(float) * 14, D3DDECLTYPE_FLOAT1, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 4}, // FlipbookIndexAndNextRate
-		{0, sizeof(float) * 15, D3DDECLTYPE_FLOAT1, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 5}, // AlphaThreshold
-#endif
 		D3DDECL_END()};
 
-#ifdef __EFFEKSEER_BUILD_VERSION16__
-	m_shader_lighting = Shader::Create(this,
-									   Standard_Lighting_VS::g_vs30_VS,
-									   sizeof(Standard_Lighting_VS::g_vs30_VS),
-									   Standard_Lighting_PS::g_ps30_PS,
-									   sizeof(Standard_Lighting_PS::g_ps30_PS),
-									   "StandardRenderer Lighting",
-									   decl_lighting);
+	D3DVERTEXELEMENT9 decl_lighting_ad[] = {
+		{0, 0, D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 0},
+		{0, 12, D3DDECLTYPE_D3DCOLOR, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 1},
+		{0, 16, D3DDECLTYPE_D3DCOLOR, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 2},
+		{0, 20, D3DDECLTYPE_D3DCOLOR, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 3},
+		{0, 24, D3DDECLTYPE_FLOAT2, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 4},
+		{0, 32, D3DDECLTYPE_FLOAT2, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 5},
+		{0, sizeof(float) * 10, D3DDECLTYPE_FLOAT4, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 6},  // AlphaTextureUV + UVDistortionTextureUV
+		{0, sizeof(float) * 14, D3DDECLTYPE_FLOAT2, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 7},  // BlendUV
+		{0, sizeof(float) * 16, D3DDECLTYPE_FLOAT4, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 8},  // BlendAlphaUV + BlendUVDistortionUV
+		{0, sizeof(float) * 20, D3DDECLTYPE_FLOAT1, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 9},  // FlipbookIndexAndNextRate
+		{0, sizeof(float) * 21, D3DDECLTYPE_FLOAT1, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 10}, // AlphaThreshold
+		D3DDECL_END()};
 
-#else
+	m_shader_ad_lighting = Shader::Create(this,
+									   Standard_Lighting_VS_Ad::g_vs30_main,
+										  sizeof(Standard_Lighting_VS_Ad::g_vs30_main),
+										  Standard_Lighting_PS_Ad::g_ps30_main,
+										  sizeof(Standard_Lighting_PS_Ad::g_ps30_main),
+									   "StandardRenderer Lighting",
+										  decl_lighting,
+										  false);
+	if (m_shader_ad_lighting == NULL)
+		return false;
+
 	m_shader_lighting = Shader::Create(this,
 									   Standard_Lighting_VS::g_vs30_main,
 									   sizeof(Standard_Lighting_VS::g_vs30_main),
 									   Standard_Lighting_PS::g_ps30_main,
 									   sizeof(Standard_Lighting_PS::g_ps30_main),
 									   "StandardRenderer Lighting",
-									   decl_lighting);
-#endif
+									   decl_lighting,
+									   false);
 	if (m_shader_lighting == NULL)
 		return false;
 
-#ifdef __EFFEKSEER_BUILD_VERSION16__
 	m_shader_lighting->SetVertexConstantBufferSize(sizeof(Effekseer::Matrix44) * 2 + sizeof(float) * 4 + sizeof(float) * 4);
-	m_shader_lighting->SetVertexRegisterCount(8 + 1 + 1);
+	m_shader_lighting->SetPixelConstantBufferSize(sizeof(float) * 4 * 9);
 
-	m_shader_lighting->SetPixelConstantBufferSize(sizeof(float) * 4 * 5);
-	m_shader_lighting->SetPixelRegisterCount(5);
-#else
-	m_shader_lighting->SetVertexConstantBufferSize(sizeof(Effekseer::Matrix44) * 2 + sizeof(float) * 4 + sizeof(float) * 4);
-	m_shader_lighting->SetVertexRegisterCount(8 + 1 + 1);
-
-	m_shader_lighting->SetPixelConstantBufferSize(sizeof(float) * 4 * 3);
-	m_shader_lighting->SetPixelRegisterCount(12);
-#endif
-
-	Release();
+	m_shader_ad_lighting->SetVertexConstantBufferSize(sizeof(Effekseer::Matrix44) * 2 + sizeof(float) * 4 + sizeof(float) * 4);
+	m_shader_ad_lighting->SetPixelConstantBufferSize(sizeof(float) * 4 * 9);
 
 	m_standardRenderer =
-		new EffekseerRenderer::StandardRenderer<RendererImplemented, Shader, Vertex, VertexDistortion>(this, m_shader, m_shader_distortion);
+		new EffekseerRenderer::StandardRenderer<RendererImplemented, Shader>(this);
 
 	GetImpl()->CreateProxyTextures(this);
 
@@ -729,7 +706,7 @@ int32_t RendererImplemented::GetSquareMaxCount() const
 //----------------------------------------------------------------------------------
 ::Effekseer::SpriteRenderer* RendererImplemented::CreateSpriteRenderer()
 {
-	return new ::EffekseerRenderer::SpriteRendererBase<RendererImplemented, Vertex, VertexDistortion>(this);
+	return new ::EffekseerRenderer::SpriteRendererBase<RendererImplemented, true>(this);
 }
 
 //----------------------------------------------------------------------------------
@@ -737,7 +714,7 @@ int32_t RendererImplemented::GetSquareMaxCount() const
 //----------------------------------------------------------------------------------
 ::Effekseer::RibbonRenderer* RendererImplemented::CreateRibbonRenderer()
 {
-	return new ::EffekseerRenderer::RibbonRendererBase<RendererImplemented, Vertex, VertexDistortion>(this);
+	return new ::EffekseerRenderer::RibbonRendererBase<RendererImplemented, true>(this);
 }
 
 //----------------------------------------------------------------------------------
@@ -745,7 +722,7 @@ int32_t RendererImplemented::GetSquareMaxCount() const
 //----------------------------------------------------------------------------------
 ::Effekseer::RingRenderer* RendererImplemented::CreateRingRenderer()
 {
-	return new ::EffekseerRenderer::RingRendererBase<RendererImplemented, Vertex, VertexDistortion>(this);
+	return new ::EffekseerRenderer::RingRendererBase<RendererImplemented, true>(this);
 }
 
 //----------------------------------------------------------------------------------
@@ -761,7 +738,7 @@ int32_t RendererImplemented::GetSquareMaxCount() const
 //----------------------------------------------------------------------------------
 ::Effekseer::TrackRenderer* RendererImplemented::CreateTrackRenderer()
 {
-	return new ::EffekseerRenderer::TrackRendererBase<RendererImplemented, Vertex, VertexDistortion>(this);
+	return new ::EffekseerRenderer::TrackRendererBase<RendererImplemented, true>(this);
 }
 
 //----------------------------------------------------------------------------------
@@ -883,43 +860,31 @@ void RendererImplemented::DrawPolygon(int32_t vertexCount, int32_t indexCount)
 	GetDevice()->DrawIndexedPrimitive(D3DPT_TRIANGLELIST, 0, 0, vertexCount, 0, indexCount / 3);
 }
 
-//----------------------------------------------------------------------------------
-//
-//----------------------------------------------------------------------------------
-Shader* RendererImplemented::GetShader(bool useTexture, ::Effekseer::RendererMaterialType materialType) const
+Shader* RendererImplemented::GetShader(::EffekseerRenderer::StandardRendererShaderType type) const
 {
-	if (materialType == ::Effekseer::RendererMaterialType::BackDistortion)
+	if (type == ::EffekseerRenderer::StandardRendererShaderType::AdvancedBackDistortion)
 	{
-		if (useTexture && GetRenderMode() == Effekseer::RenderMode::Normal)
-		{
-			return m_shader_distortion;
-		}
-		else
-		{
-			return m_shader_distortion;
-		}
+		return m_shader_ad_distortion;
 	}
-	else if (materialType == ::Effekseer::RendererMaterialType::Lighting)
+	else if (type == ::EffekseerRenderer::StandardRendererShaderType::AdvancedLit)
 	{
-		if (useTexture && GetRenderMode() == Effekseer::RenderMode::Normal)
-		{
-			return m_shader_lighting;
-		}
-		else
-		{
-			return m_shader_lighting;
-		}
+		return m_shader_ad_lighting;
 	}
-	else
+	else if (type == ::EffekseerRenderer::StandardRendererShaderType::AdvancedUnlit)
 	{
-		if (useTexture && GetRenderMode() == Effekseer::RenderMode::Normal)
-		{
-			return m_shader;
-		}
-		else
-		{
-			return m_shader;
-		}
+		return m_shader_ad;
+	}
+	else if (type == ::EffekseerRenderer::StandardRendererShaderType::BackDistortion)
+	{
+		return m_shader_distortion;
+	}
+	else if (type == ::EffekseerRenderer::StandardRendererShaderType::Lit)
+	{
+		return m_shader_lighting;
+	}
+	else if (type == ::EffekseerRenderer::StandardRendererShaderType::Unlit)
+	{
+		return m_shader;
 	}
 }
 
@@ -1086,6 +1051,132 @@ void RendererImplemented::DeleteProxyTexture(Effekseer::TextureData* data)
 	{
 		delete data;
 	}
+}
+
+bool Model::LoadToGPU()
+{
+	if (IsLoadedOnGPU)
+	{
+		return false;
+	}
+
+	// get device
+	LPDIRECT3DDEVICE9 device = nullptr;
+	if (device_ != nullptr)
+	{
+		device = device_;
+	}
+
+	HRESULT hr;
+
+	for (int32_t f = 0; f < GetFrameCount(); f++)
+	{
+		InternalModels[f].VertexCount = GetVertexCount(f);
+
+		IDirect3DVertexBuffer9* vb = NULL;
+		hr =
+			device->CreateVertexBuffer(sizeof(Effekseer::Model::VertexWithIndex) * InternalModels[f].VertexCount * ModelCount,
+									   D3DUSAGE_WRITEONLY,
+									   0,
+									   D3DPOOL_MANAGED,
+									   &vb,
+									   NULL);
+
+		if (FAILED(hr))
+		{
+			/* DirectX9ExではD3DPOOL_MANAGED使用不可 */
+			hr = device->CreateVertexBuffer(sizeof(Effekseer::Model::VertexWithIndex) * InternalModels[f].VertexCount *
+												ModelCount,
+											D3DUSAGE_WRITEONLY,
+											0,
+											D3DPOOL_DEFAULT,
+											&vb,
+											NULL);
+		}
+
+		ES_SAFE_RELEASE(InternalModels[f].VertexBuffer);
+
+		if (vb != NULL)
+		{
+			uint8_t* resource = NULL;
+			vb->Lock(0, 0, (void**)&resource, 0);
+
+			for (int32_t m = 0; m < ModelCount; m++)
+			{
+				for (int32_t i = 0; i < GetVertexCount(f); i++)
+				{
+					Effekseer::Model::VertexWithIndex v;
+					v.Position = GetVertexes(f)[i].Position;
+					v.Normal = GetVertexes(f)[i].Normal;
+					v.Binormal = GetVertexes(f)[i].Binormal;
+					v.Tangent = GetVertexes(f)[i].Tangent;
+					v.UV = GetVertexes(f)[i].UV;
+					v.VColor = GetVertexes(f)[i].VColor;
+
+					std::swap(v.VColor.R, v.VColor.B);
+
+					v.Index[0] = m;
+
+					memcpy(resource, &v, sizeof(Effekseer::Model::VertexWithIndex));
+					resource += sizeof(Effekseer::Model::VertexWithIndex);
+				}
+			}
+
+			vb->Unlock();
+		}
+
+		InternalModels[f].VertexBuffer = vb;
+
+		InternalModels[f].FaceCount = GetFaceCount(f);
+		InternalModels[f].IndexCount = InternalModels[f].FaceCount * 3;
+
+		IDirect3DIndexBuffer9* ib = NULL;
+		hr = device->CreateIndexBuffer(sizeof(Effekseer::Model::Face) * InternalModels[f].FaceCount * ModelCount,
+									   D3DUSAGE_WRITEONLY,
+									   D3DFMT_INDEX32,
+									   D3DPOOL_MANAGED,
+									   &ib,
+									   NULL);
+
+		if (FAILED(hr))
+		{
+			hr = device->CreateIndexBuffer(sizeof(Effekseer::Model::Face) * InternalModels[f].FaceCount * ModelCount,
+										   D3DUSAGE_WRITEONLY,
+										   D3DFMT_INDEX32,
+										   D3DPOOL_DEFAULT,
+										   &ib,
+										   NULL);
+		}
+
+		ES_SAFE_RELEASE(InternalModels[f].IndexBuffer);
+
+		if (ib != NULL)
+		{
+			uint8_t* resource = NULL;
+			ib->Lock(0, 0, (void**)&resource, 0);
+			for (int32_t m = 0; m < ModelCount; m++)
+			{
+				for (int32_t i = 0; i < InternalModels[f].FaceCount; i++)
+				{
+					Effekseer::Model::Face face;
+					face.Indexes[0] = GetFaces(f)[i].Indexes[0] + GetVertexCount(f) * m;
+					face.Indexes[1] = GetFaces(f)[i].Indexes[1] + GetVertexCount(f) * m;
+					face.Indexes[2] = GetFaces(f)[i].Indexes[2] + GetVertexCount(f) * m;
+
+					memcpy(resource, &face, sizeof(Effekseer::Model::Face));
+					resource += sizeof(Effekseer::Model::Face);
+				}
+			}
+
+			ib->Unlock();
+		}
+
+		InternalModels[f].IndexBuffer = ib;
+	}
+
+	IsLoadedOnGPU = true;
+
+	return true;
 }
 
 //----------------------------------------------------------------------------------

@@ -12,6 +12,8 @@
 namespace EffekseerRendererDX9
 {
 
+const int32_t ModelRendererInstanceCount = 10;
+
 MaterialLoader::MaterialLoader(Renderer* renderer, ::Effekseer::FileInterface* fileInterface)
 	: fileInterface_(fileInterface)
 {
@@ -95,7 +97,7 @@ MaterialLoader ::~MaterialLoader()
 	for (int32_t st = 0; st < shaderTypeCount; st++)
 	{
 		Shader* shader = nullptr;
-		auto parameterGenerator = EffekseerRenderer::MaterialShaderParameterGenerator(material, false, st, 20);
+		auto parameterGenerator = EffekseerRenderer::MaterialShaderParameterGenerator(material, false, st, ModelRendererInstanceCount);
 
 		if (materialData->IsSimpleVertex)
 		{
@@ -111,7 +113,7 @@ MaterialLoader ::~MaterialLoader()
 									(uint8_t*)binary->GetPixelShaderData(shaderTypes[st]),
 									binary->GetPixelShaderSize(shaderTypes[st]),
 									"MaterialStandardRenderer",
-									decl);
+									decl, true);
 		}
 		else
 		{
@@ -171,7 +173,7 @@ MaterialLoader ::~MaterialLoader()
 									(uint8_t*)binary->GetPixelShaderData(shaderTypes[st]),
 									binary->GetPixelShaderSize(shaderTypes[st]),
 									"MaterialStandardRenderer",
-									decl);
+									decl, true);
 		}
 
 		if (shader == nullptr)
@@ -181,11 +183,9 @@ MaterialLoader ::~MaterialLoader()
 		auto pixelUniformSize = parameterGenerator.PixelShaderUniformBufferSize;
 
 		shader->SetVertexConstantBufferSize(vertexUniformSize);
-		shader->SetVertexRegisterCount(vertexUniformSize / (sizeof(float) * 4));
-
+		
 		shader->SetPixelConstantBufferSize(pixelUniformSize);
-		shader->SetPixelRegisterCount(pixelUniformSize / (sizeof(float) * 4));
-
+		
 		materialData->TextureCount = material.GetTextureCount();
 		materialData->UniformCount = material.GetUniformCount();
 
@@ -201,7 +201,7 @@ MaterialLoader ::~MaterialLoader()
 
 	for (int32_t st = 0; st < shaderTypeCount; st++)
 	{
-		auto parameterGenerator = EffekseerRenderer::MaterialShaderParameterGenerator(material, true, st, 20);
+		auto parameterGenerator = EffekseerRenderer::MaterialShaderParameterGenerator(material, true, st, ModelRendererInstanceCount);
 
 		D3DVERTEXELEMENT9 decl[] = {{0, 0, D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_POSITION, 0},
 									{0, 12, D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_NORMAL, 0},
@@ -221,7 +221,8 @@ MaterialLoader ::~MaterialLoader()
 									 (uint8_t*)binary->GetPixelShaderData(shaderTypesModel[st]),
 									 binary->GetPixelShaderSize(shaderTypesModel[st]),
 									 "MaterialStandardModelRenderer",
-									 decl);
+									 decl,
+									 false);
 		if (shader == nullptr)
 			return false;
 
@@ -229,10 +230,8 @@ MaterialLoader ::~MaterialLoader()
 		auto pixelUniformSize = parameterGenerator.PixelShaderUniformBufferSize;
 
 		shader->SetVertexConstantBufferSize(vertexUniformSize);
-		shader->SetVertexRegisterCount(vertexUniformSize / (sizeof(float) * 4));
 
 		shader->SetPixelConstantBufferSize(pixelUniformSize);
-		shader->SetPixelRegisterCount(pixelUniformSize / (sizeof(float) * 4));
 
 		if (st == 0)
 		{

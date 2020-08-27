@@ -4,145 +4,150 @@
 #include "../EffekseerMaterialCompiler/DirectX12/EffekseerMaterialCompilerDX12.h"
 #include "../EffekseerRendererLLGI/EffekseerRendererLLGI.RendererImplemented.h"
 
-#ifdef __EFFEKSEER_BUILD_VERSION16__
-
-namespace Standard_VS
+namespace Sprite_Unlit_VS_Ad
 {
 static
-#include "Shader/EffekseerRenderer.Standard_VS.h"
-} // namespace Standard_VS
+#include "ShaderHeader/EffekseerRenderer.Standard_VS.h"
+} // namespace Sprite_Unlit_VS_Ad
 
-namespace Standard_PS
+namespace Sprite_Unlit_PS_Ad
 {
 static
-#include "Shader/EffekseerRenderer.Standard_PS.h"
-} // namespace Standard_PS
+#include "ShaderHeader/EffekseerRenderer.Standard_PS.h"
+} // namespace Sprite_Unlit_PS_Ad
 
-namespace Standard_Distortion_VS
+namespace Sprite_Distortion_VS_Ad
 {
 static
-#include "Shader/EffekseerRenderer.Standard_Distortion_VS.h"
-} // namespace Standard_Distortion_VS
+#include "ShaderHeader/EffekseerRenderer.Standard_Distortion_VS.h"
+} // namespace Sprite_Distortion_VS_Ad
 
-namespace Standard_Distortion_PS
+namespace Sprite_Distortion_PS_Ad
 {
 static
-#include "Shader/EffekseerRenderer.Standard_Distortion_PS.h"
-} // namespace Standard_Distortion_PS
+#include "ShaderHeader/EffekseerRenderer.Standard_Distortion_PS.h"
+} // namespace Sprite_Distortion_PS_Ad
 
-namespace ShaderLightingTextureNormal_
+namespace Model_Lit_VS_Ad
 {
 static
-#include "Shader/EffekseerRenderer.ModelRenderer.ShaderLightingTextureNormal_VS.h"
+#include "ShaderHeader/EffekseerRenderer.ModelRenderer.ShaderLightingTextureNormal_VS.h"
+} // namespace Model_Lit_VS_Ad
 
-	static
-#include "Shader/EffekseerRenderer.ModelRenderer.ShaderLightingTextureNormal_PS.h"
-
-} // namespace ShaderLightingTextureNormal_
-
-namespace ShaderTexture_
+namespace Model_Lit_PS_Ad
 {
 static
-#include "Shader/EffekseerRenderer.ModelRenderer.ShaderTexture_VS.h"
+#include "ShaderHeader/EffekseerRenderer.ModelRenderer.ShaderLightingTextureNormal_PS.h"
 
-	static
-#include "Shader/EffekseerRenderer.ModelRenderer.ShaderTexture_PS.h"
-} // namespace ShaderTexture_
+} // namespace Model_Lit_PS_Ad
 
-namespace ShaderDistortionTexture_
+namespace Model_Unlit_VS_Ad
 {
 static
-#include "Shader/EffekseerRenderer.ModelRenderer.ShaderDistortion_VS.h"
+#include "ShaderHeader/EffekseerRenderer.ModelRenderer.ShaderTexture_VS.h"
+} // namespace Model_Unlit_VS_Ad
 
-	static
-#include "Shader/EffekseerRenderer.ModelRenderer.ShaderDistortion_PS.h"
-} // namespace ShaderDistortionTexture_
-
-namespace ShaderStandardLighting_
+namespace Model_Unlit_PS_Ad
 {
 static
-#include "Shader/EffekseerRenderer.Standard_Lighting_VS.h"
+#include "ShaderHeader/EffekseerRenderer.ModelRenderer.ShaderTexture_PS.h"
+} // namespace Model_Unlit_PS_Ad
 
-	static
-#include "Shader/EffekseerRenderer.Standard_Lighting_PS.h"
-} // namespace ShaderStandardLighting_
-
-#else
-
-namespace Standard_VS
+namespace Model_Distortion_VS_Ad
 {
 static
-#include "ShaderHeader_15/EffekseerRenderer.Standard_VS.h"
-} // namespace Standard_VS
+#include "ShaderHeader/EffekseerRenderer.ModelRenderer.ShaderDistortion_VS.h"
+} // namespace Model_Distortion_VS_Ad
 
-namespace Standard_PS
+namespace Model_Distortion_PS_Ad
 {
 static
-#include "ShaderHeader_15/EffekseerRenderer.Standard_PS.h"
-} // namespace Standard_PS
+#include "ShaderHeader/EffekseerRenderer.ModelRenderer.ShaderDistortion_PS.h"
+} // namespace Model_Distortion_PS_Ad
 
-namespace Standard_Distortion_VS
+namespace Sprite_Lit_VS_Ad
 {
 static
-#include "ShaderHeader_15/EffekseerRenderer.Standard_Distortion_VS.h"
-} // namespace Standard_Distortion_VS
+#include "ShaderHeader/EffekseerRenderer.Standard_Lighting_VS.h"
+} // namespace Sprite_Lit_VS_Ad
 
-namespace Standard_Distortion_PS
+namespace Sprite_Lit_PS_Ad
 {
 static
-#include "ShaderHeader_15/EffekseerRenderer.Standard_Distortion_PS.h"
-} // namespace Standard_Distortion_PS
+#include "ShaderHeader/EffekseerRenderer.Standard_Lighting_PS.h"
+} // namespace Sprite_Lit_PS_Ad
 
-namespace ShaderLightingTextureNormal_VS
+namespace Sprite_Unlit_VS
 {
 static
-#include "ShaderHeader_15/EffekseerRenderer.ModelRenderer.ShaderLightingTextureNormal_VS.h"
-} // namespace ShaderLightingTextureNormal_
+#include "ShaderHeader/sprite_unlit_vs.h"
+} // namespace Sprite_Unlit_VS
 
-namespace ShaderLightingTextureNormal_PS
-{
-	static
-#include "ShaderHeader_15/EffekseerRenderer.ModelRenderer.ShaderLightingTextureNormal_PS.h"
-
-} // namespace ShaderLightingTextureNormal_
-
-namespace ShaderTexture_VS
+namespace Sprite_Unlit_PS
 {
 static
-#include "ShaderHeader_15/EffekseerRenderer.ModelRenderer.ShaderTexture_VS.h"
-} // namespace ShaderTexture_
+#include "ShaderHeader/sprite_unlit_ps.h"
+} // namespace Sprite_Unlit_PS
 
-namespace ShaderTexture_PS
-{
-	static
-#include "ShaderHeader_15/EffekseerRenderer.ModelRenderer.ShaderTexture_PS.h"
-} // namespace ShaderTexture_
-
-namespace ShaderDistortionTexture_VS
+namespace Sprite_Distortion_VS
 {
 static
-#include "ShaderHeader_15/EffekseerRenderer.ModelRenderer.ShaderDistortion_VS.h"
-} // namespace ShaderDistortionTexture_
+#include "ShaderHeader/sprite_distortion_vs.h"
+} // namespace Sprite_Distortion_VS
 
-namespace ShaderDistortionTexture_PS
-{
-	static
-#include "ShaderHeader_15/EffekseerRenderer.ModelRenderer.ShaderDistortion_PS.h"
-} // namespace ShaderDistortionTexture_
-
-namespace ShaderStandardLighting_VS
+namespace Sprite_Distortion_PS
 {
 static
-#include "ShaderHeader_15/EffekseerRenderer.Standard_Lighting_VS.h"
-}
+#include "ShaderHeader/sprite_distortion_ps.h"
+} // namespace Sprite_Distortion_PS
 
-namespace ShaderStandardLighting_PS
+namespace Sprite_Lit_VS
 {
-	static
-#include "ShaderHeader_15/EffekseerRenderer.Standard_Lighting_PS.h"
-} // namespace ShaderStandardLighting_
+static
+#include "ShaderHeader/sprite_lit_vs.h"
+} // namespace Sprite_Lit_VS
 
-#endif
+namespace Sprite_Lit_PS
+{
+static
+#include "ShaderHeader/sprite_lit_ps.h"
+} // namespace Sprite_Lit_PS
+
+namespace Model_Unlit_VS
+{
+static
+#include "ShaderHeader/model_unlit_vs.h"
+} // namespace Model_Unlit_VS
+
+namespace Model_Unlit_PS
+{
+static
+#include "ShaderHeader/model_unlit_ps.h"
+} // namespace Model_Unlit_PS
+
+namespace Model_Distortion_VS
+{
+static
+#include "ShaderHeader/model_distortion_vs.h"
+} // namespace Model_Distortion_VS
+
+namespace Model_Distortion_PS
+{
+static
+#include "ShaderHeader/model_distortion_ps.h"
+} // namespace Model_Distortion_PS
+
+namespace Model_Lit_VS
+{
+static
+#include "ShaderHeader/model_lit_vs.h"
+} // namespace Model_Lit_VS
+
+namespace Model_Lit_PS
+{
+static
+#include "ShaderHeader/model_lit_ps.h"
+} // namespace Model_Lit_PS
 
 namespace EffekseerRendererDX12
 {
@@ -178,29 +183,43 @@ namespace EffekseerRendererDX12
 		return;
 	};
 
-	allocate_(renderer->fixedShader_.StandardTexture_VS, Standard_VS::g_main, sizeof(Standard_VS::g_main));
-	allocate_(renderer->fixedShader_.StandardTexture_PS, Standard_PS::g_main, sizeof(Standard_PS::g_main));
+	allocate_(renderer->fixedShader_.AdvancedSpriteUnlit_VS, Sprite_Unlit_VS_Ad::g_main, sizeof(Sprite_Unlit_VS_Ad::g_main));
+	allocate_(renderer->fixedShader_.AdvancedSpriteUnlit_PS, Sprite_Unlit_PS_Ad::g_main, sizeof(Sprite_Unlit_PS_Ad::g_main));
+	allocate_(renderer->fixedShader_.AdvancedSpriteDistortion_VS, Sprite_Distortion_VS_Ad::g_main, sizeof(Sprite_Distortion_VS_Ad::g_main));
+	allocate_(renderer->fixedShader_.AdvancedSpriteDistortion_PS, Sprite_Distortion_PS_Ad::g_main, sizeof(Sprite_Distortion_PS_Ad::g_main));
+	allocate_(renderer->fixedShader_.AdvancedSpriteLit_VS, Sprite_Lit_VS_Ad::g_main, sizeof(Sprite_Lit_VS_Ad::g_main));
+	allocate_(renderer->fixedShader_.AdvancedSpriteLit_PS, Sprite_Lit_PS_Ad::g_main, sizeof(Sprite_Lit_PS_Ad::g_main));
 
-	allocate_(renderer->fixedShader_.StandardDistortedTexture_VS, Standard_Distortion_VS::g_main, sizeof(Standard_Distortion_VS::g_main));
-	allocate_(renderer->fixedShader_.StandardDistortedTexture_PS, Standard_Distortion_PS::g_main, sizeof(Standard_Distortion_PS::g_main));
+	allocate_(renderer->fixedShader_.AdvancedModelUnlit_VS, Model_Unlit_VS_Ad::g_main, sizeof(Model_Unlit_VS_Ad::g_main));
+	allocate_(renderer->fixedShader_.AdvancedModelUnlit_PS, Model_Unlit_PS_Ad::g_main, sizeof(Model_Unlit_PS_Ad::g_main));
+	allocate_(renderer->fixedShader_.AdvancedModelDistortion_VS, Model_Distortion_VS_Ad::g_main, sizeof(Model_Distortion_VS_Ad::g_main));
+	allocate_(renderer->fixedShader_.AdvancedModelDistortion_PS, Model_Distortion_PS_Ad::g_main, sizeof(Model_Distortion_PS_Ad::g_main));
+	allocate_(renderer->fixedShader_.AdvancedModelLit_VS, Model_Lit_VS_Ad::g_main, sizeof(Model_Lit_VS_Ad::g_main));
+	allocate_(renderer->fixedShader_.AdvancedModelLit_PS, Model_Lit_PS_Ad::g_main, sizeof(Model_Lit_PS_Ad::g_main));
 
-	allocate_(renderer->fixedShader_.ModelShaderTexture_VS, ShaderTexture_VS::g_main, sizeof(ShaderTexture_VS::g_main));
-	allocate_(renderer->fixedShader_.ModelShaderTexture_PS, ShaderTexture_PS::g_main, sizeof(ShaderTexture_PS::g_main));
+	allocate_(renderer->fixedShader_.SpriteUnlit_VS, Sprite_Unlit_VS::g_main, sizeof(Sprite_Unlit_VS::g_main));
+	allocate_(renderer->fixedShader_.SpriteUnlit_PS, Sprite_Unlit_PS::g_main, sizeof(Sprite_Unlit_PS::g_main));
 
-	allocate_(renderer->fixedShader_.ModelShaderLightingTextureNormal_VS,
-			  ShaderLightingTextureNormal_VS::g_main,
-			  sizeof(ShaderLightingTextureNormal_VS::g_main));
-	allocate_(renderer->fixedShader_.ModelShaderLightingTextureNormal_PS,
-			  ShaderLightingTextureNormal_PS::g_main,
-			  sizeof(ShaderLightingTextureNormal_PS::g_main));
+	allocate_(renderer->fixedShader_.SpriteDistortion_VS, Sprite_Distortion_VS::g_main, sizeof(Sprite_Distortion_VS::g_main));
+	allocate_(renderer->fixedShader_.SpriteDistortion_PS, Sprite_Distortion_PS::g_main, sizeof(Sprite_Distortion_PS::g_main));
+
+	allocate_(renderer->fixedShader_.SpriteLit_VS, Sprite_Lit_VS::g_main, sizeof(Sprite_Lit_VS::g_main));
+	allocate_(renderer->fixedShader_.SpriteLit_PS, Sprite_Lit_PS::g_main, sizeof(Sprite_Lit_PS::g_main));
+
+	allocate_(renderer->fixedShader_.ModelUnlit_VS, Model_Unlit_VS::g_main, sizeof(Model_Unlit_VS::g_main));
+	allocate_(renderer->fixedShader_.ModelUnlit_PS, Model_Unlit_PS::g_main, sizeof(Model_Unlit_PS::g_main));
+
+	allocate_(renderer->fixedShader_.ModelLit_VS,
+			  Model_Lit_VS::g_main,
+			  sizeof(Model_Lit_VS::g_main));
+	allocate_(renderer->fixedShader_.ModelLit_PS,
+			  Model_Lit_PS::g_main,
+			  sizeof(Model_Lit_PS::g_main));
 
 	allocate_(
-		renderer->fixedShader_.ModelShaderDistortionTexture_VS, ShaderDistortionTexture_VS::g_main, sizeof(ShaderDistortionTexture_VS::g_main));
+		renderer->fixedShader_.ModelDistortion_VS, Model_Distortion_VS::g_main, sizeof(Model_Distortion_VS::g_main));
 	allocate_(
-		renderer->fixedShader_.ModelShaderDistortionTexture_PS, ShaderDistortionTexture_PS::g_main, sizeof(ShaderDistortionTexture_PS::g_main));
-
-	allocate_(renderer->fixedShader_.StandardLightingTexture_VS, ShaderStandardLighting_VS::g_main, sizeof(ShaderStandardLighting_VS::g_main));
-	allocate_(renderer->fixedShader_.StandardLightingTexture_PS, ShaderStandardLighting_PS::g_main, sizeof(ShaderStandardLighting_PS::g_main));
+		renderer->fixedShader_.ModelDistortion_PS, Model_Distortion_PS::g_main, sizeof(Model_Distortion_PS::g_main));
 
 	renderer->platformType_ = Effekseer::CompiledMaterialPlatformType::DirectX12;
 	renderer->materialCompiler_ = new Effekseer::MaterialCompilerDX12();

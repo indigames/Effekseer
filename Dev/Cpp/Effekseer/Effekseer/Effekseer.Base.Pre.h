@@ -86,10 +86,8 @@ class ModelLoader;
 
 class Model;
 
-#if __EFFEKSEER_BUILD_VERSION16__
 class CurveLoader;
 class Curve;
-#endif
 
 typedef int Handle;
 
@@ -733,13 +731,12 @@ struct NodeRendererBasicParameter
 	RendererMaterialType MaterialType = RendererMaterialType::Default;
 	int32_t Texture1Index = -1;
 	int32_t Texture2Index = -1;
-#ifdef __EFFEKSEER_BUILD_VERSION16__
 	int32_t Texture3Index = -1;
 	int32_t Texture4Index = -1;
 	int32_t Texture5Index = -1;
 	int32_t Texture6Index = -1;
 	int32_t Texture7Index = -1;
-#endif
+
 	float DistortionIntensity = 0.0f;
 	MaterialParameter* MaterialParameterPtr = nullptr;
 	AlphaBlendType AlphaBlend = AlphaBlendType::Blend;
@@ -748,7 +745,6 @@ struct NodeRendererBasicParameter
 	TextureWrapType TextureWrap1 = TextureWrapType::Repeat;
 	TextureFilterType TextureFilter2 = TextureFilterType::Nearest;
 	TextureWrapType TextureWrap2 = TextureWrapType::Repeat;
-#ifdef __EFFEKSEER_BUILD_VERSION16__
 	TextureFilterType TextureFilter3 = TextureFilterType::Nearest;
 	TextureWrapType TextureWrap3 = TextureWrapType::Repeat;
 
@@ -766,7 +762,7 @@ struct NodeRendererBasicParameter
 
 	float UVDistortionIntensity = 1.0f;
 
-	int32_t TextureBlendType = 0;
+	int32_t TextureBlendType = -1;
 
 	float BlendUVDistortionIntensity = 1.0f;
 
@@ -781,7 +777,9 @@ struct NodeRendererBasicParameter
 	float EdgeThreshold = 0.0f;
 	uint8_t EdgeColor[4] = { 0 };
 	int32_t EdgeColorScaling = 1;
-#endif
+
+	//! copy from alphacutoff
+	bool IsAlphaCutoffEnabled = false;
 };
 
 //----------------------------------------------------------------------------------

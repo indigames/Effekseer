@@ -99,7 +99,7 @@ namespace Effekseer.Binary
 
 	class RendererValues
 	{
-		public static byte[] GetBytes(Data.RendererValues value, Dictionary<string, int> texture_and_index, Dictionary<string, int> normalTexture_and_index, Dictionary<string, int> model_and_index)
+		public static byte[] GetBytes(Data.RendererValues value, Dictionary<string, int> texture_and_index, Dictionary<string, int> normalTexture_and_index, Dictionary<string, int> model_and_index, ExporterVersion version)
 		{
 			List<byte[]> data = new List<byte[]>();
 
@@ -530,21 +530,22 @@ namespace Effekseer.Binary
 				// 全体色
 				OutputStandardColor(data, param.Color, param.Color_Fixed, param.Color_Random, param.Color_Easing, param.Color_FCurve);
 
-#if __EFFEKSEER_BUILD_VERSION16__
-				if (param.EnableFalloff)
+				if(version >= ExporterVersion.Ver1600)
 				{
-					data.Add((1).GetBytes());
+					if (param.EnableFalloff)
+					{
+						data.Add((1).GetBytes());
 
-					data.Add(param.FalloffParam.ColorBlendType);
-					data.Add(param.FalloffParam.BeginColor);
-					data.Add(param.FalloffParam.EndColor);
-					data.Add(BitConverter.GetBytes(param.FalloffParam.Pow.Value));
+						data.Add(param.FalloffParam.ColorBlendType);
+						data.Add(param.FalloffParam.BeginColor);
+						data.Add(param.FalloffParam.EndColor);
+						data.Add(BitConverter.GetBytes(param.FalloffParam.Pow.Value));
+					}
+					else
+					{
+						data.Add((0).GetBytes());
+					}
 				}
-				else
-				{
-					data.Add((0).GetBytes());
-				}
-#endif
 			}
 			else if (value.Type.Value == Data.RendererValues.ParamaterType.Track)
 			{

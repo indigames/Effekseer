@@ -85,7 +85,6 @@ ImageRendererGL::ImageRendererGL(EffekseerRenderer::Renderer* renderer)
 		{"atPosition", GL_FLOAT, 3, 0, false}, {"atColor", GL_UNSIGNED_BYTE, 4, 12, true}, {"atTexCoord", GL_FLOAT, 2, 16, false}};
 
 	shader_->GetAttribIdList(3, sprite_attribs);
-	shader_->SetVertexSize(sizeof(EffekseerRendererGL::Vertex));
 	shader_->SetVertexConstantBufferSize(sizeof(Effekseer::Matrix44) * 2);
 
 	shader_->AddVertexConstantLayout(EffekseerRendererGL::CONSTANT_TYPE_MATRIX44, shader_->GetUniformId("uMatCamera"), 0);
@@ -96,7 +95,6 @@ ImageRendererGL::ImageRendererGL(EffekseerRenderer::Renderer* renderer)
 	shader_->SetTextureSlot(0, shader_->GetUniformId("uTexture0"));
 
 	shader_no_texture_->GetAttribIdList(3, sprite_attribs);
-	shader_no_texture_->SetVertexSize(sizeof(EffekseerRendererGL::Vertex));
 	shader_no_texture_->SetVertexConstantBufferSize(sizeof(Effekseer::Matrix44) * 2);
 
 	shader_no_texture_->AddVertexConstantLayout(
@@ -137,7 +135,7 @@ void ImageRendererGL::Draw(const Effekseer::Vector3D positions[],
 		s.Verteies[i].Pos = positions[i];
 		s.Verteies[i].UV[0] = uvs[i].X;
 		s.Verteies[i].UV[1] = uvs[i].Y;
-		s.Verteies[i].SetColor(colors[i]);
+		s.Verteies[i].SetColor(colors[i], false);
 	}
 
 	s.TexturePtr = texturePtr;
