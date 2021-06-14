@@ -13,22 +13,23 @@ struct VS_Input
     float3 Tangent;
     float2 UV;
     float4 Color;
-    uint4 Index;
+    uint Index;
 };
 
 struct VS_Output
 {
-    float4 Pos;
-    float2 UV;
+    float4 PosVS;
     float4 Color;
+    float2 UV;
+    float4 PosP;
 };
 
 struct VS_ConstantBuffer
 {
     float4x4 mCameraProj;
-    float4x4 mModel[1];
-    float4 fUV[1];
-    float4 fModelColor[1];
+    float4x4 mModel_Inst[40];
+    float4 fUV[40];
+    float4 fModelColor[40];
     float4 fLightDirection;
     float4 fLightColor;
     float4 fLightAmbient;
@@ -37,8 +38,9 @@ struct VS_ConstantBuffer
 
 struct main0_out
 {
-    float2 _entryPointOutput_UV [[user(locn0)]];
-    float4 _entryPointOutput_Color [[user(locn1)]];
+    float4 _entryPointOutput_Color [[user(locn0)]];
+    float2 _entryPointOutput_UV [[user(locn1)]];
+    float4 _entryPointOutput_PosP [[user(locn2)]];
     float4 gl_Position [[position]];
 };
 
@@ -50,27 +52,30 @@ struct main0_in
     float3 Input_Tangent [[attribute(3)]];
     float2 Input_UV [[attribute(4)]];
     float4 Input_Color [[attribute(5)]];
-    uint4 Input_Index [[attribute(6)]];
 };
 
 static inline __attribute__((always_inline))
-VS_Output _main(VS_Input Input, constant VS_ConstantBuffer& v_27)
+VS_Output _main(VS_Input Input, constant VS_ConstantBuffer& v_31)
 {
-    float4x4 matModel = transpose(v_27.mModel[Input.Index.x]);
-    float4 uv = v_27.fUV[Input.Index.x];
-    float4 modelColor = v_27.fModelColor[Input.Index.x] * Input.Color;
-    VS_Output Output = VS_Output{ float4(0.0), float2(0.0), float4(0.0) };
-    float4 localPosition = float4(Input.Pos.x, Input.Pos.y, Input.Pos.z, 1.0);
-    float4 cameraPosition = localPosition * matModel;
-    Output.Pos = v_27.mCameraProj * cameraPosition;
+    uint index = Input.Index;
+    float4x4 mModel = transpose(v_31.mModel_Inst[index]);
+    float4 uv = v_31.fUV[index];
+    float4 modelColor = v_31.fModelColor[index] * Input.Color;
+    VS_Output Output = VS_Output{ float4(0.0), float4(0.0), float2(0.0), float4(0.0) };
+    float4 localPos = float4(Input.Pos.x, Input.Pos.y, Input.Pos.z, 1.0);
+    float4 worldPos = localPos * mModel;
+    Output.PosVS = v_31.mCameraProj * worldPos;
     Output.Color = modelColor;
-    Output.UV.x = (Input.UV.x * uv.z) + uv.x;
-    Output.UV.y = (Input.UV.y * uv.w) + uv.y;
-    Output.UV.y = v_27.mUVInversed.x + (v_27.mUVInversed.y * Output.UV.y);
+    float2 outputUV = Input.UV;
+    outputUV.x = (outputUV.x * uv.z) + uv.x;
+    outputUV.y = (outputUV.y * uv.w) + uv.y;
+    outputUV.y = v_31.mUVInversed.x + (v_31.mUVInversed.y * outputUV.y);
+    Output.UV = outputUV;
+    Output.PosP = Output.PosVS;
     return Output;
 }
 
-vertex main0_out main0(main0_in in [[stage_in]], constant VS_ConstantBuffer& v_27 [[buffer(0)]])
+vertex main0_out main0(main0_in in [[stage_in]], constant VS_ConstantBuffer& v_31 [[buffer(0)]], uint gl_InstanceIndex [[instance_id]])
 {
     main0_out out = {};
     VS_Input Input;
@@ -80,11 +85,12 @@ vertex main0_out main0(main0_in in [[stage_in]], constant VS_ConstantBuffer& v_2
     Input.Tangent = in.Input_Tangent;
     Input.UV = in.Input_UV;
     Input.Color = in.Input_Color;
-    Input.Index = in.Input_Index;
-    VS_Output flattenTemp = _main(Input, v_27);
-    out.gl_Position = flattenTemp.Pos;
-    out._entryPointOutput_UV = flattenTemp.UV;
+    Input.Index = gl_InstanceIndex;
+    VS_Output flattenTemp = _main(Input, v_31);
+    out.gl_Position = flattenTemp.PosVS;
     out._entryPointOutput_Color = flattenTemp.Color;
+    out._entryPointOutput_UV = flattenTemp.UV;
+    out._entryPointOutput_PosP = flattenTemp.PosP;
     return out;
 }
 

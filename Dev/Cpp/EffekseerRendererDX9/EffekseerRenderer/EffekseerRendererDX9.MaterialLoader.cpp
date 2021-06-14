@@ -14,24 +14,21 @@ namespace EffekseerRendererDX9
 
 const int32_t ModelRendererInstanceCount = 10;
 
-MaterialLoader::MaterialLoader(Renderer* renderer, ::Effekseer::FileInterface* fileInterface)
-	: fileInterface_(fileInterface)
+MaterialLoader::MaterialLoader(const RendererImplementedRef& renderer, ::Effekseer::FileInterface* fileInterface)
+	: renderer_(renderer)
+	, fileInterface_(fileInterface)
 {
 	if (fileInterface == nullptr)
 	{
 		fileInterface_ = &defaultFileInterface_;
 	}
-
-	renderer_ = renderer;
-	ES_SAFE_ADDREF(renderer_);
 }
 
 MaterialLoader ::~MaterialLoader()
 {
-	ES_SAFE_RELEASE(renderer_);
 }
 
-::Effekseer::MaterialData* MaterialLoader::Load(const EFK_CHAR* path)
+::Effekseer::MaterialRef MaterialLoader::Load(const char16_t* path)
 {
 	// code file
 	{
@@ -74,11 +71,11 @@ MaterialLoader ::~MaterialLoader()
 	return nullptr;
 }
 
-::Effekseer::MaterialData* MaterialLoader::LoadAcutually(::Effekseer::Material& material, ::Effekseer::CompiledMaterialBinary* binary)
+::Effekseer::MaterialRef MaterialLoader::LoadAcutually(::Effekseer::MaterialFile& materialFile, ::Effekseer::CompiledMaterialBinary* binary)
 {
-	auto materialData = new ::Effekseer::MaterialData();
-	materialData->IsSimpleVertex = material.GetIsSimpleVertex();
-	materialData->IsRefractionRequired = material.GetHasRefraction();
+	auto material = ::Effekseer::MakeRefPtr<::Effekseer::Material>();
+	material->IsSimpleVertex = materialFile.GetIsSimpleVertex();
+	material->IsRefractionRequired = materialFile.GetHasRefraction();
 
 	std::array<Effekseer::MaterialShaderType, 2> shaderTypes;
 	std::array<Effekseer::MaterialShaderType, 2> shaderTypesModel;
@@ -89,7 +86,7 @@ MaterialLoader ::~MaterialLoader()
 	shaderTypesModel[1] = Effekseer::MaterialShaderType::RefractionModel;
 	int32_t shaderTypeCount = 1;
 
-	if (material.GetHasRefraction())
+	if (materialFile.GetHasRefraction())
 	{
 		shaderTypeCount = 2;
 	}
@@ -97,9 +94,9 @@ MaterialLoader ::~MaterialLoader()
 	for (int32_t st = 0; st < shaderTypeCount; st++)
 	{
 		Shader* shader = nullptr;
-		auto parameterGenerator = EffekseerRenderer::MaterialShaderParameterGenerator(material, false, st, ModelRendererInstanceCount);
+		auto parameterGenerator = EffekseerRenderer::MaterialShaderParameterGenerator(materialFile, false, st, ModelRendererInstanceCount);
 
-		if (materialData->IsSimpleVertex)
+		if (material->IsSimpleVertex)
 		{
 			// Pos(3) Color(1) UV(2)
 			D3DVERTEXELEMENT9 decl[] = {{0, 0, D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_POSITION, 0},
@@ -107,13 +104,14 @@ MaterialLoader ::~MaterialLoader()
 										{0, 16, D3DDECLTYPE_FLOAT2, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 0},
 										D3DDECL_END()};
 
-			shader = Shader::Create(static_cast<RendererImplemented*>(renderer_),
+			shader = Shader::Create(renderer_.Get(),
 									(uint8_t*)binary->GetVertexShaderData(shaderTypes[st]),
 									binary->GetVertexShaderSize(shaderTypes[st]),
 									(uint8_t*)binary->GetPixelShaderData(shaderTypes[st]),
 									binary->GetPixelShaderSize(shaderTypes[st]),
 									"MaterialStandardRenderer",
-									decl, true);
+									decl,
+									true);
 		}
 		else
 		{
@@ -144,36 +142,37 @@ MaterialLoader ::~MaterialLoader()
 					return D3DDECLTYPE_FLOAT4;
 			};
 
-			if (material.GetCustomData1Count() > 0)
+			if (materialFile.GetCustomData1Count() > 0)
 			{
-				decl[count].Type = getFormat(material.GetCustomData1Count());
+				decl[count].Type = getFormat(materialFile.GetCustomData1Count());
 				decl[count].Offset = offset;
 				decl[count].UsageIndex = index;
 				index++;
 				count++;
-				offset += sizeof(float) * material.GetCustomData1Count();
+				offset += sizeof(float) * materialFile.GetCustomData1Count();
 			}
 
-			if (material.GetCustomData2Count() > 0)
+			if (materialFile.GetCustomData2Count() > 0)
 			{
-				decl[count].Type = getFormat(material.GetCustomData2Count());
+				decl[count].Type = getFormat(materialFile.GetCustomData2Count());
 				decl[count].Offset = offset;
 				decl[count].UsageIndex = index;
 				index++;
 				count++;
 
-				offset += sizeof(float) * material.GetCustomData2Count();
+				offset += sizeof(float) * materialFile.GetCustomData2Count();
 			}
 
 			decl[count] = D3DDECL_END();
 
-			shader = Shader::Create(static_cast<RendererImplemented*>(renderer_),
+			shader = Shader::Create(renderer_.Get(),
 									(uint8_t*)binary->GetVertexShaderData(shaderTypes[st]),
 									binary->GetVertexShaderSize(shaderTypes[st]),
 									(uint8_t*)binary->GetPixelShaderData(shaderTypes[st]),
 									binary->GetPixelShaderSize(shaderTypes[st]),
 									"MaterialStandardRenderer",
-									decl, true);
+									decl,
+									true);
 		}
 
 		if (shader == nullptr)
@@ -183,25 +182,25 @@ MaterialLoader ::~MaterialLoader()
 		auto pixelUniformSize = parameterGenerator.PixelShaderUniformBufferSize;
 
 		shader->SetVertexConstantBufferSize(vertexUniformSize);
-		
+
 		shader->SetPixelConstantBufferSize(pixelUniformSize);
-		
-		materialData->TextureCount = material.GetTextureCount();
-		materialData->UniformCount = material.GetUniformCount();
+
+		material->TextureCount = materialFile.GetTextureCount();
+		material->UniformCount = materialFile.GetUniformCount();
 
 		if (st == 0)
 		{
-			materialData->UserPtr = shader;
+			material->UserPtr = shader;
 		}
 		else
 		{
-			materialData->RefractionUserPtr = shader;
+			material->RefractionUserPtr = shader;
 		}
 	}
 
 	for (int32_t st = 0; st < shaderTypeCount; st++)
 	{
-		auto parameterGenerator = EffekseerRenderer::MaterialShaderParameterGenerator(material, true, st, ModelRendererInstanceCount);
+		auto parameterGenerator = EffekseerRenderer::MaterialShaderParameterGenerator(materialFile, true, st, ModelRendererInstanceCount);
 
 		D3DVERTEXELEMENT9 decl[] = {{0, 0, D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_POSITION, 0},
 									{0, 12, D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_NORMAL, 0},
@@ -209,13 +208,13 @@ MaterialLoader ::~MaterialLoader()
 									{0, 36, D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_NORMAL, 2},
 									{0, 48, D3DDECLTYPE_FLOAT2, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 0},
 									{0, 56, D3DDECLTYPE_D3DCOLOR, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_NORMAL, 3},
-									{0, 60, D3DDECLTYPE_UBYTE4, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_BLENDINDICES, 0},
+									{1, 0, D3DDECLTYPE_FLOAT1, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_BLENDINDICES, 0},
 									D3DDECL_END()};
 
 		// compile
 		std::string log;
 
-		auto shader = Shader::Create(static_cast<RendererImplemented*>(renderer_),
+		auto shader = Shader::Create(renderer_.Get(),
 									 (uint8_t*)binary->GetVertexShaderData(shaderTypesModel[st]),
 									 binary->GetVertexShaderSize(shaderTypesModel[st]),
 									 (uint8_t*)binary->GetPixelShaderData(shaderTypesModel[st]),
@@ -235,29 +234,29 @@ MaterialLoader ::~MaterialLoader()
 
 		if (st == 0)
 		{
-			materialData->ModelUserPtr = shader;
+			material->ModelUserPtr = shader;
 		}
 		else
 		{
-			materialData->RefractionModelUserPtr = shader;
+			material->RefractionModelUserPtr = shader;
 		}
 	}
 
-	materialData->CustomData1 = material.GetCustomData1Count();
-	materialData->CustomData2 = material.GetCustomData2Count();
-	materialData->TextureCount = std::min(material.GetTextureCount(), Effekseer::UserTextureSlotMax);
-	materialData->UniformCount = material.GetUniformCount();
-	materialData->ShadingModel = material.GetShadingModel();
+	material->CustomData1 = materialFile.GetCustomData1Count();
+	material->CustomData2 = materialFile.GetCustomData2Count();
+	material->TextureCount = std::min(materialFile.GetTextureCount(), Effekseer::UserTextureSlotMax);
+	material->UniformCount = materialFile.GetUniformCount();
+	material->ShadingModel = materialFile.GetShadingModel();
 
-	for (int32_t i = 0; i < materialData->TextureCount; i++)
+	for (int32_t i = 0; i < material->TextureCount; i++)
 	{
-		materialData->TextureWrapTypes.at(i) = material.GetTextureWrap(i);
+		material->TextureWrapTypes.at(i) = materialFile.GetTextureWrap(i);
 	}
 
-	return materialData;
+	return material;
 }
 
-::Effekseer::MaterialData* MaterialLoader::Load(const void* data, int32_t size, Effekseer::MaterialFileType fileType)
+::Effekseer::MaterialRef MaterialLoader::Load(const void* data, int32_t size, Effekseer::MaterialFileType fileType)
 {
 	if (fileType == Effekseer::MaterialFileType::Compiled)
 	{
@@ -273,24 +272,34 @@ MaterialLoader ::~MaterialLoader()
 		}
 
 		// compiled
-		Effekseer::Material material;
-		material.Load((const uint8_t*)compiled.GetOriginalData().data(), static_cast<int32_t>(compiled.GetOriginalData().size()));
+		Effekseer::MaterialFile materialFile;
+		if (!materialFile.Load((const uint8_t*)compiled.GetOriginalData().data(), static_cast<int32_t>(compiled.GetOriginalData().size())))
+		{
+			std::cout << "Error : Invalid material is loaded." << std::endl;
+			return nullptr;
+		}
+
 		auto binary = compiled.GetBinary(::Effekseer::CompiledMaterialPlatformType::DirectX9);
 
-		return LoadAcutually(material, binary);
+		return LoadAcutually(materialFile, binary);
 	}
 	else
 	{
-		Effekseer::Material material;
-		material.Load((const uint8_t*)data, size);
-		auto compiler = ::Effekseer::CreateUniqueReference(new Effekseer::MaterialCompilerDX9());
-		auto binary = ::Effekseer::CreateUniqueReference(compiler->Compile(&material));
+		Effekseer::MaterialFile materialFile;
+		if (!materialFile.Load((const uint8_t*)data, size))
+		{
+			std::cout << "Error : Invalid material is loaded." << std::endl;
+			return nullptr;
+		}
 
-		return LoadAcutually(material, binary.get());
+		auto compiler = ::Effekseer::CreateUniqueReference(new Effekseer::MaterialCompilerDX9());
+		auto binary = ::Effekseer::CreateUniqueReference(compiler->Compile(&materialFile));
+
+		return LoadAcutually(materialFile, binary.get());
 	}
 }
 
-void MaterialLoader::Unload(::Effekseer::MaterialData* data)
+void MaterialLoader::Unload(::Effekseer::MaterialRef data)
 {
 	if (data == nullptr)
 		return;
@@ -303,7 +312,11 @@ void MaterialLoader::Unload(::Effekseer::MaterialData* data)
 	ES_SAFE_DELETE(modelShader);
 	ES_SAFE_DELETE(refractionShader);
 	ES_SAFE_DELETE(refractionModelShader);
-	ES_SAFE_DELETE(data);
+
+	data->UserPtr = nullptr;
+	data->ModelUserPtr = nullptr;
+	data->RefractionUserPtr = nullptr;
+	data->RefractionModelUserPtr = nullptr;
 }
 
 } // namespace EffekseerRendererDX9

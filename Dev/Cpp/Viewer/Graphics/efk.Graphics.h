@@ -25,13 +25,6 @@ namespace efk
 {
 class Graphics;
 
-enum class TextureFormat
-{
-	RGBA8U,
-	RGBA16F,
-	R16F,
-};
-
 enum class TextureFeatureType
 {
 	Texture2D,
@@ -44,15 +37,20 @@ class RenderTexture
 protected:
 	int32_t samplingCount_ = 1;
 	Effekseer::Tool::Vector2DI size_;
-	TextureFormat format_;
+	Effekseer::Backend::TextureFormatType format_;
 
 public:
 	RenderTexture() = default;
 	virtual ~RenderTexture() = default;
 
-	virtual bool Initialize(Effekseer::Tool::Vector2DI size, TextureFormat format, uint32_t multisample = 1) = 0;
+	virtual bool Initialize(Effekseer::Tool::Vector2DI size, Effekseer::Backend::TextureFormatType format, uint32_t multisample = 1) = 0;
 
 	virtual uint64_t GetViewID() = 0;
+
+	virtual Effekseer::Backend::TextureRef GetAsBackend()
+	{
+		return nullptr;
+	}
 
 	Effekseer::Tool::Vector2DI GetSize() const
 	{
@@ -64,7 +62,7 @@ public:
 		return samplingCount_;
 	}
 
-	TextureFormat GetFormat() const
+	Effekseer::Backend::TextureFormatType GetFormat() const
 	{
 		return format_;
 	}
@@ -78,6 +76,11 @@ public:
 	DepthTexture() = default;
 	virtual ~DepthTexture() = default;
 
+	virtual Effekseer::Backend::TextureRef GetAsBackend()
+	{
+		return nullptr;
+	}
+
 	virtual bool Initialize(int32_t width, int32_t height, uint32_t multisample = 1) = 0;
 
 	static DepthTexture* Create(Graphics* graphics);
@@ -85,10 +88,6 @@ public:
 
 class Graphics
 {
-protected:
-	RenderTexture* currentRenderTexture = nullptr;
-	DepthTexture* currentDepthTexture = nullptr;
-
 public:
 	Graphics()
 	{
@@ -97,11 +96,9 @@ public:
 	{
 	}
 
-	virtual bool Initialize(void* windowHandle, int32_t windowWidth, int32_t windowHeight, bool isSRGBMode) = 0;
+	virtual bool Initialize(void* windowHandle, int32_t windowWidth, int32_t windowHeight) = 0;
 
-	virtual void CopyTo(RenderTexture* src, RenderTexture* dst) = 0;
-
-	//virtual void CopyToBackground() = 0;
+	virtual void CopyTo(Effekseer::Backend::TextureRef src, Effekseer::Backend::TextureRef dst) = 0;
 
 	virtual void Resize(int32_t width, int32_t height) = 0;
 
@@ -111,9 +108,9 @@ public:
 
 	virtual void EndScene() = 0;
 
-	virtual void SetRenderTarget(RenderTexture* renderTexture, DepthTexture* depthTexture) = 0;
+	virtual void SetRenderTarget(std::vector<Effekseer::Backend::TextureRef> renderTextures, Effekseer::Backend::TextureRef depthTexture) = 0;
 
-	virtual void SaveTexture(RenderTexture* texture, std::vector<Effekseer::Color>& pixels) = 0;
+	virtual void SaveTexture(Effekseer::Backend::TextureRef texture, std::vector<Effekseer::Color>& pixels) = 0;
 
 	virtual void Clear(Effekseer::Color color) = 0;
 
@@ -123,52 +120,25 @@ public:
 
 	virtual DeviceType GetDeviceType() const = 0;
 
-	virtual RenderTexture* GetRenderTexture() const
-	{
-		return currentRenderTexture;
-	}
-	virtual DepthTexture* GetDepthTexture() const
-	{
-		return currentDepthTexture;
-	}
-
-	virtual void ResolveRenderTarget(RenderTexture* src, RenderTexture* dest)
+	virtual void ResolveRenderTarget(Effekseer::Backend::TextureRef src, Effekseer::Backend::TextureRef dest)
 	{
 	}
 
-	virtual bool CheckFormatSupport(TextureFormat format, TextureFeatureType feature)
+	virtual bool CheckFormatSupport(Effekseer::Backend::TextureFormatType format, TextureFeatureType feature)
 	{
 		return true;
 	}
 
-	virtual int GetMultisampleLevel(TextureFormat format)
+	virtual int GetMultisampleLevel(Effekseer::Backend::TextureFormatType format)
 	{
 		return 4;
 	}
 
-	virtual std::shared_ptr<Effekseer::Tool::RenderPass> CreateRenderPass(std::shared_ptr<efk::RenderTexture> colorTexture, std::shared_ptr<efk::DepthTexture> depthTexture)
-	{
-		return nullptr;
-	}
-
-	virtual std::shared_ptr<Effekseer::Tool::CommandList> CreateCommandList()
-	{
-		return nullptr;
-	}
-
-	/**
-	Called when device is losted.
-	*/
-	//std::function<void()> LostedDevice;
-
-	/**
-	Called when device is resetted.
-	*/
-	//std::function<void()> ResettedDevice;
-
-	/**
-	Called when device is presented.
-	*/
 	std::function<void()> Presented;
+
+	virtual Effekseer::RefPtr<Effekseer::Backend::GraphicsDevice> GetGraphicsDevice()
+	{
+		return nullptr;
+	}
 };
 } // namespace efk

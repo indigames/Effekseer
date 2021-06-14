@@ -14,7 +14,7 @@ namespace EffekseerSound
 //----------------------------------------------------------------------------------
 //
 //----------------------------------------------------------------------------------
-SoundPlayer::SoundPlayer(SoundImplemented* sound)
+SoundPlayer::SoundPlayer(const SoundImplementedRef& sound)
 	: m_sound(sound)
 {
 }
@@ -33,19 +33,20 @@ SoundPlayer::~SoundPlayer()
 {
 	if (m_sound->GetMute())
 	{
-		return NULL;
+		return nullptr;
 	}
-	SoundData* soundData = (SoundData*)parameter.Data;
-	if (soundData)
+
+	if (parameter.Data != nullptr)
 	{
-		SoundVoice* voice = m_sound->GetVoice(soundData->channels);
+		SoundData* soundDataImpl = (SoundData*)parameter.Data.Get();
+		SoundVoice* voice = m_sound->GetVoice(soundDataImpl->GetChannels());
 		if (voice)
 		{
 			voice->Play(tag, parameter);
 			return (::Effekseer::SoundHandle)voice;
 		}
 	}
-	return NULL;
+	return nullptr;
 }
 
 //----------------------------------------------------------------------------------

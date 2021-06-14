@@ -1,19 +1,14 @@
-﻿
-
-//----------------------------------------------------------------------------------
-//
-//----------------------------------------------------------------------------------
+﻿#include "Effekseer.EffectNodeTrack.h"
 #include "Effekseer.Effect.h"
 #include "Effekseer.EffectNode.h"
 #include "Effekseer.Manager.h"
 #include "Effekseer.Vector3D.h"
-#include "SIMD/Effekseer.SIMDUtils.h"
+#include "SIMD/Utils.h"
 
 #include "Effekseer.Instance.h"
 #include "Effekseer.InstanceContainer.h"
 #include "Effekseer.InstanceGlobal.h"
 
-#include "Effekseer.EffectNodeTrack.h"
 #include "Effekseer.InstanceGroup.h"
 
 #include "Effekseer.Setting.h"
@@ -26,7 +21,7 @@ namespace Effekseer
 //----------------------------------------------------------------------------------
 //
 //----------------------------------------------------------------------------------
-void EffectNodeTrack::LoadRendererParameter(unsigned char*& pos, Setting* setting)
+void EffectNodeTrack::LoadRendererParameter(unsigned char*& pos, const SettingRef& setting)
 {
 	int32_t type = 0;
 	memcpy(&type, pos, sizeof(int));
@@ -85,10 +80,10 @@ void EffectNodeTrack::LoadRendererParameter(unsigned char*& pos, Setting* settin
 //----------------------------------------------------------------------------------
 //
 //----------------------------------------------------------------------------------
-void EffectNodeTrack::BeginRendering(int32_t count, Manager* manager)
+void EffectNodeTrack::BeginRendering(int32_t count, Manager* manager, void* userData)
 {
-	TrackRenderer* renderer = manager->GetTrackRenderer();
-	if (renderer != NULL)
+	TrackRendererRef renderer = manager->GetTrackRenderer();
+	if (renderer != nullptr)
 	{
 		// m_nodeParameter.TextureFilter = RendererCommon.FilterType;
 		// m_nodeParameter.TextureWrap = RendererCommon.WrapType;
@@ -102,18 +97,20 @@ void EffectNodeTrack::BeginRendering(int32_t count, Manager* manager)
 		m_nodeParameter.BasicParameterPtr = &RendererCommon.BasicParameter;
 		m_nodeParameter.TextureUVTypeParameterPtr = &TextureUVType;
 		m_nodeParameter.IsRightHand = manager->GetCoordinateSystem() == CoordinateSystem::RH;
-		m_nodeParameter.EnableViewOffset = (TranslationType == ParameterTranslationType_ViewOffset);
+		m_nodeParameter.Maginification = GetEffect()->GetMaginification();
 
-		renderer->BeginRendering(m_nodeParameter, count, m_userData);
+		m_nodeParameter.EnableViewOffset = (TranslationType == ParameterTranslationType_ViewOffset);
+		m_nodeParameter.UserData = GetRenderingUserData();
+		renderer->BeginRendering(m_nodeParameter, count, userData);
 	}
 }
 
 //----------------------------------------------------------------------------------
 //
 //----------------------------------------------------------------------------------
-void EffectNodeTrack::BeginRenderingGroup(InstanceGroup* group, Manager* manager)
+void EffectNodeTrack::BeginRenderingGroup(InstanceGroup* group, Manager* manager, void* userData)
 {
-	TrackRenderer* renderer = manager->GetTrackRenderer();
+	TrackRendererRef renderer = manager->GetTrackRenderer();
 	if (renderer != nullptr)
 	{
 		m_currentGroupValues = group->rendererValues.track;
@@ -134,7 +131,7 @@ void EffectNodeTrack::BeginRenderingGroup(InstanceGroup* group, Manager* manager
 			m_instanceParameter.FlipbookIndexAndNextRate = groupFirst->m_flipbookIndexAndNextRate;
 
 			m_instanceParameter.AlphaThreshold = groupFirst->m_AlphaThreshold;
-			
+
 			if (m_nodeParameter.EnableViewOffset == true)
 			{
 				m_instanceParameter.ViewOffsetDistance = groupFirst->translation_values.view_offset.distance;
@@ -143,23 +140,23 @@ void EffectNodeTrack::BeginRenderingGroup(InstanceGroup* group, Manager* manager
 			CalcCustomData(group->GetFirst(), m_instanceParameter.CustomData1, m_instanceParameter.CustomData2);
 		}
 
-		renderer->BeginRenderingGroup(m_nodeParameter, group->GetInstanceCount(), m_userData);
+		renderer->BeginRenderingGroup(m_nodeParameter, group->GetInstanceCount(), userData);
 	}
 }
 
-void EffectNodeTrack::EndRenderingGroup(InstanceGroup* group, Manager* manager)
+void EffectNodeTrack::EndRenderingGroup(InstanceGroup* group, Manager* manager, void* userData)
 {
-	TrackRenderer* renderer = manager->GetTrackRenderer();
-	if (renderer != NULL)
+	TrackRendererRef renderer = manager->GetTrackRenderer();
+	if (renderer != nullptr)
 	{
-		renderer->EndRenderingGroup(m_nodeParameter, group->GetInstanceCount(), m_userData);
+		renderer->EndRenderingGroup(m_nodeParameter, group->GetInstanceCount(), userData);
 	}
 }
 
-void EffectNodeTrack::Rendering(const Instance& instance, const Instance* next_instance, Manager* manager)
+void EffectNodeTrack::Rendering(const Instance& instance, const Instance* next_instance, Manager* manager, void* userData)
 {
-	TrackRenderer* renderer = manager->GetTrackRenderer();
-	if (renderer != NULL)
+	TrackRendererRef renderer = manager->GetTrackRenderer();
+	if (renderer != nullptr)
 	{
 		float t = (float)instance.m_LivingTime / (float)instance.m_LivedTime;
 		int32_t time = (int32_t)instance.m_LivingTime;
@@ -186,7 +183,7 @@ void EffectNodeTrack::Rendering(const Instance& instance, const Instance* next_i
 
 		m_instanceParameter.SRTMatrix43 = instance.GetGlobalMatrix43();
 
-		renderer->Rendering(m_nodeParameter, m_instanceParameter, m_userData);
+		renderer->Rendering(m_nodeParameter, m_instanceParameter, userData);
 		m_instanceParameter.InstanceIndex++;
 	}
 }
@@ -194,12 +191,12 @@ void EffectNodeTrack::Rendering(const Instance& instance, const Instance* next_i
 //----------------------------------------------------------------------------------
 //
 //----------------------------------------------------------------------------------
-void EffectNodeTrack::EndRendering(Manager* manager)
+void EffectNodeTrack::EndRendering(Manager* manager, void* userData)
 {
-	TrackRenderer* renderer = manager->GetTrackRenderer();
-	if (renderer != NULL)
+	TrackRendererRef renderer = manager->GetTrackRenderer();
+	if (renderer != nullptr)
 	{
-		renderer->EndRendering(m_nodeParameter, m_userData);
+		renderer->EndRendering(m_nodeParameter, userData);
 	}
 }
 
@@ -228,15 +225,16 @@ void EffectNodeTrack::InitializeRenderedInstanceGroup(InstanceGroup& instanceGro
 //----------------------------------------------------------------------------------
 //
 //----------------------------------------------------------------------------------
-void EffectNodeTrack::InitializeRenderedInstance(Instance& instance, Manager* manager)
+void EffectNodeTrack::InitializeRenderedInstance(Instance& instance, InstanceGroup& instanceGroup, Manager* manager)
 {
-	IRandObject* rand = &instance.GetRandObject();
+	auto& instValues = instanceGroup.rendererValues.track;
+
 	// Calculate only center
 	int32_t time = (int32_t)instance.m_LivingTime;
 	int32_t livedTime = (int32_t)instance.m_LivedTime;
 
 	Color c;
-	SetValues(c, instance, m_currentGroupValues.ColorCenterMiddle, TrackColorCenterMiddle, time, livedTime);
+	SetValues(c, instance, instValues.ColorCenterMiddle, TrackColorCenterMiddle, time, livedTime);
 
 	if (RendererCommon.ColorBindType == BindType::Always || RendererCommon.ColorBindType == BindType::WhenCreating)
 	{
@@ -249,14 +247,15 @@ void EffectNodeTrack::InitializeRenderedInstance(Instance& instance, Manager* ma
 //----------------------------------------------------------------------------------
 //
 //----------------------------------------------------------------------------------
-void EffectNodeTrack::UpdateRenderedInstance(Instance& instance, Manager* manager)
+void EffectNodeTrack::UpdateRenderedInstance(Instance& instance, InstanceGroup& instanceGroup, Manager* manager)
 {
+	auto& instValues = instanceGroup.rendererValues.track;
 	// Calculate only center
 	int32_t time = (int32_t)instance.m_LivingTime;
 	int32_t livedTime = (int32_t)instance.m_LivedTime;
 
 	Color c;
-	SetValues(c, instance, m_currentGroupValues.ColorCenterMiddle, TrackColorCenterMiddle, time, livedTime);
+	SetValues(c, instance, instValues.ColorCenterMiddle, TrackColorCenterMiddle, time, livedTime);
 
 	instance.ColorInheritance = c;
 }

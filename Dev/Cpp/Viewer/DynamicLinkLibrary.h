@@ -4,7 +4,7 @@
 #include <atomic>
 
 #ifdef _WIN32
-#include <Windows.h>
+#include <windows.h>
 #else
 #include <cstddef>
 #include <dlfcn.h>
@@ -47,7 +47,7 @@ public:
 #else
 		void* pProc = dlsym(dll_, name);
 #endif
-		if (pProc == NULL)
+		if (pProc == nullptr)
 		{
 			return nullptr;
 		}

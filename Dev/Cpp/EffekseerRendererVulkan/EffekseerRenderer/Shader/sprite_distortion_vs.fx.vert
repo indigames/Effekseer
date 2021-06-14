@@ -4,64 +4,57 @@ struct VS_Input
 {
     vec3 Pos;
     vec4 Color;
-    vec2 UV;
-    vec3 Binormal;
-    vec3 Tangent;
+    vec4 Normal;
+    vec4 Tangent;
+    vec2 UV1;
+    vec2 UV2;
 };
 
 struct VS_Output
 {
-    vec4 Position;
-    vec4 Color;
+    vec4 PosVS;
     vec2 UV;
-    vec4 Pos;
-    vec4 PosU;
-    vec4 PosR;
+    vec4 ProjBinormal;
+    vec4 ProjTangent;
+    vec4 PosP;
+    vec4 Color;
 };
 
 layout(set = 0, binding = 0, std140) uniform VS_ConstantBuffer
 {
     layout(row_major) mat4 mCamera;
-    layout(row_major) mat4 mProj;
+    layout(row_major) mat4 mCameraProj;
     vec4 mUVInversed;
     vec4 mflipbookParameter;
-} _63;
+} _72;
 
 layout(location = 0) in vec3 Input_Pos;
 layout(location = 1) in vec4 Input_Color;
-layout(location = 2) in vec2 Input_UV;
-layout(location = 3) in vec3 Input_Binormal;
-layout(location = 4) in vec3 Input_Tangent;
-layout(location = 0) out vec4 _entryPointOutput_Color;
-layout(location = 1) out vec2 _entryPointOutput_UV;
-layout(location = 2) out vec4 _entryPointOutput_Pos;
-layout(location = 3) out vec4 _entryPointOutput_PosU;
-layout(location = 4) out vec4 _entryPointOutput_PosR;
+layout(location = 2) in vec4 Input_Normal;
+layout(location = 3) in vec4 Input_Tangent;
+layout(location = 4) in vec2 Input_UV1;
+layout(location = 5) in vec2 Input_UV2;
+layout(location = 0) centroid out vec2 _entryPointOutput_UV;
+layout(location = 1) out vec4 _entryPointOutput_ProjBinormal;
+layout(location = 2) out vec4 _entryPointOutput_ProjTangent;
+layout(location = 3) out vec4 _entryPointOutput_PosP;
+layout(location = 4) centroid out vec4 _entryPointOutput_Color;
 
 VS_Output _main(VS_Input Input)
 {
-    VS_Output Output = VS_Output(vec4(0.0), vec4(0.0), vec2(0.0), vec4(0.0), vec4(0.0), vec4(0.0));
-    vec4 pos4 = vec4(Input.Pos.x, Input.Pos.y, Input.Pos.z, 1.0);
-    vec4 localBinormal = vec4(Input.Pos.x + Input.Binormal.x, Input.Pos.y + Input.Binormal.y, Input.Pos.z + Input.Binormal.z, 1.0);
-    vec4 localTangent = vec4(Input.Pos.x + Input.Tangent.x, Input.Pos.y + Input.Tangent.y, Input.Pos.z + Input.Tangent.z, 1.0);
-    localBinormal *= _63.mCamera;
-    localTangent *= _63.mCamera;
-    vec4 cameraPos = pos4 * _63.mCamera;
-    cameraPos /= vec4(cameraPos.w);
-    localBinormal /= vec4(localBinormal.w);
-    localTangent /= vec4(localTangent.w);
-    localBinormal = cameraPos + normalize(localBinormal - cameraPos);
-    localTangent = cameraPos + normalize(localTangent - cameraPos);
-    Output.Position = cameraPos * _63.mProj;
-    Output.Pos = Output.Position;
-    Output.PosU = localBinormal * _63.mProj;
-    Output.PosR = localTangent * _63.mProj;
-    Output.PosU /= vec4(Output.PosU.w);
-    Output.PosR /= vec4(Output.PosR.w);
-    Output.Pos /= vec4(Output.Pos.w);
+    VS_Output Output = VS_Output(vec4(0.0), vec2(0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0));
+    vec4 worldNormal = vec4((Input.Normal.xyz - vec3(0.5)) * 2.0, 0.0);
+    vec4 worldTangent = vec4((Input.Tangent.xyz - vec3(0.5)) * 2.0, 0.0);
+    vec4 worldBinormal = vec4(cross(worldNormal.xyz, worldTangent.xyz), 0.0);
+    vec4 worldPos = vec4(Input.Pos.x, Input.Pos.y, Input.Pos.z, 1.0);
+    Output.PosVS = worldPos * _72.mCameraProj;
     Output.Color = Input.Color;
-    Output.UV = Input.UV;
-    Output.UV.y = _63.mUVInversed.x + (_63.mUVInversed.y * Input.UV.y);
+    vec2 uv1 = Input.UV1;
+    uv1.y = _72.mUVInversed.x + (_72.mUVInversed.y * uv1.y);
+    Output.UV = uv1;
+    Output.ProjTangent = (worldPos + worldTangent) * _72.mCameraProj;
+    Output.ProjBinormal = (worldPos + worldBinormal) * _72.mCameraProj;
+    Output.PosP = Output.PosVS;
     return Output;
 }
 
@@ -70,17 +63,18 @@ void main()
     VS_Input Input;
     Input.Pos = Input_Pos;
     Input.Color = Input_Color;
-    Input.UV = Input_UV;
-    Input.Binormal = Input_Binormal;
+    Input.Normal = Input_Normal;
     Input.Tangent = Input_Tangent;
+    Input.UV1 = Input_UV1;
+    Input.UV2 = Input_UV2;
     VS_Output flattenTemp = _main(Input);
-    vec4 _position = flattenTemp.Position;
+    vec4 _position = flattenTemp.PosVS;
     _position.y = -_position.y;
     gl_Position = _position;
-    _entryPointOutput_Color = flattenTemp.Color;
     _entryPointOutput_UV = flattenTemp.UV;
-    _entryPointOutput_Pos = flattenTemp.Pos;
-    _entryPointOutput_PosU = flattenTemp.PosU;
-    _entryPointOutput_PosR = flattenTemp.PosR;
+    _entryPointOutput_ProjBinormal = flattenTemp.ProjBinormal;
+    _entryPointOutput_ProjTangent = flattenTemp.ProjTangent;
+    _entryPointOutput_PosP = flattenTemp.PosP;
+    _entryPointOutput_Color = flattenTemp.Color;
 }
 

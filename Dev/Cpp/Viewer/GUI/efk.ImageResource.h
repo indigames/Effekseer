@@ -1,5 +1,6 @@
 #pragma once
 
+#include "../efk.Base.h"
 #include <Effekseer.h>
 #include <string>
 
@@ -9,16 +10,17 @@ namespace efk
 class ImageResource
 {
 private:
-	std::shared_ptr<Effekseer::TextureLoader> loader_ = nullptr;
+	DeviceType deviceType_;
+	Effekseer::TextureLoaderRef loader_;
 	std::u16string path;
-	Effekseer::TextureData* textureData = nullptr;
+	Effekseer::TextureRef texture;
 
 public:
 	//! dummy
 	ImageResource() = default;
 
 #if !defined(SWIG)
-	ImageResource(std::shared_ptr<Effekseer::TextureLoader> loader);
+	ImageResource(DeviceType deviceType, Effekseer::TextureLoaderRef loader);
 #endif
 	virtual ~ImageResource();
 	bool Validate();
@@ -29,11 +31,16 @@ public:
 	}
 	int32_t GetWidth() const
 	{
-		return textureData->Width;
+		return texture->GetWidth();
 	}
 	int32_t GetHeight() const
 	{
-		return textureData->Height;
+		return texture->GetHeight();
+	}
+
+	DeviceType GetDeviceType() const
+	{
+		return deviceType_;
 	}
 
 #if !defined(SWIG)
@@ -41,9 +48,9 @@ public:
 	{
 		this->path = path;
 	}
-	Effekseer::TextureData*& GetTextureData()
+	const Effekseer::TextureRef& GetTexture()
 	{
-		return textureData;
+		return texture;
 	}
 #endif
 };

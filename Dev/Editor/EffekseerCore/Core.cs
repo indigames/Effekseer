@@ -21,6 +21,41 @@ namespace Effekseer
 			languages = lines.ToList();
 		}
 
+		public static void CreateTableFromDirectory(string rootDirectory)
+		{
+			languages = new List<string> { "en" };
+
+			var languageDir = Utils.Misc.BackSlashToSlash(System.IO.Path.Combine(rootDirectory, "resources/languages/"));
+
+			var directories = System.IO.Directory.GetDirectories(languageDir).Select(_ => Utils.Misc.BackSlashToSlash(_));
+			foreach (var directory in directories)
+			{
+				var name = directory.Split('/').Last();
+				if(name == "en")
+				{
+					continue;
+				}
+				languages.Add(name);
+			}
+
+
+		}
+
+		public static void StoreLanguageNames(string rootDirectory)
+		{
+			var languageDir = Utils.Misc.BackSlashToSlash(System.IO.Path.Combine(rootDirectory, "resources/languages/"));
+
+			foreach (var lang in languages)
+			{
+				var languageNameFilePath = languageDir + lang + "/language.txt";
+				if (System.IO.File.Exists(languageNameFilePath))
+				{
+					var name = System.IO.File.ReadAllText(languageNameFilePath, Encoding.UTF8);
+					MultiLanguageTextProvider.AddText("Language_" + lang, name);
+				}
+			}
+		}
+
 		public static void SelectLanguage(int index, bool callEvent = true)
 		{
 			if (selectedIndex == index) return;
@@ -85,14 +120,7 @@ namespace Effekseer
 					if (record.Count < 2) continue;
 					if (record[0] == string.Empty) continue;
 
-					if (texts.ContainsKey(record[0]))
-					{
-						texts[record[0]] = record[1];
-					}
-					else
-					{
-						texts.Add(record[0], record[1]);
-					}
+					AddText(record[0], record[1]);
 				}
 			}
 		}
@@ -110,6 +138,18 @@ namespace Effekseer
 				return ret;
 			}
 			return key;
+		}
+
+		public static void AddText(string key, string text)
+		{
+			if (texts.ContainsKey(key))
+			{
+				texts[key] = text;
+			}
+			else
+			{
+				texts.Add(key, text);
+			}
 		}
 	}
 
@@ -148,7 +188,7 @@ namespace Effekseer
 
 	public class Core
 	{
-		public const string Version = "1.52b";
+		public const string Version = "1.60c";
 
 		public const string OptionFilePath = "config.option.xml";
 
@@ -173,6 +213,8 @@ namespace Effekseer
 		static Data.RecordingValues recording = new Data.RecordingValues();
 
 		static Data.DynamicValues dynamic_ = new Data.DynamicValues();
+
+		static Data.ProceduralModelValues proceduralModels = new ProceduralModelValues();
 
 		static int start_frame = 0;
 
@@ -357,6 +399,11 @@ namespace Effekseer
 		public static Data.DynamicValues Dynamic
 		{
 			get { return dynamic_; }
+		}
+
+		public static Data.ProceduralModelValues ProceduralModel
+		{
+			get { return proceduralModels; }
 		}
 
 		/// <summary>
@@ -739,6 +786,8 @@ namespace Effekseer
 
 			dynamic_ = new Data.DynamicValues();
 
+			proceduralModels.ProceduralModels.Clear();
+
 			// Add a root node
 			Root.AddChild();
 			Command.CommandManager.Clear();
@@ -763,6 +812,7 @@ namespace Effekseer
 			var cullingElement = Data.IO.SaveObjectToElement(doc, "Culling", Culling, false);
 			var globalElement = Data.IO.SaveObjectToElement(doc, "Global", Global, false);
 			var dynamicElement = Data.IO.SaveObjectToElement(doc, "Dynamic", Dynamic, false);
+			var proceduralModelElement = Data.IO.SaveObjectToElement(doc, "ProceduralModel", ProceduralModel, false);
 
 			System.Xml.XmlElement project_root = doc.CreateElement("EffekseerProject");
 
@@ -772,6 +822,7 @@ namespace Effekseer
 			if (cullingElement != null) project_root.AppendChild(cullingElement);
 			if (globalElement != null) project_root.AppendChild(globalElement);
 			if (dynamicElement != null) project_root.AppendChild(dynamicElement);
+			if (proceduralModelElement != null) project_root.AppendChild(proceduralModelElement);
 
 			// recording option (this option is stored in local or global)
 			if (recording.RecordingStorageTarget.Value == Data.RecordingStorageTargetTyoe.Local)
@@ -810,13 +861,6 @@ namespace Effekseer
 			return;
 		}
 
-		public static Data.NodeRoot LoadFromXml(string xml, string path)
-		{
-			var doc = new System.Xml.XmlDocument();
-			doc.LoadXml(xml);
-			return LoadFromXml(doc, path);
-		}
-
 		public static Data.NodeRoot LoadFromXml(System.Xml.XmlDocument doc, string path)
 		{
 			if (doc.ChildNodes.Count != 2) return null;
@@ -832,17 +876,14 @@ namespace Effekseer
 
 				if (toolVersion > ParseVersion(currentVersion))
 				{
-					switch (Language)
+					if(MultiLanguageTextProvider.HasKey("Error_TooNewFile"))
 					{
-						case Language.English:
-							throw new Exception("Version Error : \nThe file is created with a newer version of the tool.\nPlease use the latest version of the tool.");
-							break;
-						case Language.Japanese:
-							throw new Exception("Version Error : \nファイルがより新しいバージョンのツールで作成されています。\n最新バージョンのツールを使用してください。");
-							break;
+						throw new Exception(MultiLanguageTextProvider.GetText("Error_TooNewFile"));
 					}
-
-
+					else
+					{
+						throw new Exception("Version Error : \nThe file is created with a newer version of the tool.\nPlease use the latest version of the tool.");
+					}
 				}
 			}
 
@@ -896,15 +937,39 @@ namespace Effekseer
 				replace(doc);
 			}
 
-			if (toolVersion < ParseVersion("1.50"))
+			if (toolVersion < ParseVersion("1.50β3"))
 			{
 				var updater = new Utils.ProjectVersionUpdator14xTo15x();
 				updater.Update(doc);
 			}
 
-			if (toolVersion < ParseVersion("1.60"))
+			if (toolVersion < ParseVersion("1.60α1"))
 			{
-				var updater = new Utils.ProjectVersionUpdator15xTo16x();
+				var updater = new Utils.ProjectVersionUpdator15xTo16Alpha1();
+				updater.Update(doc);
+			}
+
+			if (toolVersion <= ParseVersion("1.60α2"))
+			{
+				var updater = new Utils.ProjectVersionUpdator16Alpha1To16Alpha2();
+				updater.Update(doc);
+			}
+
+			if (toolVersion < ParseVersion("1.60α3"))
+			{
+				var updater = new Utils.ProjectVersionUpdator16Alpha2To16x();
+				updater.Update(doc);
+			}
+
+			if (toolVersion < ParseVersion("1.60α6"))
+			{
+				var updater = new Utils.ProjectVersionUpdator16Alpha5To16x();
+				updater.Update(doc);
+			}
+
+			if (toolVersion < ParseVersion("1.60α9"))
+			{
+				var updater = new Utils.ProjectVersionUpdator16Alpha8To16x();
 				updater.Update(doc);
 			}
 
@@ -943,6 +1008,13 @@ namespace Effekseer
 			{
 				var o = dynamic_ as object;
 				Data.IO.LoadObjectFromElement(dynamicElement as System.Xml.XmlElement, ref o, false);
+			}
+
+			var proceduralElement = doc["EffekseerProject"]["ProceduralModel"];
+			if (proceduralElement != null)
+			{
+				var o = proceduralModels as object;
+				Data.IO.LoadObjectFromElement(proceduralElement as System.Xml.XmlElement, ref o, false);
 			}
 
 			// recording option (this option is stored in local or global)
@@ -1011,9 +1083,21 @@ namespace Effekseer
 				updater.Update(root_node);
 			}
 
-			if (toolVersion < ParseVersion("1.60"))
+			if (toolVersion < ParseVersion("1.60α1"))
 			{
-				var updater = new Utils.ProjectVersionUpdator15xTo16x();
+				var updater = new Utils.ProjectVersionUpdator15xTo16Alpha1();
+				updater.Update(root_node);
+			}
+
+			if (toolVersion < ParseVersion("1.60α2"))
+			{
+				var updater = new Utils.ProjectVersionUpdator16Alpha1To16Alpha2();
+				updater.Update(root_node);
+			}
+
+			if (toolVersion < ParseVersion("1.60α3"))
+			{
+				var updater = new Utils.ProjectVersionUpdator16Alpha2To16x();
 				updater.Update(root_node);
 			}
 
@@ -1095,6 +1179,8 @@ namespace Effekseer
 			SelectedNode = null;
 
 			ResourceCache.Reset();
+			dynamic_ = new DynamicValues();
+			proceduralModels.ProceduralModels.Clear();
 
 			OnBeforeLoad?.Invoke(null, null);
 
@@ -1195,17 +1281,56 @@ namespace Effekseer
 
 		static uint ParseVersion(string versionText)
 		{
-			versionText = versionText.Replace("CTP1", "");
-			versionText = versionText.Replace("CTP2", "");
-			versionText = versionText.Replace("CTP3", "");
-			versionText = versionText.Replace("CTP4", "");
-			versionText = versionText.Replace("CTP5", "");
+			uint minorVersion = 0;
+
+			Func<string, uint, uint?> calcMinorVersion = (string key, uint baseId) =>
+			{
+				if (versionText.Contains(key))
+				{
+					var strs = versionText.Split(new[] { key }, StringSplitOptions.None);
+
+					if (strs.Length < 2)
+						return baseId;
+
+					uint id = 0;
+					uint.TryParse(strs[1], out id);
+					return id + baseId;
+				}
+
+				return null;
+			};
+
+			var alphaId = calcMinorVersion("α", 0);
+			var betaId = calcMinorVersion("β", 10);
+			var rcId = calcMinorVersion("RC", 20);
+
+			if(alphaId.HasValue)
+			{
+				minorVersion = alphaId.Value;
+			}
+			else if (betaId.HasValue)
+			{
+				minorVersion = betaId.Value;
+			}
+			else if (rcId.HasValue)
+			{
+				minorVersion = rcId.Value;
+			}
+			else
+			{
+				minorVersion = 30;
+			}
 
 			versionText = versionText.Replace("α1", "");
 			versionText = versionText.Replace("α2", "");
 			versionText = versionText.Replace("α3", "");
 			versionText = versionText.Replace("α4", "");
 			versionText = versionText.Replace("α5", "");
+			versionText = versionText.Replace("α6", "");
+			versionText = versionText.Replace("α7", "");
+			versionText = versionText.Replace("α8", "");
+			versionText = versionText.Replace("α9", "");
+			versionText = versionText.Replace("α10", "");
 
 			versionText = versionText.Replace("β1", "");
 			versionText = versionText.Replace("β2", "");
@@ -1232,6 +1357,15 @@ namespace Effekseer
 			versionText = versionText.Replace("j", "");
 			versionText = versionText.Replace("k", "");
 			versionText = versionText.Replace("l", "");
+			versionText = versionText.Replace("m", "");
+			versionText = versionText.Replace("n", "");
+			versionText = versionText.Replace("o", "");
+			versionText = versionText.Replace("p", "");
+			versionText = versionText.Replace("q", "");
+			versionText = versionText.Replace("r", "");
+			versionText = versionText.Replace("s", "");
+			versionText = versionText.Replace("t", "");
+			versionText = versionText.Replace("u", "");
 
 			if (versionText.Length == 2) versionText += "000";
 			if (versionText.Length == 3) versionText += "00";
@@ -1241,6 +1375,8 @@ namespace Effekseer
 			uint version = 0;
 
 			uint.TryParse(versionText, out version);
+
+			version = (version * 100) + minorVersion;
 
 			return version;
 		}
@@ -1341,80 +1477,51 @@ namespace Effekseer
 
 					if (node.LocationValues.Type.Value == Data.LocationValues.ParamaterType.LocationFCurve)
 					{
-						var name = "Location";
-						if(Language == Language.Japanese)
-						{
-							name = "位置";
-						}
-
+						var name = MultiLanguageTextProvider.GetText("Fcurve_Elm_Location");
 						list.Add(Tuple35.Create(name,(object)node.LocationValues.LocationFCurve.FCurve));
 					}
 
 					if (node.RotationValues.Type.Value == Data.RotationValues.ParamaterType.RotationFCurve)
 					{
-						var name = "Angle";
-						if (Language == Language.Japanese)
-						{
-							name = "角度";
-						}
-
+						var name = MultiLanguageTextProvider.GetText("Fcurve_Elm_Angle");
 						list.Add(Tuple35.Create(name, (object)node.RotationValues.RotationFCurve.FCurve));
 					}
 
 					if (node.ScalingValues.Type.Value == Data.ScaleValues.ParamaterType.FCurve)
 					{
-						var name = "Scaling Factor";
-						if (Language == Language.Japanese)
-						{
-							name = "拡大率";
-						}
-
+						var name = MultiLanguageTextProvider.GetText("Fcurve_Elm_ScalingFactor");
 						list.Add(Tuple35.Create(name, (object)node.ScalingValues.FCurve.FCurve));
+					}
+
+					if (node.ScalingValues.Type.Value == Data.ScaleValues.ParamaterType.SingleFCurve)
+					{
+						var name = MultiLanguageTextProvider.GetText("Fcurve_Elm_ScalingFactor_Single");
+						list.Add(Tuple35.Create(name, (object)node.ScalingValues.SingleFCurve));
 					}
 
 					if (node.RendererCommonValues.UV.Value == Data.RendererCommonValues.UVType.FCurve)
 					{
-						var name = "UV(Start)";
-						if (Language == Language.Japanese)
-						{
-							name = "UV(始点)";
-						}
-
+						var name = MultiLanguageTextProvider.GetText("Fcurve_Elm_UV_Start");
 						list.Add(Tuple35.Create(name, (object)node.RendererCommonValues.UVFCurve.Start));
 					}
 
 					if (node.RendererCommonValues.UV.Value == Data.RendererCommonValues.UVType.FCurve)
 					{
-						var name = "UV(Size)";
-						if (Language == Language.Japanese)
-						{
-							name = "UV(大きさ)";
-						}
-
+						var name = MultiLanguageTextProvider.GetText("Fcurve_Elm_UV_Size");
 						list.Add(Tuple35.Create(name, (object)node.RendererCommonValues.UVFCurve.Size));
 					}
 
 					if (node.DrawingValues.Type.Value == Data.RendererValues.ParamaterType.Sprite &&
 						node.DrawingValues.Sprite.ColorAll.Value == Data.StandardColorType.FCurve)
 					{
-						var name = "Sprite-Color all(RGBA)";
-						if (Language == Language.Japanese)
-						{
-							name = "スプライト・全体色(RGBA)";
-						}
-
+						var name = MultiLanguageTextProvider.GetText("Fcurve_Elm_Sprite_Color");
 						list.Add(Tuple35.Create(name, (object)node.DrawingValues.Sprite.ColorAll_FCurve.FCurve));
 					}
 
 					if (node.DrawingValues.Type.Value == Data.RendererValues.ParamaterType.Model &&
 						node.DrawingValues.Model.Color.Value == Data.StandardColorType.FCurve)
 					{
-						var name = "Model-Color(RGBA)";
-						if (Language == Language.Japanese)
-						{
-							name = "モデル・色(RGBA)";
-						}
-
+						var name = MultiLanguageTextProvider.GetText("Fcurve_Elm_Model_Color");
 						list.Add(Tuple35.Create(name, (object)node.DrawingValues.Model.Color_FCurve.FCurve));
 					}
 
@@ -1422,118 +1529,120 @@ namespace Effekseer
 					{
 						if (node.DrawingValues.Track.ColorLeft.Value == Data.StandardColorType.FCurve)
 						{
-							var name = "Track-Color,Left(RGBA)";
-							if (Language == Language.Japanese)
-							{
-								name = "軌跡・左(RGBA)";
-							}
-
+							var name = MultiLanguageTextProvider.GetText("Fcurve_Elm_Track_Color_L");
 							list.Add(Tuple35.Create(name, (object)node.DrawingValues.Track.ColorLeft_FCurve.FCurve));
 						}
 
 						if (node.DrawingValues.Track.ColorLeftMiddle.Value == Data.StandardColorType.FCurve)
 						{
-							var name = "Track-Color,Left-Center(RGBA)";
-							if (Language == Language.Japanese)
-							{
-								name = "軌跡・左中間(RGBA)";
-							}
-
+							var name = MultiLanguageTextProvider.GetText("Fcurve_Elm_Track_Color_LC");
 							list.Add(Tuple35.Create(name, (object)node.DrawingValues.Track.ColorLeftMiddle_FCurve.FCurve));
 						}
 
 						if (node.DrawingValues.Track.ColorCenter.Value == Data.StandardColorType.FCurve)
 						{
-							var name = "Track-Color,Center(RGBA)";
-							if (Language == Language.Japanese)
-							{
-								name = "軌跡・中央(RGBA)";
-							}
-
+							var name = MultiLanguageTextProvider.GetText("Fcurve_Elm_Track_Color_C");
 							list.Add(Tuple35.Create(name, (object)node.DrawingValues.Track.ColorCenter_FCurve.FCurve));
 						}
 
 						if (node.DrawingValues.Track.ColorCenterMiddle.Value == Data.StandardColorType.FCurve)
 						{
-							var name = "Track-Color,Center-Middle(RGBA)";
-							if (Language == Language.Japanese)
-							{
-								name = "軌跡・中央中間(RGBA)";
-							}
-
+							var name = MultiLanguageTextProvider.GetText("Fcurve_Elm_Track_Color_CM");
 							list.Add(Tuple35.Create(name, (object)node.DrawingValues.Track.ColorCenterMiddle_FCurve.FCurve));
 						}
 
 						if (node.DrawingValues.Track.ColorRight.Value == Data.StandardColorType.FCurve)
 						{
-							var name = "Track-Color,Right(RGBA)";
-							if (Language == Language.Japanese)
-							{
-								name = "軌跡・右(RGBA)";
-							}
-
+							var name = MultiLanguageTextProvider.GetText("Fcurve_Elm_Track_Color_R");
 							list.Add(Tuple35.Create(name, (object)node.DrawingValues.Track.ColorRight_FCurve.FCurve));
 						}
 
 						if (node.DrawingValues.Track.ColorRightMiddle.Value == Data.StandardColorType.FCurve)
 						{
-							var name = "Track-Color,Right-Center(RGBA)";
-							if (Language == Language.Japanese)
-							{
-								name = "軌跡・右中間(RGBA)";
-
-							}
+							var name = MultiLanguageTextProvider.GetText("Fcurve_Elm_Track_Color_RC");
 							list.Add(Tuple35.Create(name, (object)node.DrawingValues.Track.ColorRightMiddle_FCurve.FCurve));
 						}
 					}
 
 					if (node.RendererCommonValues.CustomData1.CustomData.Value == Data.CustomDataType.FCurve2D)
 					{
-						var name = "CustomData1";
-						if (Language == Language.Japanese)
-						{
-							name = "カスタムデータ1";
-						}
+						var name = MultiLanguageTextProvider.GetText("Fcurve_Elm_CustomData") + "1";
 						list.Add(Tuple35.Create(name, (object)node.RendererCommonValues.CustomData1.FCurve));
 					}
 
 					if (node.RendererCommonValues.CustomData2.CustomData.Value == Data.CustomDataType.FCurve2D)
 					{
-						var name = "CustomData2";
-						if (Language == Language.Japanese)
-						{
-							name = "カスタムデータ2";
-						}
+						var name = MultiLanguageTextProvider.GetText("Fcurve_Elm_CustomData") + "2";
 						list.Add(Tuple35.Create(name, (object)node.RendererCommonValues.CustomData2.FCurve));
 					}
 
 					if (node.RendererCommonValues.CustomData1.CustomData.Value == Data.CustomDataType.FCurveColor)
 					{
-						var name = "CustomData1";
-						if (Language == Language.Japanese)
-						{
-							name = "カスタムデータ1";
-						}
+						var name = MultiLanguageTextProvider.GetText("Fcurve_Elm_CustomData") + "1";
 						list.Add(Tuple35.Create(name, (object)node.RendererCommonValues.CustomData1.FCurveColor));
 					}
 
 					if (node.RendererCommonValues.CustomData2.CustomData.Value == Data.CustomDataType.FCurveColor)
 					{
-						var name = "CustomData2";
-						if (Language == Language.Japanese)
-						{
-							name = "カスタムデータ2";
-						}
+						var name = MultiLanguageTextProvider.GetText("Fcurve_Elm_CustomData") + "2";
 						list.Add(Tuple35.Create(name, (object)node.RendererCommonValues.CustomData2.FCurveColor));
+					}
+
+					if (node.AdvancedRendererCommonValuesValues.AlphaTextureParam.Enabled == true &&
+					    node.AdvancedRendererCommonValuesValues.AlphaTextureParam.UV.Value == Data.RendererCommonValues.UVType.FCurve)
+					{
+						var typename = MultiLanguageTextProvider.GetText("Fcurve_Elm_Alpha");						
+						var startName = typename + MultiLanguageTextProvider.GetText("Fcurve_Elm_UV_Start");
+						var endName	= typename + MultiLanguageTextProvider.GetText("Fcurve_Elm_UV_Size");
+						list.Add(Tuple35.Create(startName, (object)node.AdvancedRendererCommonValuesValues.AlphaTextureParam.UVFCurve.Start));
+						list.Add(Tuple35.Create(endName, (object)node.AdvancedRendererCommonValuesValues.AlphaTextureParam.UVFCurve.Size));
+					}
+
+					if (node.AdvancedRendererCommonValuesValues.UVDistortionTextureParam.Enabled == true &&
+						node.AdvancedRendererCommonValuesValues.UVDistortionTextureParam.UV.Value == Data.RendererCommonValues.UVType.FCurve)
+					{
+						var typename = MultiLanguageTextProvider.GetText("Fcurve_Elm_UVDistortion");
+						var startName = typename + MultiLanguageTextProvider.GetText("Fcurve_Elm_UV_Start");
+						var endName = typename + MultiLanguageTextProvider.GetText("Fcurve_Elm_UV_Size");
+						list.Add(Tuple35.Create(startName, (object)node.AdvancedRendererCommonValuesValues.UVDistortionTextureParam.UVFCurve.Start));
+						list.Add(Tuple35.Create(endName, (object)node.AdvancedRendererCommonValuesValues.UVDistortionTextureParam.UVFCurve.Size));
+					}
+
+					if (node.AdvancedRendererCommonValuesValues.BlendTextureParams.Enabled == true)
+					{
+						if (node.AdvancedRendererCommonValuesValues.BlendTextureParams.BlendTextureParam.UV.Value == Data.RendererCommonValues.UVType.FCurve)
+						{
+							var typename = MultiLanguageTextProvider.GetText("Fcurve_Elm_Blend");
+							var startName = typename + MultiLanguageTextProvider.GetText("Fcurve_Elm_UV_Start");
+							var endName = typename + MultiLanguageTextProvider.GetText("Fcurve_Elm_UV_Size");
+							list.Add(Tuple35.Create(startName, (object)node.AdvancedRendererCommonValuesValues.BlendTextureParams.BlendTextureParam.UVFCurve.Start));
+							list.Add(Tuple35.Create(endName, (object)node.AdvancedRendererCommonValuesValues.BlendTextureParams.BlendTextureParam.UVFCurve.Size));
+						}
+
+						if (node.AdvancedRendererCommonValuesValues.BlendTextureParams.EnableBlendAlphaTexture == true &&
+							node.AdvancedRendererCommonValuesValues.BlendTextureParams.BlendAlphaTextureParam.UV.Value == Data.RendererCommonValues.UVType.FCurve)
+						{
+							var typename = MultiLanguageTextProvider.GetText("Fcurve_Elm_BlendAlpha");
+							var startName = typename + MultiLanguageTextProvider.GetText("Fcurve_Elm_UV_Start");
+							var endName = typename + MultiLanguageTextProvider.GetText("Fcurve_Elm_UV_Size");
+							list.Add(Tuple35.Create(startName, (object)node.AdvancedRendererCommonValuesValues.BlendTextureParams.BlendAlphaTextureParam.UVFCurve.Start));
+							list.Add(Tuple35.Create(endName, (object)node.AdvancedRendererCommonValuesValues.BlendTextureParams.BlendAlphaTextureParam.UVFCurve.Size));
+						}
+
+						if (node.AdvancedRendererCommonValuesValues.BlendTextureParams.EnableBlendUVDistortionTexture == true &&
+							node.AdvancedRendererCommonValuesValues.BlendTextureParams.BlendUVDistortionTextureParam.UV.Value == Data.RendererCommonValues.UVType.FCurve)
+						{
+							var typename = MultiLanguageTextProvider.GetText("Fcurve_Elm_BlendUVDistortion");
+							var startName = typename + MultiLanguageTextProvider.GetText("Fcurve_Elm_UV_Start");
+							var endName = typename + MultiLanguageTextProvider.GetText("Fcurve_Elm_UV_Size");
+							list.Add(Tuple35.Create(startName, (object)node.AdvancedRendererCommonValuesValues.BlendTextureParams.BlendUVDistortionTextureParam.UVFCurve.Start));
+							list.Add(Tuple35.Create(endName, (object)node.AdvancedRendererCommonValuesValues.BlendTextureParams.BlendUVDistortionTextureParam.UVFCurve.Size));
+						}
 					}
 
 					if (node.AdvancedRendererCommonValuesValues.AlphaCutoffParam.Type == Data.AlphaCutoffParameter.ParameterType.FCurve)
 					{
-						var name = "AlphaThreshold";
-						if (Language == Language.Japanese)
-						{
-							name = "アルファ閾値";
-						}
+						var name = MultiLanguageTextProvider.GetText("Fcurve_Elm_AlphaThreshold");
 						list.Add(Tuple35.Create(name, (object)node.AdvancedRendererCommonValuesValues.AlphaCutoffParam.FCurve));
 					}
 

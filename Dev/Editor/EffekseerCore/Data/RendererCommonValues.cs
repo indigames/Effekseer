@@ -41,6 +41,9 @@ namespace Effekseer.Data
 
 		[Key(key = "CustomDataType_FCurveColor")]
 		FCurveColor = 53,
+
+		[Key(key = "CustomDataType_DynamicInput")]
+		DynamicInput = 60,
 	}
 
 	public class CustomDataParameter : IEditableValueCollection
@@ -49,8 +52,7 @@ namespace Effekseer.Data
 		internal string Name = string.Empty;
 		internal string Desc = string.Empty;
 
-		[Name(language = Language.Japanese, value = "カスタムデータ")]
-		[Name(language = Language.English, value = "Custom Data")]
+		[Key(key = "CustomData")]
 		[Selector(ID = 10)]
 		public Value.Enum<CustomDataType> CustomData
 		{
@@ -103,16 +105,7 @@ namespace Effekseer.Data
 			}
 			else
 			{
-				if (Core.Language == Language.English)
-				{
-					ev.Title = "CustomData" + customDataNum.ToString();
-				}
-
-				if (Core.Language == Language.Japanese)
-				{
-					ev.Title = "カスタムデータ" + customDataNum.ToString();
-				}
-
+				ev.Title = MultiLanguageTextProvider.GetText("CustomData_Name") + customDataNum.ToString();
 				ev.Description = "";
 			}
 
@@ -374,7 +367,7 @@ namespace Effekseer.Data
 						if (!withNameFlag) continue;
 
 						status = new ValueStatus();
-						var value = new Value.PathForImage(rcValues.BasePath, Resources.GetString("ImageFilter"), true, texture.DefaultPath);
+						var value = new Value.PathForImage(rcValues.BasePath, Resources.GetString("ImageFilter"), true, defaultPath);
 						status.Value = value;
 						status.IsShown = texture.IsParam;
 						status.Priority = texture.Priority;
@@ -740,7 +733,7 @@ namespace Effekseer.Data
 		[Selected(ID = 3, Value = (int)MaterialType.Default)]
 		[Selected(ID = 3, Value = (int)MaterialType.Lighting)]
 		[Key(key = "BRS_EmissiveScaling")]
-		public Value.Int EmissiveScaling { get; private set; }
+		public Value.Float EmissiveScaling { get; private set; }
 
 		[Selected(ID = 3, Value = (int)MaterialType.Default)]
 		[Selected(ID = 3, Value = (int)MaterialType.BackDistortion)]
@@ -912,7 +905,7 @@ namespace Effekseer.Data
 			Material = new Value.Enum<MaterialType>(MaterialType.Default);
 			MaterialFile = new MaterialFileParameter(this);
 
-			EmissiveScaling = new Value.Int(1, int.MaxValue, 1);
+			EmissiveScaling = new Value.Float(1.0f, float.MaxValue, 0.0f);
 
 			ColorTexture = new Value.PathForImage(basepath, Resources.GetString("ImageFilter"), true, "");
 			Filter = new Value.Enum<FilterType>(FilterType.Linear);

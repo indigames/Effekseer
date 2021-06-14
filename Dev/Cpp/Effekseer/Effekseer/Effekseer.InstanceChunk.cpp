@@ -51,7 +51,7 @@ void InstanceChunk::GenerateChildrenInRequired()
 	{
 		if (instancesAlive_[i])
 		{
-			Instance* instance = reinterpret_cast<Instance*>(instances_[i]);
+			auto instance = reinterpret_cast<Instance*>(instances_[i]);
 
 			instance->GenerateChildrenInRequired();
 		}
@@ -109,7 +109,7 @@ void InstanceChunk::GenerateChildrenInRequiredByInstanceGlobal(const InstanceGlo
 	}
 }
 
-Instance* InstanceChunk::CreateInstance(Manager* pManager, EffectNode* pEffectNode, InstanceContainer* pContainer, InstanceGroup* pGroup)
+Instance* InstanceChunk::CreateInstance(ManagerImplemented* pManager, EffectNodeImplemented* pEffectNode, InstanceContainer* pContainer, InstanceGroup* pGroup)
 {
 	for (int32_t i = 0; i < InstancesOfChunk; i++)
 	{

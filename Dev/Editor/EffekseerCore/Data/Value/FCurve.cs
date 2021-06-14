@@ -7,35 +7,28 @@ namespace Effekseer.Data.Value
 {
 	public enum FCurveTimelineMode : int
 	{
-		[Name(language = Language.Japanese, value = "時間(フレーム)")]
-		[Name(language = Language.English, value = "Time(Frame)")]
+		[Key(key = "FcurveTimelineMode_Time")]
 		Time = 0,
 
-		[Name(language = Language.Japanese, value = "パーセント(0-100)")]
-		[Name(language = Language.English, value = "Percent(0-100)")]
+		[Key(key = "FcurveTimelineMode_Percent")]
 		Percent = 1,
 	}
 
 	public enum FCurveEdge
 	{
-		[Name(language = Language.Japanese, value = "一定")]
-		[Name(language = Language.English, value = "Constant")]
+		[Key(key = "FcurveEdge_Constant")]
 		Constant = 0,
-		[Name(language = Language.Japanese, value = "ループ")]
-		[Name(language = Language.English, value = "Loop")]
+		[Key(key = "FcurveEdge_Loop")]
 		Loop = 1,
-		[Name(language = Language.Japanese, value = "逆ループ")]
-		[Name(language = Language.English, value = "Loop inversely")]
+		[Key(key = "FcurveEdge_LoopInversely")]
 		LoopInversely = 2,
 	}
 
 	public enum FCurveInterpolation
 	{
-		[Name(language = Language.Japanese, value = "ベジェ")]
-		[Name(language = Language.English, value = "Bezier")]
+		[Key(key = "FcurveInterpolation_Bezier")]
 		Bezier = 0,
-		[Name(language = Language.Japanese, value = "線形")]
-		[Name(language = Language.English, value = "Linear")]
+		[Key(key = "FcurveInterpolation_Linear")]
 		Linear = 1,
 	}
 
@@ -321,6 +314,11 @@ namespace Effekseer.Data.Value
 
             int length = keys[rInd].Frame - keys[lInd].Frame;
 
+			if(length == 0)
+			{
+				return ToFloat(keys[lInd].Value);
+			}
+
 			if (keys[rInd].Frame <= frame)
 			{
 				if (end == FCurveEdge.Constant)
@@ -360,7 +358,7 @@ namespace Effekseer.Data.Value
 				/* lIndとrIndの間 */
 				if (mInd == lInd)
 				{
-					if (keys[lInd].InterpolationType.Value == FCurveInterpolation.Linear)
+					if (keys[lInd].InterpolationType == FCurveInterpolation.Linear)
 					{
 						float subF = (float)(keys[rInd].Frame - keys[lInd].Frame);
 						var subV = ToFloat(keys[rInd].Value) - ToFloat(keys[lInd].Value);
@@ -369,7 +367,7 @@ namespace Effekseer.Data.Value
 
 						return subV / (float)(subF) * (float)(frame - keys[lInd].Frame) + ToFloat(keys[lInd].Value);
 					}
-					else if (keys[lInd].InterpolationType.Value == FCurveInterpolation.Bezier)
+					else if (keys[lInd].InterpolationType == FCurveInterpolation.Bezier)
 					{
 						if (keys[lInd].Frame == frame) return ToFloat(keys[lInd].Value);
 
@@ -702,7 +700,7 @@ namespace Effekseer.Data.Value
 		float RightXPrevious { get; }
 		float RightYPrevious { get; }
 
-		Enum<FCurveInterpolation> InterpolationType { get; }
+		FCurveInterpolation InterpolationType { get; }
 
 		void Commit(bool isCombined = false);
 
@@ -727,6 +725,7 @@ namespace Effekseer.Data.Value
 		float _left_y = 0;
 		float _right_x = 0;
 		float _right_y = 0;
+		FCurveInterpolation _interpolation_type = FCurveInterpolation.Bezier;
 
 
 		int _frame_temp = 0;
@@ -866,6 +865,14 @@ namespace Effekseer.Data.Value
 			}
 		}
 
+		public FCurveInterpolation InterpolationType
+		{
+			get
+			{
+				return _interpolation_type;
+			}
+		}
+
 		public void Commit(bool isCombined = false)
 		{
 			if (_frame == _frame_temp && 
@@ -954,8 +961,6 @@ namespace Effekseer.Data.Value
 
 			Command.CommandManager.Execute(cmd);
 		}
-
-		public Enum<FCurveInterpolation> InterpolationType { get; private set; }
 
 		public void SetFrame(int frame)
 		{
@@ -1191,6 +1196,11 @@ namespace Effekseer.Data.Value
 			}
 		}
 
+		public void SetInterpolationType(FCurveInterpolation interpolation_type)
+		{
+			_interpolation_type = interpolation_type;
+		}
+
 		public FCurveKey(int frame = 0, T value = default(T))
 		{
 			_frame = frame;
@@ -1207,8 +1217,6 @@ namespace Effekseer.Data.Value
 			_left_y_temp = ToFloat(value);
 			_right_y = ToFloat(value);
 			_right_y_temp = ToFloat(value);
-
-			InterpolationType = new Enum<FCurveInterpolation>(FCurveInterpolation.Bezier);
 		}
 
 		public event ChangedValueEventHandler OnChanged;

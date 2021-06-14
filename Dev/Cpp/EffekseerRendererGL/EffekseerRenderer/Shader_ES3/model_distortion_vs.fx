@@ -1,4 +1,7 @@
 #version 300 es
+#ifdef GL_ARB_shader_draw_parameters
+#extension GL_ARB_shader_draw_parameters : enable
+#endif
 
 struct VS_Input
 {
@@ -8,25 +11,25 @@ struct VS_Input
     vec3 Tangent;
     vec2 UV;
     vec4 Color;
+    uint Index;
 };
 
 struct VS_Output
 {
-    vec4 Position;
+    vec4 PosVS;
     vec2 UV;
-    vec4 Normal;
-    vec4 Binormal;
-    vec4 Tangent;
-    vec4 Pos;
+    vec4 ProjBinormal;
+    vec4 ProjTangent;
+    vec4 PosP;
     vec4 Color;
 };
 
 struct VS_ConstantBuffer
 {
     mat4 mCameraProj;
-    mat4 mModel;
-    vec4 fUV;
-    vec4 fModelColor;
+    mat4 mModel_Inst[10];
+    vec4 fUV[10];
+    vec4 fModelColor[10];
     vec4 fLightDirection;
     vec4 fLightColor;
     vec4 fLightAmbient;
@@ -41,38 +44,45 @@ layout(location = 2) in vec3 Input_Binormal;
 layout(location = 3) in vec3 Input_Tangent;
 layout(location = 4) in vec2 Input_UV;
 layout(location = 5) in vec4 Input_Color;
-out vec2 _VSPS_UV;
-out vec4 _VSPS_Normal;
-out vec4 _VSPS_Binormal;
-out vec4 _VSPS_Tangent;
-out vec4 _VSPS_Pos;
-out vec4 _VSPS_Color;
+#ifdef GL_ARB_shader_draw_parameters
+#define SPIRV_Cross_BaseInstance gl_BaseInstanceARB
+#else
+uniform int SPIRV_Cross_BaseInstance;
+#endif
+centroid out vec2 _VSPS_UV;
+out vec4 _VSPS_ProjBinormal;
+out vec4 _VSPS_ProjTangent;
+out vec4 _VSPS_PosP;
+centroid out vec4 _VSPS_Color;
 
 VS_Output _main(VS_Input Input)
 {
-    vec4 uv = CBVS0.fUV;
-    vec4 modelColor = CBVS0.fModelColor * Input.Color;
-    VS_Output Output = VS_Output(vec4(0.0), vec2(0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0));
-    vec4 localPosition = vec4(Input.Pos.x, Input.Pos.y, Input.Pos.z, 1.0);
-    vec4 localNormal = vec4(Input.Pos.x + Input.Normal.x, Input.Pos.y + Input.Normal.y, Input.Pos.z + Input.Normal.z, 1.0);
-    vec4 localBinormal = vec4(Input.Pos.x + Input.Binormal.x, Input.Pos.y + Input.Binormal.y, Input.Pos.z + Input.Binormal.z, 1.0);
-    vec4 localTangent = vec4(Input.Pos.x + Input.Tangent.x, Input.Pos.y + Input.Tangent.y, Input.Pos.z + Input.Tangent.z, 1.0);
-    localPosition *= CBVS0.mModel;
-    localNormal *= CBVS0.mModel;
-    localBinormal *= CBVS0.mModel;
-    localTangent *= CBVS0.mModel;
-    localNormal = localPosition + normalize(localNormal - localPosition);
-    localBinormal = localPosition + normalize(localBinormal - localPosition);
-    localTangent = localPosition + normalize(localTangent - localPosition);
-    Output.Position = localPosition * CBVS0.mCameraProj;
-    Output.UV.x = (Input.UV.x * uv.z) + uv.x;
-    Output.UV.y = (Input.UV.y * uv.w) + uv.y;
-    Output.Normal = localNormal * CBVS0.mCameraProj;
-    Output.Binormal = localBinormal * CBVS0.mCameraProj;
-    Output.Tangent = localTangent * CBVS0.mCameraProj;
-    Output.Pos = Output.Position;
+    uint index = Input.Index;
+    mat4 mModel = CBVS0.mModel_Inst[index];
+    vec4 uv = CBVS0.fUV[index];
+    vec4 modelColor = CBVS0.fModelColor[index] * Input.Color;
+    VS_Output Output = VS_Output(vec4(0.0), vec2(0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0));
+    vec4 localPos = vec4(Input.Pos.x, Input.Pos.y, Input.Pos.z, 1.0);
+    vec4 worldPos = localPos * mModel;
+    Output.PosVS = worldPos * CBVS0.mCameraProj;
     Output.Color = modelColor;
-    Output.UV.y = CBVS0.mUVInversed.x + (CBVS0.mUVInversed.y * Output.UV.y);
+    vec2 outputUV = Input.UV;
+    outputUV.x = (outputUV.x * uv.z) + uv.x;
+    outputUV.y = (outputUV.y * uv.w) + uv.y;
+    outputUV.y = CBVS0.mUVInversed.x + (CBVS0.mUVInversed.y * outputUV.y);
+    Output.UV = outputUV;
+    vec4 localNormal = vec4(Input.Normal.x, Input.Normal.y, Input.Normal.z, 0.0);
+    vec4 localBinormal = vec4(Input.Binormal.x, Input.Binormal.y, Input.Binormal.z, 0.0);
+    vec4 localTangent = vec4(Input.Tangent.x, Input.Tangent.y, Input.Tangent.z, 0.0);
+    vec4 worldNormal = localNormal * mModel;
+    vec4 worldBinormal = localBinormal * mModel;
+    vec4 worldTangent = localTangent * mModel;
+    worldNormal = normalize(worldNormal);
+    worldBinormal = normalize(worldBinormal);
+    worldTangent = normalize(worldTangent);
+    Output.ProjBinormal = (worldPos + worldBinormal) * CBVS0.mCameraProj;
+    Output.ProjTangent = (worldPos + worldTangent) * CBVS0.mCameraProj;
+    Output.PosP = Output.PosVS;
     return Output;
 }
 
@@ -85,13 +95,13 @@ void main()
     Input.Tangent = Input_Tangent;
     Input.UV = Input_UV;
     Input.Color = Input_Color;
+    Input.Index = uint((gl_InstanceID + SPIRV_Cross_BaseInstance));
     VS_Output flattenTemp = _main(Input);
-    gl_Position = flattenTemp.Position;
+    gl_Position = flattenTemp.PosVS;
     _VSPS_UV = flattenTemp.UV;
-    _VSPS_Normal = flattenTemp.Normal;
-    _VSPS_Binormal = flattenTemp.Binormal;
-    _VSPS_Tangent = flattenTemp.Tangent;
-    _VSPS_Pos = flattenTemp.Pos;
+    _VSPS_ProjBinormal = flattenTemp.ProjBinormal;
+    _VSPS_ProjTangent = flattenTemp.ProjTangent;
+    _VSPS_PosP = flattenTemp.PosP;
     _VSPS_Color = flattenTemp.Color;
 }
 

@@ -13,86 +13,24 @@ RenderTextureDX11::RenderTextureDX11(Graphics* graphics)
 
 RenderTextureDX11::~RenderTextureDX11()
 {
-	ES_SAFE_RELEASE(texture);
-	ES_SAFE_RELEASE(textureSRV);
-	ES_SAFE_RELEASE(textureRTV);
 }
 
-bool RenderTextureDX11::Initialize(Effekseer::Tool::Vector2DI size, TextureFormat format, uint32_t multisample)
+bool RenderTextureDX11::Initialize(Effekseer::Tool::Vector2DI size, Effekseer::Backend::TextureFormatType format, uint32_t multisample)
 {
 	auto g = (GraphicsDX11*)graphics;
+	auto gd = g->GetGraphicsDevice().DownCast<EffekseerRendererDX11::Backend::GraphicsDevice>();
 
-	HRESULT hr;
-
-	D3D11_TEXTURE2D_DESC TexDesc;
-	TexDesc.Width = size.X;
-	TexDesc.Height = size.Y;
-	TexDesc.MipLevels = 1;
-	TexDesc.ArraySize = 1;
-
-	switch (format)
-	{
-	case TextureFormat::RGBA8U:
-		TexDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-		break;
-	case TextureFormat::RGBA16F:
-		TexDesc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
-		break;
-	case TextureFormat::R16F:
-		TexDesc.Format = DXGI_FORMAT_R16_FLOAT;
-		break;
-	default:
-		assert(0);
-		return false;
-	}
-
-	dxgiFormat_ = TexDesc.Format;
-
-	uint32_t quality = 0;
-	g->GetDevice()->CheckMultisampleQualityLevels(TexDesc.Format, multisample, &quality);
-
-	TexDesc.SampleDesc.Count = multisample;
-	TexDesc.SampleDesc.Quality = quality - 1;
-	TexDesc.Usage = D3D11_USAGE_DEFAULT;
-	TexDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_RENDER_TARGET;
-	TexDesc.CPUAccessFlags = 0;
-	TexDesc.MiscFlags = 0;
-
-	hr = g->GetDevice()->CreateTexture2D(&TexDesc, nullptr, &texture);
-	if (FAILED(hr))
-	{
-		goto End;
-	}
-
-	D3D11_SHADER_RESOURCE_VIEW_DESC desc;
-	ZeroMemory(&desc, sizeof(desc));
-	desc.Format = TexDesc.Format;
-	desc.ViewDimension = (multisample > 1) ? D3D11_SRV_DIMENSION_TEXTURE2DMS : D3D11_SRV_DIMENSION_TEXTURE2D;
-	desc.Texture2D.MostDetailedMip = 0;
-	desc.Texture2D.MipLevels = TexDesc.MipLevels;
-
-	hr = g->GetDevice()->CreateShaderResourceView(texture, &desc, &textureSRV);
-	if (FAILED(hr))
-	{
-		goto End;
-	}
-
-	hr = g->GetDevice()->CreateRenderTargetView(texture, NULL, &textureRTV);
-	if (FAILED(hr))
-	{
-		goto End;
-	}
+	Effekseer::Backend::RenderTextureParameter param;
+	param.Format = format;
+	param.SamplingCount = multisample;
+	param.Size = {size.X, size.Y};
+	texture_ = gd->CreateRenderTexture(param).DownCast<EffekseerRendererDX11::Backend::Texture>();
 
 	this->size_ = size;
 	this->samplingCount_ = multisample;
 	this->format_ = format;
-	return true;
 
-End:;
-	ES_SAFE_RELEASE(texture);
-	ES_SAFE_RELEASE(textureSRV);
-	ES_SAFE_RELEASE(textureRTV);
-	return false;
+	return texture_ != nullptr;
 }
 
 DepthTextureDX11::DepthTextureDX11(Graphics* graphics)
@@ -102,69 +40,19 @@ DepthTextureDX11::DepthTextureDX11(Graphics* graphics)
 
 DepthTextureDX11::~DepthTextureDX11()
 {
-	ES_SAFE_RELEASE(depthBuffer);
-	ES_SAFE_RELEASE(depthStencilView);
-	ES_SAFE_RELEASE(depthSRV);
 }
 
 bool DepthTextureDX11::Initialize(int32_t width, int32_t height, uint32_t multisample)
 {
 	auto g = (GraphicsDX11*)graphics;
+	auto gd = g->GetGraphicsDevice().DownCast<EffekseerRendererDX11::Backend::GraphicsDevice>();
 
-	D3D11_TEXTURE2D_DESC desc;
-	desc.Width = width;
-	desc.Height = height;
-	desc.MipLevels = 1;
-	desc.ArraySize = 1;
-	desc.Format = DXGI_FORMAT_R24G8_TYPELESS;
-
-	uint32_t quality = 0;
-	g->GetDevice()->CheckMultisampleQualityLevels(desc.Format, multisample, &quality);
-
-	desc.SampleDesc.Count = multisample;
-	desc.SampleDesc.Quality = quality - 1;
-
-	desc.Usage = D3D11_USAGE_DEFAULT;
-	desc.BindFlags = D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_DEPTH_STENCIL;
-	desc.CPUAccessFlags = 0;
-	desc.MiscFlags = 0;
-
-	if (FAILED(g->GetDevice()->CreateTexture2D(&desc, NULL, &depthBuffer)))
-	{
-		goto End;
-	}
-
-	D3D11_DEPTH_STENCIL_VIEW_DESC viewDesc;
-	viewDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
-	viewDesc.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2DMS;
-	viewDesc.Flags = 0;
-	if (FAILED(g->GetDevice()->CreateDepthStencilView(depthBuffer, &viewDesc, &depthStencilView)))
-	{
-		goto End;
-	}
-
-	D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc;
-	ZeroMemory(&srvDesc, sizeof(srvDesc));
-	srvDesc.Format = DXGI_FORMAT_R24_UNORM_X8_TYPELESS;
-	srvDesc.ViewDimension = (multisample > 1) ? D3D11_SRV_DIMENSION_TEXTURE2DMS : D3D11_SRV_DIMENSION_TEXTURE2D;
-	srvDesc.Texture2D.MostDetailedMip = 0;
-	srvDesc.Texture2D.MipLevels = desc.MipLevels;
-
-	if (FAILED(g->GetDevice()->CreateShaderResourceView(depthBuffer, &srvDesc, &depthSRV)))
-	{
-		goto End;
-	}
-
-	this->width = width;
-	this->height = height;
-
-	return true;
-
-End:;
-	ES_SAFE_RELEASE(depthBuffer);
-	ES_SAFE_RELEASE(depthStencilView);
-	ES_SAFE_RELEASE(depthSRV);
-	return false;
+	Effekseer::Backend::DepthTextureParameter param;
+	param.Format = Effekseer::Backend::TextureFormatType::D24S8;
+	param.SamplingCount = multisample;
+	param.Size = {width, height};
+	texture_ = gd->CreateDepthTexture(param).DownCast<EffekseerRendererDX11::Backend::Texture>();
+	return texture_ != nullptr;
 }
 
 GraphicsDX11::GraphicsDX11()
@@ -202,7 +90,7 @@ GraphicsDX11::~GraphicsDX11()
 	ES_SAFE_RELEASE(d3dDebug);
 }
 
-bool GraphicsDX11::Initialize(void* windowHandle, int32_t windowWidth, int32_t windowHeight, bool isSRGBMode)
+bool GraphicsDX11::Initialize(void* windowHandle, int32_t windowWidth, int32_t windowHeight)
 {
 	std::string log = "";
 
@@ -210,19 +98,17 @@ bool GraphicsDX11::Initialize(void* windowHandle, int32_t windowWidth, int32_t w
 #if _DEBUG
 	debugFlag = D3D11_CREATE_DEVICE_DEBUG;
 #endif
-	D3D_FEATURE_LEVEL flevels[] = {
+	D3D_FEATURE_LEVEL desigeredFeatureLevels[] = {
 		D3D_FEATURE_LEVEL_11_0,
 		D3D_FEATURE_LEVEL_10_1,
 		D3D_FEATURE_LEVEL_10_0,
 	};
-	int32_t flevelCount = sizeof(flevels) / sizeof(D3D_FEATURE_LEVEL);
-
-	D3D_FEATURE_LEVEL currentFeatureLevel;
+	int32_t flevelCount = sizeof(desigeredFeatureLevels) / sizeof(D3D_FEATURE_LEVEL);
 
 	HRESULT hr = D3D11CreateDevice(
-		NULL, D3D_DRIVER_TYPE_HARDWARE, NULL, debugFlag, flevels, flevelCount, D3D11_SDK_VERSION, &device_, NULL, &context);
+		nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr, debugFlag, desigeredFeatureLevels, flevelCount, D3D11_SDK_VERSION, &device_, &flevel_, &context);
 
-	if FAILED (hr)
+	if (FAILED(hr))
 	{
 		log += "Failed : D3D11CreateDevice\n";
 		goto End;
@@ -249,7 +135,7 @@ bool GraphicsDX11::Initialize(void* windowHandle, int32_t windowWidth, int32_t w
 	}
 
 	adapter->GetParent(__uuidof(IDXGIFactory), (void**)&dxgiFactory);
-	if (dxgiFactory == NULL)
+	if (dxgiFactory == nullptr)
 	{
 		log += "Failed : GetParent\n";
 		goto End;
@@ -285,7 +171,7 @@ bool GraphicsDX11::Initialize(void* windowHandle, int32_t windowWidth, int32_t w
 		goto End;
 	}
 
-	if (FAILED(device_->CreateRenderTargetView(defaultRenderTarget, NULL, &renderTargetView)))
+	if (FAILED(device_->CreateRenderTargetView(defaultRenderTarget, nullptr, &renderTargetView)))
 	{
 		log += "Failed : CreateRenderTargetView\n";
 		goto End;
@@ -302,7 +188,7 @@ bool GraphicsDX11::Initialize(void* windowHandle, int32_t windowWidth, int32_t w
 	hTexture2dDesc.BindFlags = D3D11_BIND_DEPTH_STENCIL;
 	hTexture2dDesc.CPUAccessFlags = 0;
 	hTexture2dDesc.MiscFlags = 0;
-	if (FAILED(device_->CreateTexture2D(&hTexture2dDesc, NULL, &defaultDepthStencil)))
+	if (FAILED(device_->CreateTexture2D(&hTexture2dDesc, nullptr, &defaultDepthStencil)))
 	{
 		log += "Failed : CreateTexture2D\n";
 		goto End;
@@ -318,8 +204,10 @@ bool GraphicsDX11::Initialize(void* windowHandle, int32_t windowWidth, int32_t w
 		goto End;
 	}
 
+	currentRenderTargetViews.fill(nullptr);
+
 	context->OMSetRenderTargets(1, &renderTargetView, depthStencilView);
-	currentRenderTargetView = renderTargetView;
+	currentRenderTargetViews[0] = renderTargetView;
 	currentDepthStencilView = depthStencilView;
 
 	this->isSRGBMode = isSRGBMode;
@@ -335,6 +223,8 @@ bool GraphicsDX11::Initialize(void* windowHandle, int32_t windowWidth, int32_t w
 	rasterizerDesc.DepthClipEnable = false;
 	rasterizerDesc.MultisampleEnable = true;
 	device_->CreateRasterizerState(&rasterizerDesc, &rasterizerState);
+
+	graphicsDevice_ = Effekseer::MakeRefPtr<EffekseerRendererDX11::Backend::GraphicsDevice>(device_, context);
 
 	return true;
 End:
@@ -357,7 +247,7 @@ End:
 	return false;
 }
 
-void GraphicsDX11::CopyTo(RenderTexture* src, RenderTexture* dst)
+void GraphicsDX11::CopyTo(Effekseer::Backend::TextureRef src, Effekseer::Backend::TextureRef dst)
 {
 	if (src->GetSize() != dst->GetSize())
 		return;
@@ -372,102 +262,11 @@ void GraphicsDX11::CopyTo(RenderTexture* src, RenderTexture* dst)
 	else
 	{
 		// Copy to background
-		auto s = static_cast<RenderTextureDX11*>(src);
-		auto d = static_cast<RenderTextureDX11*>(dst);
+		auto s = src.DownCast<EffekseerRendererDX11::Backend::Texture>();
+		auto d = dst.DownCast<EffekseerRendererDX11::Backend::Texture>();
 		context->CopyResource(d->GetTexture(), s->GetTexture());
 	}
 }
-/*
-void GraphicsDX11::CopyToBackground()
-{
-	HRESULT hr = S_OK;
-	ID3D11RenderTargetView* renderTargetView = nullptr;
-	ID3D11Texture2D* renderTexture = nullptr;
-	context->OMGetRenderTargets(1, &renderTargetView, nullptr);
-	renderTargetView->GetResource(reinterpret_cast<ID3D11Resource**>(&renderTexture));
-
-	// Get rendertarget infromation
-	D3D11_TEXTURE2D_DESC renderTextureDesc;
-	renderTexture->GetDesc(&renderTextureDesc);
-
-	D3D11_TEXTURE2D_DESC backGroundTextureDesc;
-	ZeroMemory(&backGroundTextureDesc, sizeof(D3D11_TEXTURE2D_DESC));
-	if (backTexture != nullptr)
-	{
-		backTexture->GetDesc(&backGroundTextureDesc);
-	}
-
-	// Get scissor
-	UINT numScissorRects = 1;
-	D3D11_RECT scissorRect;
-	context->RSGetScissorRects(&numScissorRects, &scissorRect);
-
-	// Calculate area to draw
-	uint32_t width = renderTextureDesc.Width;
-	uint32_t height = renderTextureDesc.Height;
-	if (numScissorRects > 0)
-	{
-		width = scissorRect.right - scissorRect.left;
-		height = scissorRect.bottom - scissorRect.top;
-	}
-
-	// if size is changed, rebuild it
-	if (backTexture == nullptr || backGroundTextureDesc.Width != width || backGroundTextureDesc.Height != height ||
-		backGroundTextureDesc.Format != renderTextureDesc.Format)
-	{
-		ES_SAFE_RELEASE(backTexture);
-		ES_SAFE_RELEASE(backTextureSRV);
-
-		ZeroMemory(&backGroundTextureDesc, sizeof(backGroundTextureDesc));
-		backGroundTextureDesc.Usage = D3D11_USAGE_DEFAULT;
-		backGroundTextureDesc.Format = renderTextureDesc.Format;
-		backGroundTextureDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
-		backGroundTextureDesc.Width = width;
-		backGroundTextureDesc.Height = height;
-		backGroundTextureDesc.CPUAccessFlags = 0;
-		backGroundTextureDesc.MipLevels = 1;
-		backGroundTextureDesc.ArraySize = 1;
-		backGroundTextureDesc.SampleDesc.Count = 1;
-		backGroundTextureDesc.SampleDesc.Quality = 0;
-
-		HRESULT hr = S_OK;
-		hr = device_->CreateTexture2D(&backGroundTextureDesc, nullptr, &backTexture);
-		D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc;
-		ZeroMemory(&srvDesc, sizeof(srvDesc));
-		srvDesc.Format = renderTextureDesc.Format;
-		srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
-		srvDesc.Texture2D.MipLevels = 1;
-		hr = device_->CreateShaderResourceView(backTexture, &srvDesc, &backTextureSRV);
-	}
-
-	if (width == renderTextureDesc.Width && height == renderTextureDesc.Height)
-	{
-		if (renderTextureDesc.SampleDesc.Count == backGroundTextureDesc.SampleDesc.Count)
-		{
-			// Copy to background
-			context->CopyResource(backTexture, renderTexture);
-		}
-		else
-		{
-			context->ResolveSubresource(backTexture, 0, renderTexture, 0, backGroundTextureDesc.Format);
-		}
-	}
-	else
-	{
-		D3D11_BOX srcBox;
-		srcBox.left = scissorRect.left;
-		srcBox.top = scissorRect.top;
-		srcBox.right = scissorRect.right;
-		srcBox.bottom = scissorRect.bottom;
-		srcBox.front = 0;
-		srcBox.back = 1;
-		context->CopySubresourceRegion(backTexture, 0, 0, 0, 0, renderTexture, 0, &srcBox);
-	}
-
-	ES_SAFE_RELEASE(renderTexture);
-	ES_SAFE_RELEASE(renderTargetView);
-}
-*/
 
 void GraphicsDX11::Resize(int32_t width, int32_t height)
 {
@@ -490,10 +289,6 @@ bool GraphicsDX11::Present()
 
 void GraphicsDX11::BeginScene()
 {
-	if (isSRGBMode)
-	{
-	}
-
 	assert(savedRasterizerState == nullptr);
 	context->RSGetState(&savedRasterizerState);
 	context->RSSetState(rasterizerState);
@@ -503,60 +298,66 @@ void GraphicsDX11::EndScene()
 {
 	context->RSSetState(savedRasterizerState);
 	ES_SAFE_RELEASE(savedRasterizerState);
-
-	if (isSRGBMode)
-	{
-	}
 }
 
-void GraphicsDX11::SetRenderTarget(RenderTexture* renderTexture, DepthTexture* depthTexture)
+void GraphicsDX11::SetRenderTarget(std::vector<Effekseer::Backend::TextureRef> renderTextures, Effekseer::Backend::TextureRef depthTexture)
 {
-	currentRenderTexture = renderTexture;
-	currentDepthTexture = depthTexture;
+	assert(renderTextures.size() > 0);
 
-	auto rt = (RenderTextureDX11*)renderTexture;
-	auto dt = (DepthTextureDX11*)depthTexture;
-
-	if (renderTexture == nullptr)
+	if (renderTextures[0] == nullptr)
 	{
+		currentRenderTargetViews.fill(nullptr);
 		context->OMSetRenderTargets(1, &renderTargetView, depthStencilView);
-		currentRenderTargetView = renderTargetView;
+		currentRenderTargetViews[0] = renderTargetView;
 		currentDepthStencilView = depthStencilView;
 	}
 	else
 	{
-		ID3D11RenderTargetView* renderTargetView_ = nullptr;
+		std::array<ID3D11RenderTargetView*, 4> renderTargetView_;
+		renderTargetView_.fill(nullptr);
+
+		auto dt = depthTexture.DownCast<EffekseerRendererDX11::Backend::Texture>();
+
 		ID3D11DepthStencilView* depthStencilView_ = nullptr;
 
-		if (rt != nullptr)
+		for (size_t i = 0; i < renderTextures.size(); i++)
 		{
-			renderTargetView_ = rt->GetRenderTargetView();
+			auto rt = renderTextures[i].DownCast<EffekseerRendererDX11::Backend::Texture>();
+			if (rt != nullptr)
+			{
+				renderTargetView_[i] = rt->GetRTV();
+			}
 		}
 
 		if (dt != nullptr)
 		{
-			depthStencilView_ = dt->GetDepthStencilView();
+			depthStencilView_ = dt->GetDSV();
 		}
 
-		context->OMSetRenderTargets(1, &renderTargetView_, depthStencilView_);
+		context->OMSetRenderTargets(renderTextures.size(), renderTargetView_.data(), depthStencilView_);
 
-		D3D11_VIEWPORT vp;
-		vp.TopLeftX = 0;
-		vp.TopLeftY = 0;
-		vp.Width = static_cast<float>(renderTexture->GetSize().X);
-		vp.Height = static_cast<float>(renderTexture->GetSize().Y);
-		vp.MinDepth = 0.0f;
-		vp.MaxDepth = 1.0f;
-		context->RSSetViewports(1, &vp);
+		std::array<D3D11_VIEWPORT, 4> vps;
 
-		currentRenderTargetView = renderTargetView_;
+		for (auto& vp : vps)
+		{
+			vp.TopLeftX = 0;
+			vp.TopLeftY = 0;
+			vp.Width = static_cast<float>(renderTextures[0]->GetSize()[0]);
+			vp.Height = static_cast<float>(renderTextures[0]->GetSize()[1]);
+			vp.MinDepth = 0.0f;
+			vp.MaxDepth = 1.0f;
+		}
+
+		context->RSSetViewports(renderTextures.size(), vps.data());
+
+		currentRenderTargetViews = renderTargetView_;
 		currentDepthStencilView = depthStencilView_;
 	}
 }
 
-void GraphicsDX11::SaveTexture(RenderTexture* texture, std::vector<Effekseer::Color>& pixels)
+void GraphicsDX11::SaveTexture(Effekseer::Backend::TextureRef texture, std::vector<Effekseer::Color>& pixels)
 {
-	auto t = static_cast<RenderTextureDX11*>(texture);
+	auto t = texture.DownCast<EffekseerRendererDX11::Backend::Texture>();
 
 	HRESULT hr;
 
@@ -594,7 +395,7 @@ void GraphicsDX11::SaveTexture(RenderTexture* texture, std::vector<Effekseer::Co
 
 	pixels.resize(recordingTextureDesc.Width * recordingTextureDesc.Height);
 
-	for (int32_t h = 0; h < recordingTextureDesc.Height; h++)
+	for (UINT h = 0; h < recordingTextureDesc.Height; h++)
 	{
 		auto dst_ = &(pixels[h * recordingTextureDesc.Width]);
 		auto src_ = &(((uint8_t*)mr.pData)[h * mr.RowPitch]);
@@ -609,14 +410,25 @@ void GraphicsDX11::SaveTexture(RenderTexture* texture, std::vector<Effekseer::Co
 void GraphicsDX11::Clear(Effekseer::Color color)
 {
 	float ClearColor[] = {color.R / 255.0f, color.G / 255.0f, color.B / 255.0f, color.A / 255.0f};
-	context->ClearRenderTargetView(currentRenderTargetView, ClearColor);
-	context->ClearDepthStencilView(currentDepthStencilView, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
+
+	for (size_t i = 0; i < currentRenderTargetViews.size(); i++)
+	{
+		if (currentRenderTargetViews[i] == nullptr)
+			continue;
+
+		context->ClearRenderTargetView(currentRenderTargetViews[i], ClearColor);
+	}
+
+	if (currentDepthStencilView != nullptr)
+	{
+		context->ClearDepthStencilView(currentDepthStencilView, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
+	}
 }
 
-void GraphicsDX11::ResolveRenderTarget(RenderTexture* src, RenderTexture* dest)
+void GraphicsDX11::ResolveRenderTarget(Effekseer::Backend::TextureRef src, Effekseer::Backend::TextureRef dest)
 {
-	auto srcDX11 = (RenderTextureDX11*)src;
-	auto destDX11 = (RenderTextureDX11*)dest;
+	auto srcDX11 = src.DownCast<EffekseerRendererDX11::Backend::Texture>();
+	auto destDX11 = dest.DownCast<EffekseerRendererDX11::Backend::Texture>();
 
 	D3D11_TEXTURE2D_DESC desc;
 	ZeroMemory(&desc, sizeof(D3D11_TEXTURE2D_DESC));
@@ -626,25 +438,9 @@ void GraphicsDX11::ResolveRenderTarget(RenderTexture* src, RenderTexture* dest)
 		destDX11->GetTexture(), 0, srcDX11->GetTexture(), 0, desc.Format);
 }
 
-bool GraphicsDX11::CheckFormatSupport(TextureFormat format, TextureFeatureType feature)
+bool GraphicsDX11::CheckFormatSupport(Effekseer::Backend::TextureFormatType format, TextureFeatureType feature)
 {
-	DXGI_FORMAT dxgiformat;
-
-	switch (format)
-	{
-	case TextureFormat::RGBA8U:
-		dxgiformat = DXGI_FORMAT_R8G8B8A8_UNORM;
-		break;
-	case TextureFormat::RGBA16F:
-		dxgiformat = DXGI_FORMAT_R16G16B16A16_FLOAT;
-		break;
-	case TextureFormat::R16F:
-		dxgiformat = DXGI_FORMAT_R16_FLOAT;
-		break;
-	default:
-		assert(0);
-		return false;
-	}
+	const DXGI_FORMAT dxgiformat = EffekseerRendererDX11::Backend::GetTextureFormatType(format);
 
 	UINT dxfeature = 0;
 	device_->CheckFormatSupport(dxgiformat, &dxfeature);
@@ -669,25 +465,15 @@ bool GraphicsDX11::CheckFormatSupport(TextureFormat format, TextureFeatureType f
 	return false;
 }
 
-int GraphicsDX11::GetMultisampleLevel(TextureFormat format)
+int GraphicsDX11::GetMultisampleLevel(Effekseer::Backend::TextureFormatType format)
 {
-	DXGI_FORMAT dxgiformat;
-
-	switch (format)
+	// old video cards cannot be debugged on many contributor's environment
+	if (flevel_ != D3D_FEATURE_LEVEL_11_0)
 	{
-	case TextureFormat::RGBA8U:
-		dxgiformat = DXGI_FORMAT_R8G8B8A8_UNORM;
-		break;
-	case TextureFormat::RGBA16F:
-		dxgiformat = DXGI_FORMAT_R16G16B16A16_FLOAT;
-		break;
-	case TextureFormat::R16F:
-		dxgiformat = DXGI_FORMAT_R16_FLOAT;
-		break;
-	default:
-		assert(0);
-		return false;
+		return 1;
 	}
+
+	const DXGI_FORMAT dxgiformat = EffekseerRendererDX11::Backend::GetTextureFormatType(format);
 
 	for (int i = 1; i <= D3D11_MAX_MULTISAMPLE_SAMPLE_COUNT; i <<= 1)
 	{
@@ -718,7 +504,7 @@ void GraphicsDX11::ResetDevice()
 		return;
 	}
 
-	if (FAILED(device_->CreateRenderTargetView(defaultRenderTarget, NULL, &renderTargetView)))
+	if (FAILED(device_->CreateRenderTargetView(defaultRenderTarget, nullptr, &renderTargetView)))
 	{
 		return;
 	}
@@ -735,7 +521,7 @@ void GraphicsDX11::ResetDevice()
 	hTexture2dDesc.BindFlags = D3D11_BIND_DEPTH_STENCIL;
 	hTexture2dDesc.CPUAccessFlags = 0;
 	hTexture2dDesc.MiscFlags = 0;
-	if (FAILED(device_->CreateTexture2D(&hTexture2dDesc, NULL, &defaultDepthStencil)))
+	if (FAILED(device_->CreateTexture2D(&hTexture2dDesc, nullptr, &defaultDepthStencil)))
 	{
 		return;
 	}
@@ -751,14 +537,10 @@ void GraphicsDX11::ResetDevice()
 
 	context->OMSetRenderTargets(1, &renderTargetView, depthStencilView);
 
-	currentRenderTargetView = renderTargetView;
+	currentRenderTargetViews.fill(nullptr);
+	currentRenderTargetViews[0] = renderTargetView;
 	currentDepthStencilView = depthStencilView;
 }
-
-//void* GraphicsDX11::GetBack()
-//{
-//	return backTextureSRV;
-//}
 
 ID3D11Device* GraphicsDX11::GetDevice() const
 {

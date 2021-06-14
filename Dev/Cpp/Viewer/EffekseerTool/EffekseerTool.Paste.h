@@ -21,15 +21,15 @@ class Paste
 private:
 	efk::ImageRenderer* imageRenderer = nullptr;
 
-	Paste(efk::Graphics* graphics, EffekseerRenderer::Renderer* renderer);
+	Paste(efk::Graphics* graphics, const EffekseerRenderer::RendererRef& renderer);
 
 public:
 	virtual ~Paste();
 
-	static Paste* Create(efk::Graphics* graphics, EffekseerRenderer::Renderer* renderer);
+	static Paste* Create(efk::Graphics* graphics, const EffekseerRenderer::RendererRef& renderer);
 
 public:
-	void Rendering(::Effekseer::TextureData* texture, int32_t width, int32_t height);
+	void Rendering(::Effekseer::TextureRef texture, int32_t width, int32_t height);
 };
 //----------------------------------------------------------------------------------
 //

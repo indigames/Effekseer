@@ -2,12 +2,11 @@
 #include "../../3rdParty/stb/stb_image_write.h"
 #include <assert.h>
 
-DistortingCallbackDX9::DistortingCallbackDX9(::EffekseerRendererDX9::Renderer* renderer,
+DistortingCallbackDX9::DistortingCallbackDX9(::EffekseerRendererDX9::RendererRef renderer,
 											 LPDIRECT3DDEVICE9 device,
 											 int texWidth,
 											 int texHeight)
-	: renderer(renderer)
-	, device(device)
+	: device(device)
 	, texWidth_(texWidth)
 	, texHeight_(texHeight)
 {
@@ -19,7 +18,7 @@ DistortingCallbackDX9::~DistortingCallbackDX9()
 	ES_SAFE_RELEASE(texture);
 }
 
-bool DistortingCallbackDX9::OnDistorting()
+bool DistortingCallbackDX9::OnDistorting(EffekseerRenderer::Renderer* renderer)
 {
 	IDirect3DSurface9* targetSurface = nullptr;
 	IDirect3DSurface9* texSurface = nullptr;
@@ -37,7 +36,7 @@ bool DistortingCallbackDX9::OnDistorting()
 	ES_SAFE_RELEASE(texSurface);
 	ES_SAFE_RELEASE(targetSurface);
 
-	renderer->SetBackground(texture);
+	reinterpret_cast<EffekseerRendererDX9::Renderer*>(renderer)->SetBackground(texture);
 
 	return true;
 }
@@ -47,6 +46,13 @@ void DistortingCallbackDX9::Lost()
 	ES_SAFE_RELEASE(texture);
 }
 
+void DistortingCallbackDX9::ChangeDevice(LPDIRECT3DDEVICE9 device)
+{
+	Effekseer::SafeAddRef(device);
+	Effekseer::SafeRelease(this->device);
+	this->device = device;
+}
+
 void DistortingCallbackDX9::Reset()
 {
 	device->CreateTexture(texWidth_, texHeight_, 1, D3DUSAGE_RENDERTARGET, D3DFMT_X8R8G8B8, D3DPOOL_DEFAULT, &texture, NULL);
@@ -54,17 +60,17 @@ void DistortingCallbackDX9::Reset()
 
 void EffectPlatformDX9::CreateCheckedSurface()
 {
-	device_->CreateOffscreenPlainSurface(WindowWidth, WindowHeight, D3DFMT_X8R8G8B8, D3DPOOL_SYSTEMMEM, &checkedSurface_, nullptr);
+	device_->CreateOffscreenPlainSurface(initParam_.WindowSize[0], initParam_.WindowSize[1], D3DFMT_X8R8G8B8, D3DPOOL_SYSTEMMEM, &checkedSurface_, nullptr);
 	D3DLOCKED_RECT lockedRect;
 	checkedSurface_->LockRect(&lockedRect, nullptr, 0);
 	memcpy(lockedRect.pBits, checkeredPattern_.data(), checkeredPattern_.size() * sizeof(uint32_t));
 	checkedSurface_->UnlockRect();
 }
 
-EffekseerRenderer::Renderer* EffectPlatformDX9::CreateRenderer()
+EffekseerRenderer::RendererRef EffectPlatformDX9::CreateRenderer()
 {
 	auto ret = EffekseerRendererDX9::Renderer::Create(device_, 2000);
-	distorting_ = new DistortingCallbackDX9((EffekseerRendererDX9::Renderer*)ret, device_, WindowWidth, WindowHeight);
+	distorting_ = new DistortingCallbackDX9((EffekseerRendererDX9::RendererRef)ret, device_, initParam_.WindowSize[0], initParam_.WindowSize[1]);
 	ret->SetDistortingCallback(distorting_);
 	return ret;
 }
@@ -82,8 +88,8 @@ void EffectPlatformDX9::InitializeDevice(const EffectPlatformInitializingParamet
 
 	D3DPRESENT_PARAMETERS d3dp;
 	ZeroMemory(&d3dp, sizeof(d3dp));
-	d3dp.BackBufferWidth = WindowWidth;
-	d3dp.BackBufferHeight = WindowHeight;
+	d3dp.BackBufferWidth = initParam_.WindowSize[0];
+	d3dp.BackBufferHeight = initParam_.WindowSize[1];
 	d3dp.BackBufferFormat = D3DFMT_X8R8G8B8;
 	d3dp.BackBufferCount = 1;
 	d3dp.SwapEffect = D3DSWAPEFFECT_DISCARD;
@@ -167,7 +173,7 @@ bool EffectPlatformDX9::TakeScreenshot(const char* path)
 {
 
 	IDirect3DSurface9* surface = nullptr;
-	device_->CreateOffscreenPlainSurface(WindowWidth, WindowHeight, D3DFMT_X8R8G8B8, D3DPOOL_SYSTEMMEM, &surface, nullptr);
+	device_->CreateOffscreenPlainSurface(initParam_.WindowSize[0], initParam_.WindowSize[1], D3DFMT_X8R8G8B8, D3DPOOL_SYSTEMMEM, &surface, nullptr);
 
 	LPDIRECT3DSURFACE9 backBuf;
 	device_->GetRenderTarget(0, &backBuf);
@@ -178,24 +184,24 @@ bool EffectPlatformDX9::TakeScreenshot(const char* path)
 	D3DLOCKED_RECT locked;
 	RECT rect;
 	rect.left = 0;
-	rect.bottom = WindowHeight;
+	rect.bottom = initParam_.WindowSize[1];
 	rect.top = 0;
-	rect.right = WindowWidth;
+	rect.right = initParam_.WindowSize[0];
 	surface->LockRect(&locked, &rect, D3DLOCK_NO_DIRTY_UPDATE | D3DLOCK_NOSYSLOCK | D3DLOCK_READONLY);
 
 	std::vector<uint8_t> data;
 
-	data.resize(WindowWidth * WindowHeight * 4);
+	data.resize(initParam_.WindowSize[0] * initParam_.WindowSize[1] * 4);
 
-	for (int32_t h = 0; h < WindowHeight; h++)
+	for (int32_t h = 0; h < initParam_.WindowSize[1]; h++)
 	{
-		auto dst_ = &(data[h * WindowWidth * 4]);
+		auto dst_ = &(data[h * initParam_.WindowSize[0] * 4]);
 		auto src_ = &(((uint8_t*)locked.pBits)[h * locked.Pitch]);
-		memcpy(dst_, src_, WindowWidth * 4);
+		memcpy(dst_, src_, initParam_.WindowSize[0] * 4);
 	}
 
 	// HACK for Geforce
-	for (int32_t i = 0; i < WindowWidth * WindowHeight; i++)
+	for (int32_t i = 0; i < initParam_.WindowSize[0] * initParam_.WindowSize[1]; i++)
 	{
 		data[i * 4 + 3] = 255;
 		std::swap(data[i * 4 + 0], data[i * 4 + 2]);
@@ -204,7 +210,7 @@ bool EffectPlatformDX9::TakeScreenshot(const char* path)
 	surface->UnlockRect();
 	surface->Release();
 
-	stbi_write_png(path, WindowWidth, WindowHeight, 4, data.data(), WindowWidth * 4);
+	stbi_write_png(path, initParam_.WindowSize[0], initParam_.WindowSize[1], 4, data.data(), initParam_.WindowSize[0] * 4);
 
 	return true;
 }
@@ -222,7 +228,7 @@ void EffectPlatformDX9::ResetDevice()
 
 	distorting_->Lost();
 
-	auto renderer = static_cast<EffekseerRendererDX9::Renderer*>(GetRenderer());
+	auto renderer = static_cast<EffekseerRendererDX9::Renderer*>(GetRenderer().Get());
 
 	for (size_t i = 0; i < effects_.size(); i++)
 	{
@@ -235,8 +241,8 @@ void EffectPlatformDX9::ResetDevice()
 
 	D3DPRESENT_PARAMETERS d3dp;
 	ZeroMemory(&d3dp, sizeof(d3dp));
-	d3dp.BackBufferWidth = WindowWidth;
-	d3dp.BackBufferHeight = WindowHeight;
+	d3dp.BackBufferWidth = initParam_.WindowSize[0];
+	d3dp.BackBufferHeight = initParam_.WindowSize[1];
 	d3dp.BackBufferFormat = D3DFMT_X8R8G8B8;
 	d3dp.BackBufferCount = 1;
 	d3dp.SwapEffect = D3DSWAPEFFECT_DISCARD;
@@ -249,12 +255,34 @@ void EffectPlatformDX9::ResetDevice()
 		d3dp.PresentationInterval = D3DPRESENT_INTERVAL_IMMEDIATE;
 	}
 
-	hr = device_->Reset(&d3dp);
+	bool newDevice = true;
 
-	if (FAILED(hr))
+	if (newDevice)
 	{
-		throw "Failed : ResetDevice";
-		return;
+		distorting_->ChangeDevice(nullptr);
+		renderer->ChangeDevice(nullptr);
+		device_->Release();
+
+		hr =
+			d3d_->CreateDevice(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, (HWND)GetNativePtr(0), D3DCREATE_HARDWARE_VERTEXPROCESSING, &d3dp, &device_);
+
+		if (FAILED(hr))
+		{
+			throw "Failed : CreateDevice";
+		}
+
+		renderer->ChangeDevice(device_);
+		distorting_->ChangeDevice(device_);
+	}
+	else
+	{
+		hr = device_->Reset(&d3dp);
+
+		if (FAILED(hr))
+		{
+			throw "Failed : ResetDevice";
+			return;
+		}
 	}
 
 	distorting_->Reset();
@@ -263,7 +291,7 @@ void EffectPlatformDX9::ResetDevice()
 
 	for (size_t i = 0; i < effects_.size(); i++)
 	{
-		effects_[i]->ReloadResources(buffers_[i].data(), buffers_[i].size());
+		effects_[i]->ReloadResources(buffers_[i].data(), static_cast<int32_t>(buffers_[i].size()));
 	}
 
 	CreateCheckedSurface();

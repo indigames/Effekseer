@@ -7,19 +7,8 @@ cmake_minimum_required(VERSION 3.0)
 # For MSVC
 if (MSVC)
     option(USE_MSVC_RUNTIME_LIBRARY_DLL "Use MSVC runtime library DLL" OFF)
+    set(CMAKE_EXE_LINKER_FLAGS_RELWITHDEBINFO "${CMAKE_EXE_LINKER_FLAGS_RELEASE} /SUBSYSTEM:WINDOWS")
     set(CMAKE_EXE_LINKER_FLAGS_RELEASE "${CMAKE_EXE_LINKER_FLAGS_RELEASE} /SUBSYSTEM:WINDOWS")
-endif()
-
-# For Mac
-if(APPLE)
-    set(CMAKE_OSX_DEPLOYMENT_TARGET 10.10)
-endif()
-
-# C++ version
-if(WIN32)
-    set(CMAKE_CXX_STANDARD 17)
-else()
-    set(CMAKE_CXX_STANDARD 14)
 endif()
 
 file(GLOB srcs 
@@ -31,29 +20,9 @@ file(GLOB hs
     Dialog/*.h
     Graphics/*.h)
 
-file(GLOB srcs_third_imgui
-    ThirdParty/imgui_main/*.cpp)
-
 file(GLOB srcs_third_imgui_platform
     ThirdParty/imgui_platform/imgui_impl_opengl3.cpp
     ThirdParty/imgui_platform/imgui_impl_glfw.cpp)
-
-file(GLOB srcs_third_node
-    ThirdParty/NodeEditor/Source/*.cpp)
-
-if(WIN32)
-    file(GLOB srcs_third_nfd
-        ThirdParty/nfd/nfd_common.c
-        ThirdParty/nfd/nfd_win.cpp)
-elseif(APPLE)
-    file(GLOB srcs_third_nfd
-        ThirdParty/nfd/nfd_common.c
-        ThirdParty/nfd/nfd_cocoa.m)
-else()
-    file(GLOB srcs_third_nfd
-        ThirdParty/nfd/nfd_common.c
-        ThirdParty/nfd/nfd_gtk.c)
-endif()
 
 link_directories(
     ${PROJECT_SOURCE_DIR}/../lib/
@@ -62,25 +31,17 @@ link_directories(
 # Add compile targets
 add_executable(
     EffekseerMaterialEditor
-    ${hs} ${srcs} ${srcs_third_imgui} ${srcs_third_imgui_platform} ${srcs_third_node} ${srcs_third_nfd})
+    ${hs} ${srcs} ${srcs_third_imgui_platform})
 
 # Flags
 if (MSVC)
-    if (NOT USE_MSVC_RUNTIME_LIBRARY_DLL)
-        foreach (flag CMAKE_C_FLAGS
-            CMAKE_C_FLAGS_DEBUG
-            CMAKE_C_FLAGS_RELEASE
-            CMAKE_CXX_FLAGS
-            CMAKE_CXX_FLAGS_DEBUG
-            CMAKE_CXX_FLAGS_RELEASE)
-
-            if (${flag} MATCHES "/MD")
-                string(REGEX REPLACE "/MD" "/MT" ${flag} "${${flag}}")
-            endif()
-            if (${flag} MATCHES "/MDd")
-                string(REGEX REPLACE "/MDd" "/MTd" ${flag} "${${flag}}")
-            endif()
-        endforeach()
+    # CMAKE_MSVC_RUNTIME_LIBRARY can be only used if minimum required is larger than 3.17
+    if(USE_MSVC_RUNTIME_LIBRARY_DLL)
+        cmake_policy(SET CMP0091 NEW)
+        set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL")
+    else()
+        cmake_policy(SET CMP0091 NEW)
+        set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
     endif()
 endif()
 
@@ -96,10 +57,8 @@ target_include_directories(
     ${PROJECT_SOURCE_DIR}/../3rdParty/AltseedRHI/include/
     ../EffekseerMaterial/
     ThirdParty/imgui_platform/
-    ThirdParty/imgui_main/
     ThirdParty/picojson/
-    ThirdParty/stb_image/
-    ThirdParty/NodeEditor/Include/)
+    ThirdParty/stb_image/)
 
 target_link_directories(
     EffekseerMaterialEditor
@@ -113,6 +72,10 @@ target_link_libraries(
     EffekseerMaterial
     EditorCommon
     AltseedRHI
+    Boxer
+    nfd
+    imgui
+    imgui-node-editor
     debug "${GLFW3_LIB_DEBUG}"
     optimized "${GLFW3_LIB_RELEASE}"
 )
@@ -171,6 +134,8 @@ target_link_libraries(
     ${CORE_FOUNDATION_FRAMEWORK}
     ${CORE_VIDEO_FRAMEWORK})
 
+    set_target_properties(EffekseerMaterialEditor PROPERTIES XCODE_ATTRIBUTE_ENABLE_HARDENED_RUNTIME YES)
+
 else()
 
 # For Linux
@@ -181,17 +146,9 @@ FIND_PACKAGE(OpenGL REQUIRED)
 find_package(X11 REQUIRED)
 find_package(Threads REQUIRED)
 
-find_package(PkgConfig REQUIRED)
-pkg_check_modules(GTK3 REQUIRED gtk+-3.0)
-
 include_directories(
     ${OPENGL_INCLUDE_DIR}
-    ${GTK3_INCLUDE_DIRS}
     ${X11_INCLUDE_DIR})
-
-link_directories(${GTK3_LIBRARY_DIRS})
-
-add_definitions(${GTK3_CFLAGS_OTHER})
 
 target_link_libraries(
     EffekseerMaterialEditor
@@ -203,14 +160,13 @@ target_link_libraries(
     stdc++fs
     ${CMAKE_THREAD_LIBS_INIT}
     ${OPENGL_LIBRARY}
-    ${GTK3_LIBRARIES}
     ${X11_LIBRARIES})
 
 endif()
 
 set_target_properties(EffekseerMaterialEditor PROPERTIES LINKER_LANGUAGE CXX)
 
-set(files ${hs} ${srcs} ${srcs_third_imgui} ${srcs_third_imgui_platform} ${srcs_third_node} ${srcs_third_nfd})
+set(files ${hs} ${srcs} ${srcs_third_imgui_platform})
 
 foreach(FILE ${files}) 
     # Get the directory of the source file

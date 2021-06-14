@@ -2,6 +2,7 @@
 #ifndef __EFFEKSEER_CLIENT_IMPLEMENTED_H__
 #define __EFFEKSEER_CLIENT_IMPLEMENTED_H__
 
+#if !(defined(__EFFEKSEER_NETWORK_DISABLED__))
 #if !(defined(_PSVITA) || defined(_PS4) || defined(_SWITCH) || defined(_XBOXONE))
 
 //----------------------------------------------------------------------------------
@@ -28,11 +29,11 @@ private:
 	bool isThreadRunning = false;
 	std::thread m_threadRecv;
 
-	EfkSocket m_socket;
-	uint16_t m_port;
+	EfkSocket m_socket = InvalidSocket;
+	uint16_t m_port = 0;
 	std::vector<uint8_t> m_sendBuffer;
 
-	bool m_running;
+	bool m_running = false;
 	std::mutex mutexStop;
 
 	bool GetAddr(const char* host, IN_ADDR* addr);
@@ -49,8 +50,8 @@ public:
 
 	bool Send(void* data, int32_t datasize);
 
-	void Reload(const EFK_CHAR* key, void* data, int32_t size);
-	void Reload(Manager* manager, const EFK_CHAR* path, const EFK_CHAR* key);
+	void Reload(const char16_t* key, void* data, int32_t size);
+	void Reload(ManagerRef manager, const char16_t* path, const char16_t* key);
 
 	bool IsConnected();
 };
@@ -66,3 +67,4 @@ public:
 #endif // #if !( defined(_PSVITA) || defined(_PS4) || defined(_SWITCH) || defined(_XBOXONE) )
 
 #endif // __EFFEKSEER_CLIENT_IMPLEMENTED_H__
+#endif

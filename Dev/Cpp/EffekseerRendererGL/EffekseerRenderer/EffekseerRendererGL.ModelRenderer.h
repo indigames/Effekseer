@@ -25,6 +25,11 @@ typedef ::Effekseer::ModelRenderer::NodeParameter efkModelNodeParam;
 typedef ::Effekseer::ModelRenderer::InstanceParameter efkModelInstanceParam;
 typedef ::Effekseer::Vector3D efkVector3D;
 
+class ModelRenderer;
+typedef ::Effekseer::RefPtr<ModelRenderer> ModelRendererRef;
+
+const int OpenGLInstancingCount = 10;
+
 class ModelRenderer : public ::EffekseerRenderer::ModelRendererBase
 {
 public:
@@ -43,6 +48,10 @@ private:
 	Shader* shader_unlit_ = nullptr;
 	Shader* shader_distortion_ = nullptr;
 
+	Backend::GraphicsDeviceRef graphicsDevice_ = nullptr;
+
+	template <int N>
+	void InitRenderer();
 
 	ModelRenderer(RendererImplemented* renderer,
 				  Shader* shader_ad_lit,
@@ -55,7 +64,7 @@ private:
 public:
 	virtual ~ModelRenderer();
 
-	static ModelRenderer* Create(RendererImplemented* renderer);
+	static ModelRendererRef Create(RendererImplemented* renderer);
 
 public:
 	void BeginRendering(const efkModelNodeParam& parameter, int32_t count, void* userData) override;
@@ -64,6 +73,9 @@ public:
 
 	void EndRendering(const efkModelNodeParam& parameter, void* userData) override;
 };
+
+void AddModelVertexUniformLayout(Effekseer::CustomVector<Effekseer::Backend::UniformLayoutElement>& uniformLayout, bool isAd, bool isInstancing, int N);
+
 //----------------------------------------------------------------------------------
 //
 //----------------------------------------------------------------------------------

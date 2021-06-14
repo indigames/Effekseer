@@ -247,7 +247,7 @@ namespace Effekseer.Utils
 		}
 	}
 
-	class ProjectVersionUpdator15xTo16x : ProjectVersionUpdator
+	class ProjectVersionUpdator15xTo16Alpha1 : ProjectVersionUpdator
 	{
 		public override bool Update(System.Xml.XmlDocument document)
 		{
@@ -275,7 +275,7 @@ namespace Effekseer.Utils
 
 				if (rendererCommon != null)
 				{
-					if (rendererCommon["UVAnimation"] != null)
+					if (rendererCommon["UVAnimation"] != null && rendererCommon["UVAnimation"]["AnimationParams"] == null)
 					{
 						System.Xml.XmlNode uvAnimationParamNode = document.CreateElement("AnimationParams");
 
@@ -290,6 +290,417 @@ namespace Effekseer.Utils
 				}
 			}
 
+			return true;
+		}
+	}
+
+	class ProjectVersionUpdator16Alpha1To16Alpha2 : ProjectVersionUpdator
+	{
+		public override bool Update(System.Xml.XmlDocument document)
+		{
+			List<System.Xml.XmlNode> nodes = new List<System.Xml.XmlNode>();
+
+			Action<System.Xml.XmlNode> collectNodes = null;
+			collectNodes = (node) =>
+			{
+				if (node.Name == "Node")
+				{
+					nodes.Add(node);
+				}
+
+				for (int i = 0; i < node.ChildNodes.Count; i++)
+				{
+					collectNodes(node.ChildNodes[i]);
+				}
+			};
+
+			collectNodes((XmlNode)document);
+
+			foreach (var node in nodes)
+			{
+				var labs = node["LocationAbsValues"];
+
+				if (labs != null)
+				{
+					// old gravity and attractive force to new
+					if (labs["Type"] != null && labs["Type"].GetTextAsInt() != 0)
+					{
+						var lff = document.CreateElement("LocalForceField4");
+
+						var type = labs["Type"].GetTextAsInt();
+						if (type == 1)
+						{
+							lff.AppendChild(document.CreateTextElement("Type", (int)LocalForceFieldType.Gravity));
+						}
+						else if (type == 2)
+						{
+							lff.AppendChild(document.CreateTextElement("Type", (int)LocalForceFieldType.AttractiveForce));
+						}
+
+						if (labs["Gravity"] != null)
+						{
+							lff.AppendChild(labs["Gravity"]);
+						}
+
+						if (labs["AttractiveForce"] != null)
+						{
+							lff.AppendChild(labs["AttractiveForce"]);
+
+							if (lff["AttractiveForce"]["Force"] != null)
+							{
+								var force = lff["AttractiveForce"]["Force"].GetTextAsFloat();
+								lff.AppendChild(document.CreateTextElement("Power", force.ToString()));
+							}
+						}
+
+						labs.AppendChild(lff);
+					}
+
+					Action<XmlElement> convert = (elm) =>
+					{
+						if (elm == null)
+							return;
+
+						var typeInt = elm["Type"]?.GetTextAsInt();
+						var type = typeInt.HasValue ? (Data.LocalForceFieldType)(typeInt.Value) : Data.LocalForceFieldType.None;
+
+						if (type == LocalForceFieldType.Turbulence)
+						{
+							if (elm["Turbulence"] != null && elm["Turbulence"]["Strength"] != null)
+							{
+								var strength = elm["Turbulence"]["Strength"].GetTextAsFloat();
+								elm.AppendChild(document.CreateTextElement("Power", strength.ToString()));
+							}
+						}
+
+						float defaultPower = 1.0f;
+
+						if (type == LocalForceFieldType.Turbulence)
+						{
+							defaultPower = 0.1f;
+						}
+
+						if (elm["Power"] != null)
+						{
+							defaultPower = elm["Power"].GetTextAsFloat();
+						}
+
+						if (type == LocalForceFieldType.Turbulence)
+						{
+							defaultPower *= 10.0f;
+						}
+
+						if (type == LocalForceFieldType.Vortex)
+						{
+							defaultPower /= 5.0f;
+						}
+
+						if (elm["Power"] != null)
+						{
+							elm.RemoveChild(elm["Power"]);
+						}
+
+						elm.AppendChild(document.CreateTextElement("Power", defaultPower.ToString()));
+
+						if (type == LocalForceFieldType.Vortex)
+						{
+							if (elm["Vortex"] == null)
+							{
+								elm.AppendChild(document.CreateElement("Vortex"));
+							}
+
+							elm["Vortex"].AppendChild(document.CreateTextElement("VortexType", ((int)ForceFieldVortexType.ConstantSpeed).ToString()));
+						}
+
+						if (type == LocalForceFieldType.Turbulence)
+						{
+							if (elm["Turbulence"] == null)
+							{
+								elm.AppendChild(document.CreateElement("Turbulence"));
+							}
+
+							elm["Turbulence"].AppendChild(document.CreateTextElement("TurbulenceType", ((int)ForceFieldTurbulenceType.Complicated).ToString()));
+						}
+					};
+
+					convert(labs["LocalForceField1"]);
+					convert(labs["LocalForceField2"]);
+					convert(labs["LocalForceField3"]);
+				}
+			}
+
+			return true;
+		}
+	}
+
+	class ProjectVersionUpdator16Alpha2To16x : ProjectVersionUpdator
+	{
+		public override bool Update(System.Xml.XmlDocument document)
+		{
+			List<System.Xml.XmlNode> nodes = new List<System.Xml.XmlNode>();
+
+			Action<System.Xml.XmlNode> collectNodes = null;
+			collectNodes = (node) =>
+			{
+				if (node.Name == "Node")
+				{
+					nodes.Add(node);
+				}
+
+				for (int i = 0; i < node.ChildNodes.Count; i++)
+				{
+					collectNodes(node.ChildNodes[i]);
+				}
+			};
+
+			collectNodes((XmlNode)document);
+
+			foreach (var node in nodes)
+			{
+				var rv = node["DrawingValues"];
+				var rcv = node["AdvancedRendererCommonValuesValues"];
+
+				if (rv != null)
+				{
+					if ((rv["EnableFalloff"] != null || rv["FalloffParam"] != null) && rcv == null)
+					{
+						node.AppendChild(document.CreateElement("AdvancedRendererCommonValuesValues"));
+						rcv = node["AdvancedRendererCommonValuesValues"];
+					}
+
+					if (rv["EnableFalloff"] != null)
+					{
+						rcv.AppendChild(rv["EnableFalloff"]);
+					}
+
+					if (rv["FalloffParam"] != null)
+					{
+						rcv.AppendChild(rv["FalloffParam"]);
+					}
+				}
+			}
+
+			return true;
+		}
+	}
+
+	class ProjectVersionUpdator16Alpha5To16x : ProjectVersionUpdator
+	{
+		public override bool Update(System.Xml.XmlDocument document)
+		{
+			List<System.Xml.XmlNode> nodes = new List<System.Xml.XmlNode>();
+
+			Action<System.Xml.XmlNode> collectNodes = null;
+			collectNodes = (node) =>
+			{
+				if (node.Name == "Node")
+				{
+					nodes.Add(node);
+				}
+
+				for (int i = 0; i < node.ChildNodes.Count; i++)
+				{
+					collectNodes(node.ChildNodes[i]);
+				}
+			};
+
+			collectNodes((XmlNode)document);
+
+			foreach (var node in nodes)
+			{
+				var rcv1 = node["AdvancedRendererCommonValuesValues"];
+				if (rcv1 != null)
+				{
+					var enableAlphaTexture = rcv1["EnableAlphaTexture"];
+					if (enableAlphaTexture != null)
+					{
+						var alphaTextureParam = rcv1["AlphaTextureParam"] as XmlNode;
+						alphaTextureParam?.PrependChild(document.CreateTextElement("Enabled", enableAlphaTexture.InnerText));
+					}
+
+					var enableUVDistortion = rcv1["EnableUVDistortion"];
+					if (enableUVDistortion != null)
+					{
+						var uvDistortionParam = rcv1["UVDistortionParam"] as XmlNode;
+						uvDistortionParam?.PrependChild(document.CreateTextElement("Enabled", enableUVDistortion.InnerText));
+					}
+
+					var alphaCutoffParam = rcv1["AlphaCutoffParam"] as XmlNode;
+					if (alphaCutoffParam != null)
+					{
+						var typeNode = alphaCutoffParam["Type"];
+						var fixedNode = alphaCutoffParam["Fixed"];
+						bool enableAlphaCutoff =
+							(typeNode != null && int.Parse(typeNode.InnerText) != 0) ||
+							(fixedNode != null && float.Parse(fixedNode["Threshold"].InnerText) != 0.0f);
+						alphaCutoffParam.PrependChild(document.CreateTextElement("Enabled", enableAlphaCutoff.ToString()));
+					}
+
+					var enableFalloff = rcv1["EnableFalloff"];
+					if (enableFalloff != null)
+					{
+						var falloffParam = rcv1["FalloffParam"] as XmlNode;
+						falloffParam.PrependChild(document.CreateTextElement("Enabled", enableFalloff.InnerText));
+					}
+
+					var softParticleDistance = rcv1["SoftParticleDistance"];
+					var softParticleDistanceNear = rcv1["SoftParticleDistanceNear"];
+					var softParticleDistanceNearOffset = rcv1["SoftParticleDistanceNearOffset"];
+
+					if (softParticleDistance != null || softParticleDistanceNear != null || softParticleDistanceNearOffset != null)
+					{
+						var softParticleParams = document.CreateElement("SoftParticleParams");
+
+						if (softParticleDistance != null)
+						{
+							softParticleParams.AppendChild(document.CreateTextElement("Enabled", (softParticleDistance.GetTextAsFloat() != 0.0f).ToString()));
+							softParticleParams.AppendChild(document.CreateTextElement("Distance", softParticleDistance.InnerText));
+						}
+						if (softParticleDistanceNear != null)
+						{
+							softParticleParams.AppendChild(document.CreateTextElement("DistanceNear", softParticleDistanceNear.InnerText));
+						}
+						if (softParticleDistanceNearOffset != null)
+						{
+							softParticleParams.AppendChild(document.CreateTextElement("DistanceNearOffset", softParticleDistanceNearOffset.InnerText));
+						}
+
+						rcv1.AppendChild(softParticleParams);
+					}
+				}
+
+				var rcv2 = node["AdvancedRendererCommonValues2Values"];
+				if (rcv2 != null)
+				{
+					node.RemoveChild(rcv2);
+
+					if (rcv1 == null)
+					{
+						rcv1 = document.CreateElement("AdvancedRendererCommonValuesValues");
+						node.AppendChild(rcv1);
+					}
+
+					var blendTextureParams = rcv2["BlendTextureParams"];
+					var enableBlendTexture = rcv2["EnableBlendTexture"];
+
+					if (enableBlendTexture != null && blendTextureParams != null)
+					{
+						rcv2.RemoveChild(blendTextureParams);
+						rcv2.RemoveChild(enableBlendTexture);
+						blendTextureParams.AppendChild(document.CreateTextElement("Enabled", enableBlendTexture.InnerText));
+						rcv1.AppendChild(blendTextureParams);
+					}
+				}
+			}
+
+			return true;
+		}
+	}
+
+	class ProjectVersionUpdator16Alpha8To16x : ProjectVersionUpdator
+	{
+		public override bool Update(System.Xml.XmlDocument document)
+		{
+			var proceduralElement = document["EffekseerProject"]["ProcedualModel"];
+			if(proceduralElement != null)
+			{
+				document["EffekseerProject"].RemoveChild(proceduralElement);
+				var newNode = document.CreateElement("ProceduralModel");
+				var newNode2 = document.CreateElement("ProceduralModels");
+				newNode.AppendChild(newNode2);
+
+				List<XmlNode> children = new List<XmlNode>();
+
+				for(int i = 0; i < proceduralElement.FirstChild.ChildNodes.Count; i++)
+				{
+					children.Add(proceduralElement.FirstChild.ChildNodes[i]);
+				}
+
+				foreach(var child in children)
+				{
+					Action<XmlNode,XmlNode, string> moveElement = (XmlNode dst, XmlNode src, string name) => 
+					{
+						var node = src[name];
+						if(node != null)
+						{
+							dst.AppendChild(node);
+						}
+					};
+
+					Action<XmlNode, XmlNode, string, string> moveAndRenameElement = (XmlNode dst, XmlNode src, string newName, string name) =>
+					{
+						var node = src[name];
+						if (node != null)
+						{
+							src.RemoveChild(node);
+
+							var nn = document.CreateElement(newName);
+							while(node.ChildNodes.Count > 0)
+							{
+								nn.AppendChild(node.FirstChild);
+							}
+							dst.AppendChild(nn);
+						}
+					};
+
+					var mesh = document.CreateElement("Mesh");
+					var ribbon = document.CreateElement("Ribbon");
+					var shape = document.CreateElement("Shape");
+					var shapeNoise = document.CreateElement("ShapeNoise");
+					var vertexColor = document.CreateElement("VertexColor");
+					
+					moveElement(mesh, child, "AngleBeginEnd");
+					moveElement(mesh, child, "Divisions");
+
+					moveElement(ribbon, child, "CrossSection");
+					moveElement(ribbon, child, "Rotate");
+					moveElement(ribbon, child, "Vertices");
+					moveElement(ribbon, child, "RibbonScales");
+					moveElement(ribbon, child, "RibbonAngles");
+					moveElement(ribbon, child, "RibbonNoises");
+					moveElement(ribbon, child, "Count");
+
+					moveElement(shape, child, "PrimitiveType");
+					moveElement(shape, child, "Radius");
+					moveElement(shape, child, "Radius2");
+					moveElement(shape, child, "Depth");
+					moveElement(shape, child, "DepthMin");
+					moveElement(shape, child, "DepthMax");
+					moveElement(shape, child, "Point1");
+					moveElement(shape, child, "Point2");
+					moveElement(shape, child, "Point3");
+					moveElement(shape, child, "Point4");
+					moveElement(shape, child, "AxisType");
+
+					moveElement(shapeNoise, child, "TiltNoiseFrequency");
+					moveElement(shapeNoise, child, "TiltNoiseOffset");
+					moveElement(shapeNoise, child, "TiltNoisePower");
+					moveElement(shapeNoise, child, "WaveNoiseFrequency");
+					moveElement(shapeNoise, child, "WaveNoiseOffset");
+					moveElement(shapeNoise, child, "WaveNoisePower");
+					moveElement(shapeNoise, child, "CurlNoiseFrequency");
+					moveElement(shapeNoise, child, "CurlNoiseOffset");
+					moveElement(shapeNoise, child, "CurlNoisePower");
+
+					moveAndRenameElement(vertexColor, child, "ColorUpperLeft", "ColorLeft");
+					moveAndRenameElement(vertexColor, child, "ColorUpperCenter", "ColorCenter");
+					moveAndRenameElement(vertexColor, child, "ColorUpperRight", "ColorRight");
+					moveAndRenameElement(vertexColor, child, "ColorMiddleLeft", "ColorLeftMiddle");
+					moveAndRenameElement(vertexColor, child, "ColorMiddleCenter", "ColorCenterMiddle");
+					moveAndRenameElement(vertexColor, child, "ColorMiddleRight", "ColorRightMiddle");
+					moveElement(vertexColor, child, "ColorCenterArea");
+
+					child.AppendChild(mesh);
+					child.AppendChild(ribbon);
+					child.AppendChild(shape);
+					child.AppendChild(shapeNoise);
+					child.AppendChild(vertexColor);
+
+					newNode2.AppendChild(child);
+				}
+
+				document["EffekseerProject"].AppendChild(newNode);
+			}
 			return true;
 		}
 	}

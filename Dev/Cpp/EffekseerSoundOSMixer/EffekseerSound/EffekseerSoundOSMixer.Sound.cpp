@@ -16,21 +16,21 @@ namespace EffekseerSound
 //----------------------------------------------------------------------------------
 //
 //----------------------------------------------------------------------------------
-Sound* Sound::Create(osm::Manager* soundManager)
+SoundRef Sound::Create(osm::Manager* soundManager)
 {
-	SoundImplemented* sound = new SoundImplemented();
+	auto sound = Effekseer::MakeRefPtr<SoundImplemented>();
 	if (sound->Initialize(soundManager))
 	{
 		return sound;
 	}
-	return NULL;
+	return nullptr;
 }
 
 //----------------------------------------------------------------------------------
 //
 //----------------------------------------------------------------------------------
 SoundImplemented::SoundImplemented()
-	: m_manager(NULL)
+	: m_manager(nullptr)
 	, m_mute(false)
 {
 }
@@ -72,7 +72,7 @@ void SoundImplemented::SetListener(const ::Effekseer::Vector3D& pos, const ::Eff
 //----------------------------------------------------------------------------------
 void SoundImplemented::Destroy()
 {
-	delete this;
+	Release();
 }
 
 //----------------------------------------------------------------------------------
@@ -96,17 +96,17 @@ void SoundImplemented::Update()
 //----------------------------------------------------------------------------------
 //
 //----------------------------------------------------------------------------------
-::Effekseer::SoundPlayer* SoundImplemented::CreateSoundPlayer()
+::Effekseer::SoundPlayerRef SoundImplemented::CreateSoundPlayer()
 {
-	return new SoundPlayer(this);
+	return ::Effekseer::MakeRefPtr<SoundPlayer>(SoundImplementedRef::FromPinned(this));
 }
 
 //----------------------------------------------------------------------------------
 //
 //----------------------------------------------------------------------------------
-::Effekseer::SoundLoader* SoundImplemented::CreateSoundLoader(::Effekseer::FileInterface* fileInterface)
+::Effekseer::SoundLoaderRef SoundImplemented::CreateSoundLoader(::Effekseer::FileInterface* fileInterface)
 {
-	return new SoundLoader(this, fileInterface);
+	return ::Effekseer::MakeRefPtr<SoundLoader>(SoundImplementedRef::FromPinned(this), fileInterface);
 }
 
 //----------------------------------------------------------------------------------
@@ -187,7 +187,7 @@ bool SoundImplemented::CheckPlayingTag(::Effekseer::SoundTag tag)
 //----------------------------------------------------------------------------------
 //
 //----------------------------------------------------------------------------------
-void SoundImplemented::StopData(SoundData* soundData)
+void SoundImplemented::StopData(const ::Effekseer::SoundDataRef& soundData)
 {
 	for (auto it = m_instances.begin(); it != m_instances.end(); it++)
 	{
@@ -224,6 +224,7 @@ void SoundImplemented::Calculate3DSound(const ::Effekseer::Vector3D& position, f
 	{
 		rolloff = 0.0f;
 	}
+	else
 	{
 		rolloff = (1.0f - (distance - rolloffDistance) / rolloffDistance);
 	}

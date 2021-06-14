@@ -2,7 +2,6 @@
 #ifndef __EFFEKSEERRENDERER_MODEL_RENDERER_BASE_H__
 #define __EFFEKSEERRENDERER_MODEL_RENDERER_BASE_H__
 
-#include <Effekseer.Internal.h>
 #include <Effekseer.h>
 #include <algorithm>
 #include <assert.h>
@@ -20,7 +19,7 @@ namespace EffekseerRenderer
 
 typedef ::Effekseer::ModelRenderer::NodeParameter efkModelNodeParam;
 typedef ::Effekseer::ModelRenderer::InstanceParameter efkModelInstanceParam;
-typedef ::Effekseer::Vec3f efkVector3D;
+typedef ::Effekseer::SIMD::Vec3f efkVector3D;
 
 template <int MODEL_COUNT>
 struct ModelRendererVertexConstantBuffer
@@ -218,220 +217,13 @@ struct ModelRendererMaterialVertexConstantBuffer
 	}
 };
 
-struct ModelRendererPixelConstantBuffer
+enum class ModelRendererVertexType
 {
-	float LightDirection[4];
-	float LightColor[4];
-	float LightAmbientColor[4];
-
-	void SetModelFlipbookParameter(float enableInterpolation, float interpolationType)
-	{
-	}
-
-	void SetModelUVDistortionParameter(float intensity, float blendIntensity, const std::array<float, 2>& uvInversed)
-	{
-	}
-
-	void SetModelBlendTextureParameter(float blendType)
-	{
-	}
-
-	void SetCameraFrontDirection(float x, float y, float z)
-	{
-	}
-
-	void SetFalloffParameter(float enable, float colorBlendType, float pow, const std::array<float, 4>& beginColor, const std::array<float, 4>& endColor)
-	{
-	}
-
-	void SetEmissiveScaling(float emissiveScaling)
-	{
-	}
-
-	void SetEdgeColor(const std::array<float, 4>& edgeColor)
-	{
-	}
-
-	void SetEdgeParameter(float threshold, float colorScaling)
-	{
-	}
+	Instancing,
+	Single,
 };
 
-struct ModelRendererAdvancedPixelConstantBuffer
-{
-	float LightDirection[4];
-	float LightColor[4];
-	float LightAmbientColor[4];
-
-	struct
-	{
-		union
-		{
-			float Buffer[4];
-
-			struct
-			{
-				float EnableInterpolation;
-				float InterpolationType;
-			};
-		};
-	} ModelFlipbookParameter;
-
-	struct
-	{
-		union
-		{
-			float Buffer[4];
-
-			struct
-			{
-				float Intensity;
-				float BlendIntensity;
-				float UVInversed[2];
-			};
-		};
-	} ModelUVDistortionParameter;
-
-	struct
-	{
-		union
-		{
-			float Buffer[4];
-
-			struct
-			{
-				float BlendType;
-			};
-		};
-	} ModelBlendTextureParameter;
-
-	float CameraFrontDirection[4];
-
-	struct
-	{
-		union
-		{
-			float Buffer[4];
-
-			struct
-			{
-				float Enable;
-				float ColorBlendType;
-				float Pow;
-			};
-		};
-
-		float BeginColor[4];
-		float EndColor[4];
-
-	} FalloffParameter;
-
-	struct
-	{
-		union
-		{
-			float Buffer[4];
-
-			struct
-			{
-				float EmissiveScaling;
-			};
-		};
-	};
-
-	float EdgeColor[4];
-
-	struct
-	{
-		union
-		{
-			float Buffer[4];
-
-			struct
-			{
-				float Threshold;
-				float ColorScaling;
-			};
-		};
-	} EdgeParameter;
-
-	void SetModelFlipbookParameter(float enableInterpolation, float interpolationType)
-	{
-		ModelFlipbookParameter.EnableInterpolation;
-		ModelFlipbookParameter.InterpolationType;
-	}
-
-	void SetModelUVDistortionParameter(float intensity, float blendIntensity, const std::array<float, 2>& uvInversed)
-	{
-		ModelUVDistortionParameter.Intensity = intensity;
-		ModelUVDistortionParameter.BlendIntensity = blendIntensity;
-		ModelUVDistortionParameter.UVInversed[0] = uvInversed[0];
-		ModelUVDistortionParameter.UVInversed[1] = uvInversed[1];
-	}
-
-	void SetModelBlendTextureParameter(float blendType)
-	{
-		ModelBlendTextureParameter.BlendType = blendType;
-	}
-
-	void SetCameraFrontDirection(float x, float y, float z)
-	{
-		CameraFrontDirection[0] = x;
-		CameraFrontDirection[1] = y;
-		CameraFrontDirection[2] = z;
-		CameraFrontDirection[3] = 0.0f;
-	}
-
-	void SetFalloffParameter(float enable, float colorBlendType, float pow, const std::array<float, 4>& beginColor, const std::array<float, 4>& endColor)
-	{
-		FalloffParameter.Enable = enable;
-		FalloffParameter.ColorBlendType = colorBlendType;
-		FalloffParameter.Pow = pow;
-
-		for (size_t i = 0; i < 4; i++)
-		{
-			FalloffParameter.BeginColor[i] = beginColor[i];
-		}
-
-		for (size_t i = 0; i < 4; i++)
-		{
-			FalloffParameter.EndColor[i] = endColor[i];
-		}
-	}
-
-	void SetEmissiveScaling(float emissiveScaling)
-	{
-		EmissiveScaling = emissiveScaling;
-	}
-
-	void SetEdgeColor(const std::array<float, 4>& edgeColor)
-	{
-		for (size_t i = 0; i < 4; i++)
-		{
-			EdgeColor[i] = edgeColor[i];
-		}
-	}
-
-	void SetEdgeParameter(float threshold, float colorScaling)
-	{
-		EdgeParameter.Threshold = threshold;
-		EdgeParameter.ColorScaling = colorScaling;
-	}
-};
-
-
-struct ModelRendererDistortionPixelConstantBuffer
-{
-	float DistortionIntencity[4];
-	float UVInversedBack[4];
-
-	//! unused in none advanced renderer
-	float Interpolation[4];
-	float UVDistortion[4];
-	float TextureBlendType[4];
-};
-
-class ModelRendererBase : public ::Effekseer::ModelRenderer, public ::Effekseer::AlignedAllocationPolicy<16>
+class ModelRendererBase : public ::Effekseer::ModelRenderer, public ::Effekseer::SIMD::AlignedAllocationPolicy<16>
 {
 protected:
 	struct KeyValue
@@ -478,8 +270,7 @@ protected:
 	int32_t customData1Count_ = 0;
 	int32_t customData2Count_ = 0;
 
-	//! TODO : refactor
-	bool isAdvanced_ = false;
+	ShaderParameterCollector collector_;
 
 	void ColorToFloat4(::Effekseer::Color color, float fc[4])
 	{
@@ -499,9 +290,15 @@ protected:
 		return fc;
 	}
 
-	void VectorToFloat4(const ::Effekseer::Vec3f& v, float fc[4])
+	void VectorToFloat4(const ::Effekseer::SIMD::Vec3f& v, float fc[4])
 	{
-		::Effekseer::SIMD4f::Store3(fc, v.s);
+		::Effekseer::SIMD::Float4::Store3(fc, v.s);
+		fc[3] = 1.0f;
+	}
+
+	void VectorToFloat4(const ::Effekseer::SIMD::Vec3f& v, std::array<float, 4>& fc)
+	{
+		::Effekseer::SIMD::Float4::Store3(fc.data(), v.s);
 		fc[3] = 1.0f;
 	}
 
@@ -551,7 +348,7 @@ protected:
 					frontDirection.Z = -frontDirection.Z;
 				}
 
-				keyValues_[i].Key = Effekseer::Vec3f::Dot(t, frontDirection);
+				keyValues_[i].Key = Effekseer::SIMD::Vec3f::Dot(t, frontDirection);
 				keyValues_[i].Value = static_cast<int32_t>(i);
 			}
 
@@ -570,6 +367,7 @@ protected:
 			uvDistortionUVSorted_.resize(m_matrixes.size());
 			blendUVSorted_.resize(m_matrixes.size());
 			blendAlphaUVSorted_.resize(m_matrixes.size());
+			blendUVDistortionUVSorted_.resize(m_matrixes.size());
 			flipbookIndexAndNextRateSorted_.resize(m_matrixes.size());
 			alphaThresholdSorted_.resize(m_matrixes.size());
 			viewOffsetDistanceSorted_.resize(m_matrixes.size());
@@ -638,8 +436,8 @@ protected:
 	template <typename RENDERER, typename SHADER, int InstanceCount>
 	void StoreFileUniform(RENDERER* renderer,
 						  SHADER* shader_,
-						  Effekseer::MaterialData* material,
-						  Effekseer::MaterialParameter* materialParam,
+						  Effekseer::MaterialRef material,
+						  Effekseer::MaterialRenderData* materialRenderData,
 						  const efkModelNodeParam& param,
 						  int32_t renderPassInd,
 						  float*& cutomData1Ptr,
@@ -660,13 +458,14 @@ protected:
 
 		// camera
 		float cameraPosition[4];
-		::Effekseer::Vec3f cameraPosition3 = renderer->GetCameraPosition();
+		::Effekseer::SIMD::Vec3f cameraPosition3 = renderer->GetCameraPosition();
 		VectorToFloat4(cameraPosition3, cameraPosition);
 
 		// time
 		std::array<float, 4> predefined_uniforms;
 		predefined_uniforms.fill(0.5f);
 		predefined_uniforms[0] = renderer->GetTime();
+		predefined_uniforms[1] = param.Magnification;
 
 		// vs
 		int32_t vsOffset = sizeof(Effekseer::Matrix44) + (sizeof(Effekseer::Matrix44) + sizeof(float) * 4 * 2) * InstanceCount;
@@ -693,9 +492,9 @@ protected:
 			vsOffset += (sizeof(float) * 4) * InstanceCount;
 		}
 
-		for (size_t i = 0; i < materialParam->MaterialUniforms.size(); i++)
+		for (size_t i = 0; i < materialRenderData->MaterialUniforms.size(); i++)
 		{
-			renderer->SetVertexBufferToShader(materialParam->MaterialUniforms[i].data(), sizeof(float) * 4, vsOffset);
+			renderer->SetVertexBufferToShader(materialRenderData->MaterialUniforms[i].data(), sizeof(float) * 4, vsOffset);
 			vsOffset += (sizeof(float) * 4);
 		}
 
@@ -710,8 +509,32 @@ protected:
 		renderer->SetPixelBufferToShader(cameraPosition, sizeof(float) * 4, psOffset);
 		psOffset += (sizeof(float) * 4);
 
+		::Effekseer::Backend::TextureRef depthTexture = nullptr;
+		::EffekseerRenderer::DepthReconstructionParameter reconstructionParam;
+		renderer->GetImpl()->GetDepth(depthTexture, reconstructionParam);
+
+		SoftParticleParameter softParticleParam;
+
+		softParticleParam.SetParam(
+			0.0f,
+			0.0f,
+			0.0f,
+			param.Maginification,
+			reconstructionParam.DepthBufferScale,
+			reconstructionParam.DepthBufferOffset,
+			reconstructionParam.ProjectionMatrix33,
+			reconstructionParam.ProjectionMatrix34,
+			reconstructionParam.ProjectionMatrix43,
+			reconstructionParam.ProjectionMatrix44);
+
+		renderer->SetPixelBufferToShader(softParticleParam.reconstructionParam1.data(), sizeof(float) * 4, psOffset);
+		psOffset += (sizeof(float) * 4);
+
+		renderer->SetPixelBufferToShader(softParticleParam.reconstructionParam2.data(), sizeof(float) * 4, psOffset);
+		psOffset += (sizeof(float) * 4);
+
 		// shader model
-		material = param.EffectPointer->GetMaterial(materialParam->MaterialIndex);
+		material = param.EffectPointer->GetMaterial(materialRenderData->MaterialIndex);
 
 		if (material->ShadingModel == ::Effekseer::ShadingModelType::Lit)
 		{
@@ -719,7 +542,7 @@ protected:
 			float lightColor[4];
 			float lightAmbientColor[4];
 
-			::Effekseer::Vec3f lightDirection3 = renderer->GetLightDirection();
+			::Effekseer::SIMD::Vec3f lightDirection3 = renderer->GetLightDirection();
 			lightDirection3 = lightDirection3.Normalize();
 
 			VectorToFloat4(lightDirection3, lightDirection);
@@ -744,14 +567,143 @@ protected:
 			psOffset += (sizeof(float) * 16);
 		}
 
-		for (size_t i = 0; i < materialParam->MaterialUniforms.size(); i++)
+		for (size_t i = 0; i < materialRenderData->MaterialUniforms.size(); i++)
 		{
-			renderer->SetPixelBufferToShader(materialParam->MaterialUniforms[i].data(), sizeof(float) * 4, psOffset);
+			renderer->SetPixelBufferToShader(materialRenderData->MaterialUniforms[i].data(), sizeof(float) * 4, psOffset);
 			psOffset += (sizeof(float) * 4);
 		}
 	}
 
+	template <typename RENDERER, typename SHADER, int InstanceCount, typename VertexConstantBufferType, bool REQUIRE_ADVANCED_DATA, bool DISTORTION>
+	void StoreFixedUniforms(RENDERER* renderer,
+							SHADER* shader_,
+							const efkModelNodeParam& param)
+	{
+		VertexConstantBufferType* vcb = (VertexConstantBufferType*)shader_->GetVertexConstantBuffer();
+		std::array<float, 4> uvInversed;
+		std::array<float, 4> uvInversedBack;
+
+		GetInversedFlags(renderer, uvInversed, uvInversedBack);
+
+		vcb->UVInversed[0] = uvInversed[0];
+		vcb->UVInversed[1] = uvInversed[1];
+
+		::Effekseer::Backend::TextureRef depthTexture = nullptr;
+		::EffekseerRenderer::DepthReconstructionParameter reconstructionParam;
+		renderer->GetImpl()->GetDepth(depthTexture, reconstructionParam);
+
+		if (DISTORTION)
+		{
+			auto pcb = (PixelConstantBufferDistortion*)shader_->GetPixelConstantBuffer();
+			pcb->DistortionIntencity[0] = param.BasicParameterPtr->DistortionIntensity;
+
+			pcb->UVInversedBack[0] = uvInversedBack[0];
+			pcb->UVInversedBack[1] = uvInversedBack[1];
+
+			pcb->FlipbookParam.EnableInterpolation = static_cast<float>(param.BasicParameterPtr->EnableInterpolation);
+			pcb->FlipbookParam.InterpolationType = static_cast<float>(param.BasicParameterPtr->InterpolationType);
+
+			pcb->UVDistortionParam.Intensity = param.BasicParameterPtr->UVDistortionIntensity;
+			pcb->UVDistortionParam.BlendIntensity = param.BasicParameterPtr->BlendUVDistortionIntensity;
+			pcb->UVDistortionParam.UVInversed[0] = uvInversed[0];
+			pcb->UVDistortionParam.UVInversed[1] = uvInversed[1];
+
+			pcb->BlendTextureParam.BlendType = static_cast<float>(param.BasicParameterPtr->TextureBlendType);
+
+			pcb->SoftParticleParam.SetParam(
+				param.BasicParameterPtr->SoftParticleDistanceFar,
+				param.BasicParameterPtr->SoftParticleDistanceNear,
+				param.BasicParameterPtr->SoftParticleDistanceNearOffset,
+				param.Maginification,
+				reconstructionParam.DepthBufferScale,
+				reconstructionParam.DepthBufferOffset,
+				reconstructionParam.ProjectionMatrix33,
+				reconstructionParam.ProjectionMatrix34,
+				reconstructionParam.ProjectionMatrix43,
+				reconstructionParam.ProjectionMatrix44);
+		}
+		else
+		{
+			auto pcb = (PixelConstantBuffer*)shader_->GetPixelConstantBuffer();
+
+			// specify predefined parameters
+			if (param.BasicParameterPtr->MaterialType == Effekseer::RendererMaterialType::Lighting)
+			{
+				::Effekseer::SIMD::Vec3f lightDirection = renderer->GetLightDirection();
+				lightDirection = lightDirection.Normalize();
+				VectorToFloat4(lightDirection, vcb->LightDirection);
+				VectorToFloat4(lightDirection, pcb->LightDirection);
+			}
+
+			{
+				ColorToFloat4(renderer->GetLightColor(), vcb->LightColor);
+				pcb->LightColor = ColorToFloat4(renderer->GetLightColor());
+			}
+
+			{
+				ColorToFloat4(renderer->GetLightAmbientColor(), vcb->LightAmbientColor);
+				pcb->LightAmbientColor = ColorToFloat4(renderer->GetLightAmbientColor());
+			}
+
+			pcb->SetEmissiveScaling(static_cast<float>(param.BasicParameterPtr->EmissiveScaling));
+
+			if (REQUIRE_ADVANCED_DATA)
+			{
+				pcb->SetModelFlipbookParameter(param.BasicParameterPtr->EnableInterpolation, static_cast<float>(param.BasicParameterPtr->InterpolationType));
+				pcb->SetModelUVDistortionParameter(param.BasicParameterPtr->UVDistortionIntensity, param.BasicParameterPtr->BlendUVDistortionIntensity, {uvInversed[0], uvInversed[1]});
+				pcb->SetModelBlendTextureParameter(static_cast<float>(param.BasicParameterPtr->TextureBlendType));
+
+				::Effekseer::Vector3D CameraFront = renderer->GetCameraFrontDirection();
+
+				if (!param.IsRightHand)
+				{
+					CameraFront = -CameraFront;
+				}
+
+				pcb->SetCameraFrontDirection(-CameraFront.X, -CameraFront.Y, -CameraFront.Z);
+				pcb->SetFalloffParameter(
+					static_cast<float>(param.EnableFalloff),
+					static_cast<float>(param.FalloffParam.ColorBlendType),
+					static_cast<float>(param.FalloffParam.Pow),
+					ColorToFloat4(param.FalloffParam.BeginColor),
+					ColorToFloat4(param.FalloffParam.EndColor));
+
+				pcb->SetEdgeParameter(ColorToFloat4(Effekseer::Color(
+										  param.BasicParameterPtr->EdgeColor[0],
+										  param.BasicParameterPtr->EdgeColor[1],
+										  param.BasicParameterPtr->EdgeColor[2],
+										  param.BasicParameterPtr->EdgeColor[3])),
+									  param.BasicParameterPtr->EdgeThreshold,
+									  static_cast<float>(param.BasicParameterPtr->EdgeColorScaling));
+			}
+
+			pcb->SoftParticleParam.SetParam(
+				param.BasicParameterPtr->SoftParticleDistanceFar,
+				param.BasicParameterPtr->SoftParticleDistanceNear,
+				param.BasicParameterPtr->SoftParticleDistanceNearOffset,
+				param.Maginification,
+				reconstructionParam.DepthBufferScale,
+				reconstructionParam.DepthBufferOffset,
+				reconstructionParam.ProjectionMatrix33,
+				reconstructionParam.ProjectionMatrix34,
+				reconstructionParam.ProjectionMatrix43,
+				reconstructionParam.ProjectionMatrix44);
+
+			pcb->UVInversedBack[0] = uvInversedBack[0];
+			pcb->UVInversedBack[1] = uvInversedBack[1];
+		}
+
+		vcb->CameraMatrix = renderer->GetCameraProjectionMatrix();
+
+		vcb->SetModelFlipbookParameter(static_cast<float>(param.BasicParameterPtr->EnableInterpolation),
+									   static_cast<float>(param.BasicParameterPtr->UVLoopType),
+									   static_cast<float>(param.BasicParameterPtr->FlipbookDivideX),
+									   static_cast<float>(param.BasicParameterPtr->FlipbookDivideY));
+	}
+
 public:
+	ModelRendererVertexType VertexType = ModelRendererVertexType::Single;
+
 	virtual ~ModelRendererBase()
 	{
 	}
@@ -792,11 +744,11 @@ public:
 		customData2Sorted_.clear();
 
 		if (parameter.BasicParameterPtr->MaterialType == ::Effekseer::RendererMaterialType::File &&
-			parameter.BasicParameterPtr->MaterialParameterPtr != nullptr &&
-			parameter.BasicParameterPtr->MaterialParameterPtr->MaterialIndex >= 0 &&
-			parameter.EffectPointer->GetMaterial(parameter.BasicParameterPtr->MaterialParameterPtr->MaterialIndex) != nullptr)
+			parameter.BasicParameterPtr->MaterialRenderDataPtr != nullptr &&
+			parameter.BasicParameterPtr->MaterialRenderDataPtr->MaterialIndex >= 0 &&
+			parameter.EffectPointer->GetMaterial(parameter.BasicParameterPtr->MaterialRenderDataPtr->MaterialIndex) != nullptr)
 		{
-			auto material = parameter.EffectPointer->GetMaterial(parameter.BasicParameterPtr->MaterialParameterPtr->MaterialIndex);
+			auto material = parameter.EffectPointer->GetMaterial(parameter.BasicParameterPtr->MaterialRenderDataPtr->MaterialIndex);
 			customData1Count_ = material->CustomData1;
 			customData2Count_ = material->CustomData2;
 		}
@@ -808,50 +760,15 @@ public:
 
 		renderer->GetStandardRenderer()->ResetAndRenderingIfRequired();
 
-		isAdvanced_ = IsAdvanced(parameter);
-	}
-
-	bool IsAdvanced(const efkModelNodeParam& parameter) const
-	{
-		// TODO : merge with IsAdvanced in StandererdRenderer
-		if (parameter.BasicParameterPtr->MaterialType == ::Effekseer::RendererMaterialType::File)
-		{
-			return false;
-		}
-
-		if (parameter.BasicParameterPtr->Texture3Index >= 0)
-			return true;
-
-		if (parameter.BasicParameterPtr->Texture4Index >= 0)
-			return true;
-
-		if (parameter.BasicParameterPtr->Texture5Index >= 0)
-			return true;
-
-		if (parameter.BasicParameterPtr->Texture6Index >= 0)
-			return true;
-
-		if (parameter.BasicParameterPtr->Texture7Index >= 0)
-			return true;
-
-		if (parameter.BasicParameterPtr->EnableInterpolation ||
-			parameter.BasicParameterPtr->TextureBlendType != -1 ||
-			parameter.BasicParameterPtr->EdgeThreshold != 0 ||
-			parameter.BasicParameterPtr->EmissiveScaling != 1.0f ||
-			parameter.BasicParameterPtr->IsAlphaCutoffEnabled ||
-			parameter.EnableFalloff != 0)
-		{
-			return true;
-		}
-
-		return false;
+		collector_ = ShaderParameterCollector();
+		collector_.Collect(renderer, parameter.EffectPointer, parameter.BasicParameterPtr, parameter.EnableFalloff, renderer->GetImpl()->isSoftParticleEnabled);
 	}
 
 	template <typename RENDERER>
 	void Rendering_(RENDERER* renderer, const efkModelNodeParam& parameter, const efkModelInstanceParam& instanceParameter, void* userData)
 	{
 		::Effekseer::BillboardType btype = parameter.Billboard;
-		Effekseer::Mat44f mat44;
+		Effekseer::SIMD::Mat44f mat44;
 
 		if (btype == ::Effekseer::BillboardType::Fixed)
 		{
@@ -859,24 +776,24 @@ public:
 		}
 		else
 		{
-			Effekseer::Mat43f mat43;
-			Effekseer::Vec3f s;
-			Effekseer::Vec3f R;
-			Effekseer::Vec3f F;
+			Effekseer::SIMD::Mat43f mat43;
+			Effekseer::SIMD::Vec3f s;
+			Effekseer::SIMD::Vec3f R;
+			Effekseer::SIMD::Vec3f F;
 
 			CalcBillboard(btype, mat43, s, R, F, instanceParameter.SRTMatrix43, renderer->GetCameraFrontDirection());
 
-			mat44 = ::Effekseer::Mat43f::Scaling(s) * mat43;
+			mat44 = ::Effekseer::SIMD::Mat43f::Scaling(s) * mat43;
 		}
 
 		if (parameter.Magnification != 1.0f)
 		{
-			mat44 = Effekseer::Mat44f::Scaling(::Effekseer::Vec3f(parameter.Magnification)) * mat44;
+			mat44 = Effekseer::SIMD::Mat44f::Scaling(::Effekseer::SIMD::Vec3f(parameter.Magnification)) * mat44;
 		}
 
 		if (!parameter.IsRightHand)
 		{
-			mat44 = Effekseer::Mat44f::Scaling(1.0f, 1.0f, -1.0f) * mat44;
+			mat44 = Effekseer::SIMD::Mat44f::Scaling(1.0f, 1.0f, -1.0f) * mat44;
 		}
 
 		m_matrixes.push_back(ToStruct(mat44));
@@ -913,19 +830,29 @@ public:
 					   SHADER* shader_lit,
 					   SHADER* shader_unlit,
 					   SHADER* shader_distortion,
-					   const efkModelNodeParam& param)
+					   const efkModelNodeParam& param,
+					   void* userData)
 	{
 		if (m_matrixes.size() == 0)
 			return;
 		if (param.ModelIndex < 0)
 			return;
 
+		if (renderer->GetExternalShaderSettings() == nullptr)
+		{
+			shader_unlit->OverrideShader(nullptr);
+		}
+		else
+		{
+			shader_unlit->OverrideShader(renderer->GetExternalShaderSettings()->ModelShader);
+		}
+
 		int32_t renderPassCount = 1;
 
-		if (param.BasicParameterPtr->MaterialParameterPtr != nullptr && param.BasicParameterPtr->MaterialParameterPtr->MaterialIndex >= 0)
+		if (param.BasicParameterPtr->MaterialRenderDataPtr != nullptr && param.BasicParameterPtr->MaterialRenderDataPtr->MaterialIndex >= 0)
 		{
-			auto materialData = param.EffectPointer->GetMaterial(param.BasicParameterPtr->MaterialParameterPtr->MaterialIndex);
-			if (materialData != nullptr && materialData->IsRefractionRequired)
+			auto material = param.EffectPointer->GetMaterial(param.BasicParameterPtr->MaterialRenderDataPtr->MaterialIndex);
+			if (material != nullptr && material->IsRefractionRequired)
 			{
 				// refraction, standard
 				renderPassCount = 2;
@@ -937,32 +864,31 @@ public:
 
 		for (int32_t renderPassInd = 0; renderPassInd < renderPassCount; renderPassInd++)
 		{
-			Effekseer::MaterialParameter* materialParam = param.BasicParameterPtr->MaterialParameterPtr;
+			Effekseer::MaterialRenderData* materialRenderData = param.BasicParameterPtr->MaterialRenderDataPtr;
 
-			if (materialParam != nullptr && materialParam->MaterialIndex >= 0 &&
-				param.EffectPointer->GetMaterial(materialParam->MaterialIndex) != nullptr)
+			if (materialRenderData != nullptr && materialRenderData->MaterialIndex >= 0 &&
+				param.EffectPointer->GetMaterial(materialRenderData->MaterialIndex) != nullptr)
 			{
-				RenderPass<RENDERER, SHADER, MODEL, Instancing, InstanceCount, ModelRendererMaterialVertexConstantBuffer<InstanceCount>, ModelRendererPixelConstantBuffer>(
-					renderer, advanced_shader_lit, advanced_shader_unlit, advanced_shader_distortion, shader_lit, shader_unlit, shader_distortion, param, renderPassInd);
+				RenderPass<RENDERER, SHADER, MODEL, Instancing, InstanceCount, ModelRendererMaterialVertexConstantBuffer<InstanceCount>, false>(
+					renderer, advanced_shader_lit, advanced_shader_unlit, advanced_shader_distortion, shader_lit, shader_unlit, shader_distortion, param, renderPassInd, userData);
 			}
 			else
 			{
-				if (isAdvanced_)
+				if (collector_.DoRequireAdvancedRenderer())
 				{
-					RenderPass<RENDERER, SHADER, MODEL, Instancing, InstanceCount, ModelRendererAdvancedVertexConstantBuffer<InstanceCount>, ModelRendererAdvancedPixelConstantBuffer>(
-						renderer, advanced_shader_lit, advanced_shader_unlit, advanced_shader_distortion, shader_lit, shader_unlit, shader_distortion, param, renderPassInd);
+					RenderPass<RENDERER, SHADER, MODEL, Instancing, InstanceCount, ModelRendererAdvancedVertexConstantBuffer<InstanceCount>, true>(
+						renderer, advanced_shader_lit, advanced_shader_unlit, advanced_shader_distortion, shader_lit, shader_unlit, shader_distortion, param, renderPassInd, userData);
 				}
 				else
 				{
-					RenderPass<RENDERER, SHADER, MODEL, Instancing, InstanceCount, ModelRendererVertexConstantBuffer<InstanceCount>, ModelRendererPixelConstantBuffer>(
-						renderer, advanced_shader_lit, advanced_shader_unlit, advanced_shader_distortion, shader_lit, shader_unlit, shader_distortion, param, renderPassInd);
-
+					RenderPass<RENDERER, SHADER, MODEL, Instancing, InstanceCount, ModelRendererVertexConstantBuffer<InstanceCount>, false>(
+						renderer, advanced_shader_lit, advanced_shader_unlit, advanced_shader_distortion, shader_lit, shader_unlit, shader_distortion, param, renderPassInd, userData);
 				}
 			}
 		}
 	}
 
-	template <typename RENDERER, typename SHADER, typename MODEL, bool Instancing, int InstanceCount, typename VertexConstantBufferType, typename PixelConstantBufferType>
+	template <typename RENDERER, typename SHADER, typename MODEL, bool Instancing, int InstanceCount, typename VertexConstantBufferType, bool REQUIRE_ADVANCED_DATA>
 	void RenderPass(RENDERER* renderer,
 					SHADER* advanced_shader_lit,
 					SHADER* advanced_shader_unlit,
@@ -971,58 +897,81 @@ public:
 					SHADER* shader_unlit,
 					SHADER* shader_distortion,
 					const efkModelNodeParam& param,
-					int32_t renderPassInd)
+					int32_t renderPassInd,
+					void* userData)
 	{
 		if (m_matrixes.size() == 0)
 			return;
 		if (param.ModelIndex < 0)
 			return;
 
-		MODEL* model = (MODEL*)param.EffectPointer->GetModel(param.ModelIndex);
-		if (model == NULL)
+		::Effekseer::RefPtr<MODEL> model;
+
+		if (param.IsProceduralMode)
+		{
+			model = param.EffectPointer->GetProceduralModel(param.ModelIndex);
+		}
+		else
+		{
+			model = param.EffectPointer->GetModel(param.ModelIndex);
+		}
+
+		if (model == nullptr)
 			return;
 
-		bool isBackgroundRequired = false;
-
-		isBackgroundRequired |= (param.BasicParameterPtr->MaterialType == Effekseer::RendererMaterialType::BackDistortion);
-
-		if (param.BasicParameterPtr->MaterialParameterPtr != nullptr && param.BasicParameterPtr->MaterialParameterPtr->MaterialIndex >= 0)
-		{
-			auto materialData = param.EffectPointer->GetMaterial(param.BasicParameterPtr->MaterialParameterPtr->MaterialIndex);
-			if (materialData != nullptr && materialData->IsRefractionRequired && renderPassInd == 0)
-			{
-				isBackgroundRequired = true;
-			}
-		}
+		auto isBackgroundRequired = collector_.IsBackgroundRequiredOnFirstPass && renderPassInd == 0;
 
 		if (isBackgroundRequired)
 		{
 			auto callback = renderer->GetDistortingCallback();
 			if (callback != nullptr)
 			{
-				if (!callback->OnDistorting())
+				if (!callback->OnDistorting(renderer))
 				{
 					return;
 				}
 			}
 		}
 
-		auto distortion = param.BasicParameterPtr->MaterialType == Effekseer::RendererMaterialType::BackDistortion;
+		auto distortion = collector_.ShaderType == EffekseerRenderer::RendererShaderType::BackDistortion ||
+						  collector_.ShaderType == EffekseerRenderer::RendererShaderType::AdvancedBackDistortion;
 
 		if (isBackgroundRequired && renderer->GetBackground() == 0)
 			return;
 
+		if (isBackgroundRequired)
+		{
+			collector_.Textures[collector_.BackgroundIndex] = renderer->GetBackground();
+		}
+
+		::Effekseer::Backend::TextureRef depthTexture = nullptr;
+		::EffekseerRenderer::DepthReconstructionParameter reconstructionParam;
+		renderer->GetImpl()->GetDepth(depthTexture, reconstructionParam);
+
+		if (collector_.IsDepthRequired)
+		{
+			if (depthTexture == nullptr || (param.BasicParameterPtr->SoftParticleDistanceFar == 0.0f &&
+											param.BasicParameterPtr->SoftParticleDistanceNear == 0.0f &&
+											param.BasicParameterPtr->SoftParticleDistanceNearOffset == 0.0f &&
+											collector_.ShaderType != RendererShaderType::Material))
+			{
+				depthTexture = renderer->GetImpl()->GetProxyTexture(EffekseerRenderer::ProxyTextureType::White);
+			}
+
+			collector_.Textures[collector_.DepthIndex] = depthTexture;
+		}
+
 		// select shader
-		Effekseer::MaterialParameter* materialParam = param.BasicParameterPtr->MaterialParameterPtr;
-		// materialParam = nullptr;
-		Effekseer::MaterialData* material = nullptr;
+		Effekseer::MaterialRenderData* materialRenderData = param.BasicParameterPtr->MaterialRenderDataPtr;
+		// materialRenderData = nullptr;
+		Effekseer::MaterialRef material = nullptr;
 		SHADER* shader_ = nullptr;
 		bool renderDistortedBackground = false;
 
-		if (materialParam != nullptr && materialParam->MaterialIndex >= 0 &&
-			param.EffectPointer->GetMaterial(materialParam->MaterialIndex) != nullptr)
+		if (materialRenderData != nullptr && materialRenderData->MaterialIndex >= 0 &&
+			param.EffectPointer->GetMaterial(materialRenderData->MaterialIndex) != nullptr)
 		{
-			material = param.EffectPointer->GetMaterial(materialParam->MaterialIndex);
+			material = param.EffectPointer->GetMaterial(materialRenderData->MaterialIndex);
 
 			if (material != nullptr && material->IsRefractionRequired)
 			{
@@ -1046,22 +995,16 @@ public:
 			{
 				return;
 			}
-
-			if (material != nullptr && (material->TextureCount != materialParam->MaterialTextures.size() ||
-										material->UniformCount != materialParam->MaterialUniforms.size()))
-			{
-				return;
-			}
 		}
 		else
 		{
-			if (isAdvanced_)
+			if (collector_.DoRequireAdvancedRenderer())
 			{
 				if (distortion)
 				{
 					shader_ = advanced_shader_distortion;
 				}
-				else if (param.BasicParameterPtr->MaterialType == Effekseer::RendererMaterialType::Lighting)
+				else if (collector_.ShaderType == EffekseerRenderer::RendererShaderType::AdvancedLit)
 				{
 					shader_ = advanced_shader_lit;
 				}
@@ -1076,7 +1019,7 @@ public:
 				{
 					shader_ = shader_distortion;
 				}
-				else if (param.BasicParameterPtr->MaterialType == Effekseer::RendererMaterialType::Lighting)
+				else if (collector_.ShaderType == EffekseerRenderer::RendererShaderType::Lit)
 				{
 					shader_ = shader_lit;
 				}
@@ -1093,6 +1036,16 @@ public:
 		state.AlphaBlend = param.BasicParameterPtr->AlphaBlend;
 		state.CullingType = param.Culling;
 
+		// TODO : refactor in 1.7
+		if (renderer->GetExternalShaderSettings() != nullptr)
+		{
+			state.AlphaBlend = renderer->GetExternalShaderSettings()->Blend;
+		}
+		else if (renderer->GetRenderMode() == Effekseer::RenderMode::Wireframe)
+		{
+			state.AlphaBlend = ::Effekseer::AlphaBlendType::Opacity;
+		}
+
 		if (renderDistortedBackground)
 		{
 			state.AlphaBlend = ::Effekseer::AlphaBlendType::Blend;
@@ -1100,218 +1053,13 @@ public:
 
 		renderer->BeginShader(shader_);
 
-		// Select texture
-		if (materialParam != nullptr && material != nullptr)
+		for (int32_t i = 0; i < collector_.TextureCount; i++)
 		{
-			int32_t textureCount = 0;
-			std::array<Effekseer::TextureData*, ::Effekseer::TextureSlotMax> textures;
-
-			if (materialParam->MaterialTextures.size() > 0)
-			{
-				textureCount = Effekseer::Min(static_cast<int32_t>(materialParam->MaterialTextures.size()), ::Effekseer::UserTextureSlotMax);
-
-				auto effect = param.EffectPointer;
-
-				for (size_t i = 0; i < textureCount; i++)
-				{
-					if (materialParam->MaterialTextures[i].Type == 1)
-					{
-						if (materialParam->MaterialTextures[i].Index >= 0)
-						{
-							textures[i] = effect->GetNormalImage(materialParam->MaterialTextures[i].Index);
-						}
-						else
-						{
-							textures[i] = nullptr;
-						}
-					}
-					else
-					{
-						if (materialParam->MaterialTextures[i].Index >= 0)
-						{
-							textures[i] = effect->GetColorImage(materialParam->MaterialTextures[i].Index);
-						}
-						else
-						{
-							textures[i] = nullptr;
-						}
-					}
-
-					state.TextureFilterTypes[i] = Effekseer::TextureFilterType::Linear;
-					state.TextureWrapTypes[i] = material->TextureWrapTypes[i];
-				}
-			}
-
-			if (renderer->GetBackground() != 0)
-			{
-				textures[textureCount] = renderer->GetBackground();
-				state.TextureFilterTypes[textureCount] = Effekseer::TextureFilterType::Linear;
-				state.TextureWrapTypes[textureCount] = Effekseer::TextureWrapType::Clamp;
-				textureCount += 1;
-			}
-
-			if (textureCount > 0)
-			{
-				renderer->SetTextures(shader_, textures.data(), textureCount);
-			}
+			state.TextureFilterTypes[i] = collector_.TextureFilterTypes[i];
+			state.TextureWrapTypes[i] = collector_.TextureWrapTypes[i];
 		}
-		else
-		{
-			Effekseer::TextureData* textures[7] = {nullptr};
 
-			if (distortion)
-			{
-				if (param.BasicParameterPtr->Texture1Index >= 0)
-				{
-					textures[0] = param.EffectPointer->GetDistortionImage(param.BasicParameterPtr->Texture1Index);
-				}
-				else
-				{
-					textures[0] = renderer->GetImpl()->GetProxyTexture(EffekseerRenderer::ProxyTextureType::White);
-				}
-
-				textures[1] = renderer->GetBackground();
-
-				if (param.BasicParameterPtr->Texture3Index >= 0)
-				{
-					textures[2] = param.EffectPointer->GetDistortionImage(param.BasicParameterPtr->Texture3Index);
-				}
-				else
-				{
-					textures[2] = renderer->GetImpl()->GetProxyTexture(EffekseerRenderer::ProxyTextureType::White);
-				}
-
-				if (param.BasicParameterPtr->Texture4Index >= 0)
-				{
-					textures[3] = param.EffectPointer->GetDistortionImage(param.BasicParameterPtr->Texture4Index);
-				}
-				if (textures[3] == nullptr)
-				{
-					textures[3] = renderer->GetImpl()->GetProxyTexture(EffekseerRenderer::ProxyTextureType::Normal);
-				}
-
-				if (param.BasicParameterPtr->Texture5Index >= 0)
-				{
-					textures[4] = param.EffectPointer->GetDistortionImage(param.BasicParameterPtr->Texture5Index);
-				}
-				if (textures[4] == nullptr)
-				{
-					textures[4] = renderer->GetImpl()->GetProxyTexture(EffekseerRenderer::ProxyTextureType::White);
-				}
-
-				if (param.BasicParameterPtr->Texture6Index >= 0)
-				{
-					textures[5] = param.EffectPointer->GetDistortionImage(param.BasicParameterPtr->Texture6Index);
-				}
-				if (textures[5] == nullptr)
-				{
-					textures[5] = renderer->GetImpl()->GetProxyTexture(EffekseerRenderer::ProxyTextureType::White);
-				}
-
-				if (param.BasicParameterPtr->Texture7Index >= 0)
-				{
-					textures[6] = param.EffectPointer->GetDistortionImage(param.BasicParameterPtr->Texture7Index);
-				}
-				if (textures[6] == nullptr)
-				{
-					textures[6] = renderer->GetImpl()->GetProxyTexture(EffekseerRenderer::ProxyTextureType::Normal);
-				}
-			}
-			else
-			{
-				if (param.BasicParameterPtr->Texture1Index >= 0)
-				{
-					textures[0] = param.EffectPointer->GetColorImage(param.BasicParameterPtr->Texture1Index);
-				}
-
-				if (textures[0] == nullptr)
-				{
-					textures[0] = renderer->GetImpl()->GetProxyTexture(EffekseerRenderer::ProxyTextureType::White);
-				}
-
-				if (param.BasicParameterPtr->Texture2Index >= 0)
-				{
-					textures[1] = param.EffectPointer->GetNormalImage(param.BasicParameterPtr->Texture2Index);
-				}
-
-				if (textures[1] == nullptr)
-				{
-					textures[1] = renderer->GetImpl()->GetProxyTexture(EffekseerRenderer::ProxyTextureType::Normal);
-				}
-
-				if (param.BasicParameterPtr->Texture3Index >= 0)
-				{
-					textures[2] = param.EffectPointer->GetColorImage(param.BasicParameterPtr->Texture3Index);
-				}
-				if (textures[2] == nullptr)
-				{
-					textures[2] = renderer->GetImpl()->GetProxyTexture(EffekseerRenderer::ProxyTextureType::White);
-				}
-
-				if (param.BasicParameterPtr->Texture4Index >= 0)
-				{
-					textures[3] = param.EffectPointer->GetColorImage(param.BasicParameterPtr->Texture4Index);
-				}
-				if (textures[3] == nullptr)
-				{
-					textures[3] = renderer->GetImpl()->GetProxyTexture(EffekseerRenderer::ProxyTextureType::Normal);
-				}
-
-				if (param.BasicParameterPtr->Texture5Index >= 0)
-				{
-					textures[4] = param.EffectPointer->GetColorImage(param.BasicParameterPtr->Texture5Index);
-				}
-				if (textures[4] == nullptr)
-				{
-					textures[4] = renderer->GetImpl()->GetProxyTexture(EffekseerRenderer::ProxyTextureType::White);
-				}
-
-				if (param.BasicParameterPtr->Texture6Index >= 0)
-				{
-					textures[5] = param.EffectPointer->GetColorImage(param.BasicParameterPtr->Texture6Index);
-				}
-				if (textures[5] == nullptr)
-				{
-					textures[5] = renderer->GetImpl()->GetProxyTexture(EffekseerRenderer::ProxyTextureType::White);
-				}
-
-				if (param.BasicParameterPtr->Texture7Index >= 0)
-				{
-					textures[6] = param.EffectPointer->GetColorImage(param.BasicParameterPtr->Texture7Index);
-				}
-				if (textures[6] == nullptr)
-				{
-					textures[6] = renderer->GetImpl()->GetProxyTexture(EffekseerRenderer::ProxyTextureType::Normal);
-				}
-			}
-
-			state.TextureFilterTypes[0] = param.BasicParameterPtr->TextureFilter1;
-			state.TextureWrapTypes[0] = param.BasicParameterPtr->TextureWrap1;
-
-			if (distortion)
-			{
-				state.TextureFilterTypes[1] = Effekseer::TextureFilterType::Linear;
-				state.TextureWrapTypes[1] = Effekseer::TextureWrapType::Clamp;
-			}
-			else
-			{
-				state.TextureFilterTypes[1] = param.BasicParameterPtr->TextureFilter2;
-				state.TextureWrapTypes[1] = param.BasicParameterPtr->TextureWrap2;
-			}
-
-			state.TextureFilterTypes[2] = param.BasicParameterPtr->TextureFilter3;
-			state.TextureWrapTypes[2] = param.BasicParameterPtr->TextureWrap3;
-			state.TextureFilterTypes[3] = param.BasicParameterPtr->TextureFilter4;
-			state.TextureWrapTypes[3] = param.BasicParameterPtr->TextureWrap4;
-			state.TextureFilterTypes[4] = param.BasicParameterPtr->TextureFilter5;
-			state.TextureWrapTypes[4] = param.BasicParameterPtr->TextureWrap5;
-			state.TextureFilterTypes[5] = param.BasicParameterPtr->TextureFilter6;
-			state.TextureWrapTypes[5] = param.BasicParameterPtr->TextureWrap6;
-			state.TextureFilterTypes[6] = param.BasicParameterPtr->TextureFilter7;
-			state.TextureWrapTypes[6] = param.BasicParameterPtr->TextureWrap7;
-
-			renderer->SetTextures(shader_, textures, 7);
-		}
+		renderer->SetTextures(shader_, collector_.Textures.data(), collector_.TextureCount);
 
 		renderer->GetRenderState()->Update(distortion);
 
@@ -1320,92 +1068,27 @@ public:
 		float* cutomData1Ptr = nullptr;
 		float* cutomData2Ptr = nullptr;
 
-		if (materialParam != nullptr && material != nullptr)
+		if (materialRenderData != nullptr && material != nullptr)
 		{
 			StoreFileUniform<RENDERER, SHADER, InstanceCount>(
-				renderer, shader_, material, materialParam, param, renderPassInd, cutomData1Ptr, cutomData2Ptr);
+				renderer, shader_, material, materialRenderData, param, renderPassInd, cutomData1Ptr, cutomData2Ptr);
+
+			vcb->CameraMatrix = renderer->GetCameraProjectionMatrix();
 		}
 		else
 		{
-			std::array<float, 4> uvInversed;
-			std::array<float, 4> uvInversedBack;
-
-			GetInversedFlags(renderer, uvInversed, uvInversedBack);
-
-			vcb->UVInversed[0] = uvInversed[0];
-			vcb->UVInversed[1] = uvInversed[1];
-
 			if (distortion)
 			{
-				ModelRendererDistortionPixelConstantBuffer* pcb = (ModelRendererDistortionPixelConstantBuffer*)shader_->GetPixelConstantBuffer();
-				pcb->DistortionIntencity[0] = param.BasicParameterPtr->DistortionIntensity;
-
-				pcb->UVInversedBack[0] = uvInversedBack[0];
-				pcb->UVInversedBack[1] = uvInversedBack[1];
-
-				pcb->Interpolation[0] = static_cast<float>(param.BasicParameterPtr->EnableInterpolation);
-				pcb->Interpolation[1] = static_cast<float>(param.BasicParameterPtr->InterpolationType);
-
-				pcb->UVDistortion[0] = param.BasicParameterPtr->UVDistortionIntensity;
-				pcb->UVDistortion[1] = param.BasicParameterPtr->BlendUVDistortionIntensity;
-				pcb->UVDistortion[2] = uvInversed[0];
-				pcb->UVDistortion[3] = uvInversed[1];
-
-				pcb->TextureBlendType[0] = static_cast<float>(param.BasicParameterPtr->TextureBlendType);
+				StoreFixedUniforms<RENDERER, SHADER, InstanceCount, VertexConstantBufferType, REQUIRE_ADVANCED_DATA, true>(renderer, shader_, param);
 			}
 			else
 			{
-				PixelConstantBufferType* pcb = (PixelConstantBufferType*)shader_->GetPixelConstantBuffer();
-
-				// specify predefined parameters
-				if (param.BasicParameterPtr->MaterialType == Effekseer::RendererMaterialType::Lighting)
-				{
-					::Effekseer::Vec3f lightDirection = renderer->GetLightDirection();
-					lightDirection = lightDirection.Normalize();
-					VectorToFloat4(lightDirection, vcb->LightDirection);
-					VectorToFloat4(lightDirection, pcb->LightDirection);
-				}
-
-				{
-					ColorToFloat4(renderer->GetLightColor(), vcb->LightColor);
-					ColorToFloat4(renderer->GetLightColor(), pcb->LightColor);
-				}
-
-				{
-					ColorToFloat4(renderer->GetLightAmbientColor(), vcb->LightAmbientColor);
-					ColorToFloat4(renderer->GetLightAmbientColor(), pcb->LightAmbientColor);
-				}
-
-				pcb->SetModelFlipbookParameter(param.BasicParameterPtr->EnableInterpolation, static_cast<float>(param.BasicParameterPtr->InterpolationType));
-				pcb->SetModelUVDistortionParameter(param.BasicParameterPtr->UVDistortionIntensity, param.BasicParameterPtr->BlendUVDistortionIntensity, {uvInversed[0], uvInversed[1]});
-				pcb->SetModelBlendTextureParameter(static_cast<float>(param.BasicParameterPtr->TextureBlendType));
-
-				::Effekseer::Vector3D CameraFront = renderer->GetCameraFrontDirection();
-				pcb->SetCameraFrontDirection(-CameraFront.X, -CameraFront.Y, -CameraFront.Z);
-				pcb->SetFalloffParameter(
-					static_cast<float>(param.EnableFalloff),
-					static_cast<float>(param.FalloffParam.ColorBlendType),
-					static_cast<float>(param.FalloffParam.Pow),
-					ColorToFloat4(param.FalloffParam.BeginColor),
-					ColorToFloat4(param.FalloffParam.EndColor));
-
-				pcb->SetEmissiveScaling(static_cast<float>(param.BasicParameterPtr->EmissiveScaling));
-				pcb->SetEdgeColor(ColorToFloat4(Effekseer::Color(
-					param.BasicParameterPtr->EdgeColor[0],
-					param.BasicParameterPtr->EdgeColor[1],
-					param.BasicParameterPtr->EdgeColor[2],
-					param.BasicParameterPtr->EdgeColor[3])));
-
-				pcb->SetEdgeParameter(param.BasicParameterPtr->EdgeThreshold, static_cast<float>(param.BasicParameterPtr->EdgeColorScaling));
+				StoreFixedUniforms<RENDERER, SHADER, InstanceCount, VertexConstantBufferType, REQUIRE_ADVANCED_DATA, false>(renderer, shader_, param);
 			}
 		}
 
-		vcb->CameraMatrix = renderer->GetCameraProjectionMatrix();
-
-		vcb->SetModelFlipbookParameter(static_cast<float>(param.BasicParameterPtr->EnableInterpolation),
-									   static_cast<float>(param.BasicParameterPtr->UVLoopType),
-									   static_cast<float>(param.BasicParameterPtr->FlipbookDivideX),
-									   static_cast<float>(param.BasicParameterPtr->FlipbookDivideY));
+		renderer->GetImpl()->CurrentRenderingUserData = param.UserData;
+		renderer->GetImpl()->CurrentHandleUserData = userData;
 
 		// Check time
 		auto stTime0 = m_times[0] % model->GetFrameCount();
@@ -1423,23 +1106,34 @@ public:
 
 		if (Instancing && isTimeSame)
 		{
-			auto& imodel = model->InternalModels[stTime0];
+			//auto& imodel = model->InternalModels[stTime0];
 
 			// Invalid unless layout is set after buffer
-			renderer->SetVertexBuffer(imodel.VertexBuffer, model->GetVertexSize());
-			renderer->SetIndexBuffer(imodel.IndexBuffer);
+			renderer->SetVertexBuffer(model->GetVertexBuffer(stTime0), sizeof(Effekseer::Model::Vertex));
+
+			int32_t indexPerFace = 3;
+			if (renderer->GetRenderMode() == Effekseer::RenderMode::Wireframe)
+			{
+				renderer->SetIndexBuffer(model->GetWireIndexBuffer(stTime0));
+				indexPerFace = 6;
+			}
+			else
+			{
+				renderer->SetIndexBuffer(model->GetIndexBuffer(stTime0));
+			}
+
 			renderer->SetLayout(shader_);
 
 			for (size_t loop = 0; loop < m_matrixes.size();)
 			{
-				int32_t modelCount = Effekseer::Min(static_cast<int32_t>(m_matrixes.size()) - loop, model->ModelCount);
+				int32_t modelCount = Effekseer::Min(static_cast<int32_t>(m_matrixes.size()) - (int32_t)loop, InstanceCount);
 
 				for (int32_t num = 0; num < modelCount; num++)
 				{
 					vcb->ModelMatrix[num] = m_matrixes[loop + num];
 
 					// DepthParameter
-					::Effekseer::Mat44f modelMatrix = vcb->ModelMatrix[num];
+					::Effekseer::SIMD::Mat44f modelMatrix = vcb->ModelMatrix[num];
 
 					if (param.EnableViewOffset)
 					{
@@ -1501,7 +1195,14 @@ public:
 
 				shader_->SetConstantBuffer();
 
-				renderer->DrawPolygon(imodel.VertexCount * modelCount, imodel.IndexCount * modelCount);
+				if (VertexType == ModelRendererVertexType::Instancing)
+				{
+					renderer->DrawPolygonInstanced(model->GetVertexCount(stTime0), model->GetFaceCount(stTime0) * indexPerFace, modelCount);
+				}
+				else
+				{
+					assert(0);
+				}
 
 				loop += modelCount;
 			}
@@ -1511,11 +1212,22 @@ public:
 			for (size_t loop = 0; loop < m_matrixes.size();)
 			{
 				auto stTime = m_times[loop] % model->GetFrameCount();
-				auto& imodel = model->InternalModels[stTime];
+				// auto& imodel = model->InternalModels[stTime];
 
 				// Invalid unless layout is set after buffer
-				renderer->SetVertexBuffer(imodel.VertexBuffer, model->GetVertexSize());
-				renderer->SetIndexBuffer(imodel.IndexBuffer);
+				renderer->SetVertexBuffer(model->GetVertexBuffer(stTime), sizeof(Effekseer::Model::Vertex));
+
+				int32_t indexPerFace = 3;
+				if (renderer->GetRenderMode() == Effekseer::RenderMode::Wireframe)
+				{
+					renderer->SetIndexBuffer(model->GetWireIndexBuffer(stTime));
+					indexPerFace = 6;
+				}
+				else
+				{
+					renderer->SetIndexBuffer(model->GetIndexBuffer(stTime));
+				}
+
 				renderer->SetLayout(shader_);
 
 				vcb->ModelMatrix[0] = m_matrixes[loop];
@@ -1530,13 +1242,13 @@ public:
 				vcb->SetModelBlendUV(0, m_blendUV[loop].X, m_blendUV[loop].Y, m_blendUV[loop].Width, m_blendUV[loop].Height);
 				vcb->SetModelBlendAlphaUV(
 					0, m_blendAlphaUV[loop].X, m_blendAlphaUV[loop].Y, m_blendAlphaUV[loop].Width, m_blendAlphaUV[loop].Height);
-				vcb->SetModelUVDistortionUV(
+				vcb->SetModelBlendUVDistortionUV(
 					0, m_blendUVDistortionUV[loop].X, m_blendUVDistortionUV[loop].Y, m_blendUVDistortionUV[loop].Width, m_blendUVDistortionUV[loop].Height);
 				vcb->SetModelFlipbookIndexAndNextRate(0, m_flipbookIndexAndNextRate[loop]);
 				vcb->SetModelAlphaThreshold(0, m_alphaThreshold[loop]);
 
 				// DepthParameters
-				::Effekseer::Mat44f modelMatrix = vcb->ModelMatrix[0];
+				::Effekseer::SIMD::Mat44f modelMatrix = vcb->ModelMatrix[0];
 				if (param.EnableViewOffset == true)
 				{
 					ApplyViewOffset(modelMatrix, renderer->GetCameraMatrix(), m_viewOffsetDistance[0]);
@@ -1567,7 +1279,7 @@ public:
 				}
 
 				shader_->SetConstantBuffer();
-				renderer->DrawPolygon(imodel.VertexCount, imodel.IndexCount);
+				renderer->DrawPolygon(model->GetVertexCount(stTime), model->GetFaceCount(stTime) * indexPerFace);
 
 				loop += 1;
 			}

@@ -16,7 +16,7 @@ protected:
 	int32_t currentIndex = 0;
 	std::vector<LLGI::VertexBuffer*> vertexBuffers;
 
-	void* lockedResource_;
+	Effekseer::CustomAlignedVector<uint8_t> lockedResource_;
 
 	uint32_t m_vertexRingOffset;
 	bool m_ringBufferLock;
@@ -24,12 +24,12 @@ protected:
 	int32_t m_ringLockedOffset;
 	int32_t m_ringLockedSize;
 
-	VertexBuffer(GraphicsDevice* graphicsDevice, LLGI::VertexBuffer* buffer, int size, bool isDynamic, bool hasRefCount);
+	VertexBuffer(Backend::GraphicsDevice* graphicsDevice, LLGI::VertexBuffer* buffer, int size, bool isDynamic, bool hasRefCount);
 
 public:
 	virtual ~VertexBuffer();
 
-	static VertexBuffer* Create(GraphicsDevice* graphicsDevice, int size, bool isDynamic, bool hasRefCount);
+	static VertexBuffer* Create(Backend::GraphicsDevice* graphicsDevice, int size, bool isDynamic, bool hasRefCount);
 
 	LLGI::VertexBuffer* GetVertexBuffer()
 	{

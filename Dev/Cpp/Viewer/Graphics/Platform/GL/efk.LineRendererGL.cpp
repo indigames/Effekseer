@@ -6,109 +6,45 @@
 
 namespace efk
 {
-static const char g_sprite_vs_src[] =
-	R"(
-IN vec4 atPosition;
-IN vec4 atColor;
-IN vec4 atTexCoord;
-)"
 
-	R"(
-OUT vec4 vaColor;
-OUT vec4 vaTexCoord;
-OUT vec4 vaPos;
-OUT vec4 vaPosR;
-OUT vec4 vaPosU;
-)"
+#include "../../../Shaders/GLSL_GL_Header/line_ps.h"
+#include "../../../Shaders/GLSL_GL_Header/line_vs.h"
 
-	R"(
-uniform mat4 uMatCamera;
-uniform mat4 uMatProjection;
-
-void main() {
-	vec4 cameraPos = uMatCamera * atPosition;
-	cameraPos = cameraPos / cameraPos.w;
-
-	gl_Position = uMatProjection * cameraPos;
-
-	vaPos = gl_Position;
-
-	vec4 cameraPosU = cameraPos + vec4(0.0, 1.0, 0.0, 0.0);
-	vec4 cameraPosR = cameraPos + vec4(1.0, 0.0, 0.0, 0.0);
-
-	vaPosR = uMatProjection * cameraPosR;
-	vaPosU = uMatProjection * cameraPosU;
-	
-	vaPos = vaPos / vaPos.w;
-	vaPosR = vaPosR / vaPosR.w;
-	vaPosU = vaPosU / vaPosU.w;
-
-	vaColor = atColor;
-	vaTexCoord = atTexCoord;
-}
-
-)";
-
-static const char g_sprite_fs_texture_src[] = "IN lowp vec4 vaColor;\n"
-											  "IN mediump vec4 vaTexCoord;\n"
-
-											  "uniform sampler2D uTexture0;\n"
-
-											  "void main() {\n"
-											  "FRAGCOLOR = vaColor * TEX2D(uTexture0, vaTexCoord.xy);\n"
-											  "}\n";
-
-static const char g_sprite_fs_no_texture_src[] = "IN lowp vec4 vaColor;\n"
-												 "IN mediump vec4 vaTexCoord;\n"
-
-												 "void main() {\n"
-												 "FRAGCOLOR = vaColor;\n"
-												 "}\n";
-
-LineRendererGL::LineRendererGL(EffekseerRenderer::Renderer* renderer)
+LineRendererGL::LineRendererGL(const EffekseerRenderer::RendererRef& renderer)
 	: LineRenderer(renderer)
+	, renderer(EffekseerRendererGL::RendererImplementedRef::FromPinned(renderer.Get()))
 {
-	this->renderer = (EffekseerRendererGL::RendererImplemented*)renderer;
+	EffekseerRendererGL::ShaderCodeView lineCodeDataVS(gl_line_vs);
+	EffekseerRendererGL::ShaderCodeView lineCodeDataNPS(gl_line_ps);
 
-	EffekseerRendererGL::ShaderCodeView lineCodeDataVS(g_sprite_vs_src);
-	EffekseerRendererGL::ShaderCodeView lineCodeDataPS(g_sprite_fs_texture_src);
-	EffekseerRendererGL::ShaderCodeView lineCodeDataNPS(g_sprite_fs_no_texture_src);
-
-	auto shader_ =
-		EffekseerRendererGL::Shader::Create(this->renderer->GetGraphicsDevice(), &lineCodeDataVS, 1, &lineCodeDataPS, 1, "Standard Tex");
+	using namespace Effekseer::Backend;
+	Effekseer::CustomVector<Effekseer::Backend::UniformLayoutElement> uniformLayoutElm;
+	uniformLayoutElm.emplace_back(UniformLayoutElement{ShaderStageType::Vertex, "CBVS0.mCamera", UniformBufferLayoutElementType::Matrix44, 1, 0});
+	uniformLayoutElm.emplace_back(UniformLayoutElement{ShaderStageType::Vertex, "CBVS0.mProj", UniformBufferLayoutElementType::Matrix44, 1, sizeof(Effekseer::Matrix44)});
+	auto uniformLayout = Effekseer::MakeRefPtr<Effekseer::Backend::UniformLayout>(Effekseer::CustomVector<Effekseer::CustomString<char>>{}, uniformLayoutElm);
 
 	auto shader_no_texture_ =
-		EffekseerRendererGL::Shader::Create(this->renderer->GetGraphicsDevice(), &lineCodeDataVS, 1, &lineCodeDataNPS, 1, "Standard NoTex");
+		EffekseerRendererGL::Shader::Create(this->renderer->GetInternalGraphicsDevice(), {lineCodeDataVS}, {lineCodeDataNPS}, uniformLayout, "Standard NoTex");
 
-	EffekseerRendererGL::ShaderAttribInfo sprite_attribs[3] = {
-		{"atPosition", GL_FLOAT, 3, 0, false}, {"atColor", GL_UNSIGNED_BYTE, 4, 12, true}, {"atTexCoord", GL_FLOAT, 2, 16, false}};
+	const Effekseer::Backend::VertexLayoutElement vlElem[3] = {
+		{Effekseer::Backend::VertexLayoutFormat::R32G32B32_FLOAT, "Input_Pos", "POSITION", 0},
+		{Effekseer::Backend::VertexLayoutFormat::R8G8B8A8_UNORM, "Input_Color", "NORMAL", 0},
+		{Effekseer::Backend::VertexLayoutFormat::R32G32_FLOAT, "Input_UV", "TEXCOORD", 0},
+	};
 
-	shader_->GetAttribIdList(3, sprite_attribs);
-	shader_->SetVertexConstantBufferSize(sizeof(Effekseer::Matrix44) * 2);
+	auto vl = renderer->GetGraphicsDevice()->CreateVertexLayout(vlElem, 3).DownCast<EffekseerRendererGL::Backend::VertexLayout>();
+	shader_no_texture_->SetVertexLayout(vl);
 
-	shader_->AddVertexConstantLayout(EffekseerRendererGL::CONSTANT_TYPE_MATRIX44, shader_->GetUniformId("uMatCamera"), 0);
-
-	shader_->AddVertexConstantLayout(
-		EffekseerRendererGL::CONSTANT_TYPE_MATRIX44, shader_->GetUniformId("uMatProjection"), sizeof(Effekseer::Matrix44));
-
-	shader_->SetTextureSlot(0, shader_->GetUniformId("uTexture0"));
-
-	shader_no_texture_->GetAttribIdList(3, sprite_attribs);
 	shader_no_texture_->SetVertexConstantBufferSize(sizeof(Effekseer::Matrix44) * 2);
 
-	shader_no_texture_->AddVertexConstantLayout(
-		EffekseerRendererGL::CONSTANT_TYPE_MATRIX44, shader_no_texture_->GetUniformId("uMatCamera"), 0);
-
-	shader_no_texture_->AddVertexConstantLayout(
-		EffekseerRendererGL::CONSTANT_TYPE_MATRIX44, shader_no_texture_->GetUniformId("uMatProjection"), sizeof(Effekseer::Matrix44));
-
 	this->shader = shader_no_texture_;
-	ES_SAFE_DELETE(shader_);
 
-	vertexBuffer = EffekseerRendererGL::VertexBuffer::Create(this->renderer, sizeof(EffekseerRendererGL::Vertex) * 1024, true, true);
+	auto gd = this->renderer->GetGraphicsDevice().DownCast<EffekseerRendererGL::Backend::GraphicsDevice>();
+
+	vertexBuffer = EffekseerRendererGL::VertexBuffer::Create(gd, sizeof(EffekseerRendererGL::Vertex) * 1024, true);
 
 	vao = EffekseerRendererGL::VertexArray::Create(
-		this->renderer, shader_no_texture_, (EffekseerRendererGL::VertexBuffer*)vertexBuffer, nullptr, true);
+		gd, shader_no_texture_, (EffekseerRendererGL::VertexBuffer*)vertexBuffer, nullptr);
 }
 
 LineRendererGL::~LineRendererGL()
@@ -161,7 +97,7 @@ void LineRendererGL::Render()
 	renderer->SetVertexArray(vao);
 	renderer->BeginShader((EffekseerRendererGL::Shader*)shader);
 
-	Effekseer::TextureData* textures[2];
+	Effekseer::Backend::TextureRef textures[2];
 	textures[0] = nullptr;
 	textures[1] = nullptr;
 
@@ -170,6 +106,10 @@ void LineRendererGL::Render()
 	Effekseer::Matrix44 constantVSBuffer[2];
 	constantVSBuffer[0] = renderer->GetCameraMatrix();
 	constantVSBuffer[1] = renderer->GetProjectionMatrix();
+
+	constantVSBuffer[0].Transpose();
+	constantVSBuffer[1].Transpose();
+
 	renderer->SetVertexBufferToShader(constantVSBuffer, sizeof(Effekseer::Matrix44) * 2, 0);
 
 	shader->SetConstantBuffer();
@@ -177,9 +117,6 @@ void LineRendererGL::Render()
 	renderer->GetRenderState()->Update(false);
 
 	renderer->SetVertexBuffer((EffekseerRendererGL::VertexBuffer*)vertexBuffer, sizeof(EffekseerRendererGL::Vertex));
-	// EffekseerRendererGL::GLExt::glBindBuffer(GL_ARRAY_BUFFER, renderer->GetVertexBuffer()->GetInterface());
-	// EffekseerRendererGL::GLExt::glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-
 	renderer->SetLayout((EffekseerRendererGL::Shader*)shader);
 
 	glDrawArrays(GL_LINES, 0, vertexies.size());

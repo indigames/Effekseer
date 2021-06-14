@@ -1,10 +1,10 @@
 #include "EffectPlatformDX12.h"
 #include "../../3rdParty/LLGI/src/DX12/LLGI.CommandListDX12.h"
+#include "../../3rdParty/LLGI/src/DX12/LLGI.CompilerDX12.h"
 #include "../../3rdParty/LLGI/src/DX12/LLGI.GraphicsDX12.h"
 #include "../../3rdParty/LLGI/src/DX12/LLGI.IndexBufferDX12.h"
 #include "../../3rdParty/LLGI/src/DX12/LLGI.PlatformDX12.h"
 #include "../../3rdParty/LLGI/src/DX12/LLGI.VertexBufferDX12.h"
-#include "../../3rdParty/LLGI/src/DX12/LLGI.CompilerDX12.h"
 #include "../3rdParty/LLGI/src/LLGI.CommandList.h"
 
 #include "../../3rdParty/LLGI/src/LLGI.Compiler.h"
@@ -56,33 +56,28 @@ float4 main(PS_INPUT input) : SV_TARGET
 class DistortingCallbackDX12 : public EffekseerRenderer::DistortingCallback
 {
 	EffectPlatformDX12* platform_ = nullptr;
-	::EffekseerRenderer::Renderer* renderer_ = nullptr;
-	Effekseer::TextureData* textureData_ = nullptr;
+	Effekseer::Backend::TextureRef texture_ = nullptr;
 
 public:
-	DistortingCallbackDX12(EffectPlatformDX12* platform, ::EffekseerRenderer::Renderer* renderer) : platform_(platform), renderer_(renderer)
+	DistortingCallbackDX12(EffectPlatformDX12* platform)
+		: platform_(platform)
 	{
 	}
 
 	virtual ~DistortingCallbackDX12()
 	{
-
-		if (textureData_ != nullptr)
-		{
-			EffekseerRendererDX12::DeleteTextureData(renderer_, textureData_);
-		}
+		texture_.Reset();
 	}
 
-	virtual bool OnDistorting() override
+	virtual bool OnDistorting(EffekseerRenderer::Renderer* renderer) override
 	{
-
-		if (textureData_ == nullptr)
+		if (texture_ == nullptr)
 		{
 			auto tex = (LLGI::TextureDX12*)(platform_->GetCheckedTexture());
-			textureData_ = EffekseerRendererDX12::CreateTextureData(renderer_, tex->Get());
+			texture_ = EffekseerRendererDX12::CreateTexture(renderer->GetGraphicsDevice(), tex->Get());
 		}
 
-		renderer_->SetBackgroundTexture(textureData_);
+		renderer->SetBackground(texture_);
 
 		return true;
 	}
@@ -109,7 +104,7 @@ void EffectPlatformDX12::CreateShaders()
 	{
 		LLGI::DataStructure d;
 		d.Data = b.data();
-		d.Size = b.size();
+		d.Size = static_cast<int32_t>(b.size());
 		data_vs.push_back(d);
 	}
 
@@ -117,15 +112,15 @@ void EffectPlatformDX12::CreateShaders()
 	{
 		LLGI::DataStructure d;
 		d.Data = b.data();
-		d.Size = b.size();
+		d.Size = static_cast<int32_t>(b.size());
 		data_ps.push_back(d);
 	}
 
-	shader_vs_ = graphics_->CreateShader(data_vs.data(), data_vs.size());
-	shader_ps_ = graphics_->CreateShader(data_ps.data(), data_ps.size());
+	shader_vs_ = graphics_->CreateShader(data_vs.data(), static_cast<int32_t>(data_vs.size()));
+	shader_ps_ = graphics_->CreateShader(data_ps.data(), static_cast<int32_t>(data_ps.size()));
 }
 
-EffekseerRenderer::Renderer* EffectPlatformDX12::CreateRenderer()
+EffekseerRenderer::RendererRef EffectPlatformDX12::CreateRenderer()
 {
 	auto g = static_cast<LLGI::GraphicsDX12*>(graphics_);
 	auto p = static_cast<LLGI::PlatformDX12*>(platform_);
@@ -135,27 +130,35 @@ EffekseerRenderer::Renderer* EffectPlatformDX12::CreateRenderer()
 	auto renderer = EffekseerRendererDX12::Create(
 		g->GetDevice(), g->GetCommandQueue(), g->GetSwapBufferCount(), &format, 1, DXGI_FORMAT_D32_FLOAT, false, 10000);
 
-	renderer->SetDistortingCallback(new DistortingCallbackDX12(this, renderer));
+	renderer->SetDistortingCallback(new DistortingCallbackDX12(this));
 
-	sfMemoryPoolEfk_ = EffekseerRendererDX12::CreateSingleFrameMemoryPool(renderer);
-	commandListEfk_ = EffekseerRendererDX12::CreateCommandList(renderer, sfMemoryPoolEfk_);
+	sfMemoryPoolEfk_ = EffekseerRenderer::CreateSingleFrameMemoryPool(renderer->GetGraphicsDevice());
+	commandListEfk_ = EffekseerRenderer::CreateCommandList(renderer->GetGraphicsDevice(), sfMemoryPoolEfk_);
 
 	CreateResources();
 
 	return renderer;
 }
 
-EffectPlatformDX12::~EffectPlatformDX12() {}
+EffectPlatformDX12::~EffectPlatformDX12()
+{
+}
 
-void EffectPlatformDX12::InitializeDevice(const EffectPlatformInitializingParameter& param) { CreateCheckedTexture(); }
+void EffectPlatformDX12::InitializeDevice(const EffectPlatformInitializingParameter& param)
+{
+	CreateCheckedTexture();
+}
 
-void EffectPlatformDX12::DestroyDevice() { EffectPlatformLLGI::DestroyDevice(); }
+void EffectPlatformDX12::DestroyDevice()
+{
+	EffectPlatformLLGI::DestroyDevice();
+}
 
 void EffectPlatformDX12::BeginRendering()
 {
 	EffectPlatformLLGI::BeginRendering();
 
-	auto cl = static_cast<LLGI::CommandListDX12*>(commandList_);
+	auto cl = static_cast<LLGI::CommandListDX12*>(commandList_.get());
 	EffekseerRendererDX12::BeginCommandList(commandListEfk_, cl->GetCommandList());
 	GetRenderer()->SetCommandList(commandListEfk_);
 }
@@ -168,4 +171,7 @@ void EffectPlatformDX12::EndRendering()
 	EffectPlatformLLGI::EndRendering();
 }
 
-LLGI::Texture* EffectPlatformDX12::GetCheckedTexture() const { return checkTexture_; }
+LLGI::Texture* EffectPlatformDX12::GetCheckedTexture() const
+{
+	return checkTexture_;
+}

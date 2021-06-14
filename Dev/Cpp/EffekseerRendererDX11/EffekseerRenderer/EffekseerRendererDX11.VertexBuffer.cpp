@@ -49,16 +49,16 @@ VertexBuffer* VertexBuffer::Create(RendererImplemented* renderer, int size, bool
 	hBufferDesc.StructureByteStride = sizeof(float);
 
 	D3D11_SUBRESOURCE_DATA hSubResourceData;
-	hSubResourceData.pSysMem = NULL;
+	hSubResourceData.pSysMem = nullptr;
 	hSubResourceData.SysMemPitch = 0;
 	hSubResourceData.SysMemSlicePitch = 0;
 
 	// 生成
-	ID3D11Buffer* vb = NULL;
-	HRESULT hr = renderer->GetDevice()->CreateBuffer(&hBufferDesc, NULL, &vb);
+	ID3D11Buffer* vb = nullptr;
+	HRESULT hr = renderer->GetDevice()->CreateBuffer(&hBufferDesc, nullptr, &vb);
 	if (FAILED(hr))
 	{
-		return NULL;
+		return nullptr;
 	}
 
 	return new VertexBuffer(renderer, vb, size, isDynamic, hasRefCount);
@@ -90,8 +90,7 @@ void VertexBuffer::Lock()
 	m_resource = (uint8_t*)m_lockedResource;
 	m_offset = 0;
 
-	/* 次のRingBufferLockは強制的にDiscard */
-	m_vertexRingOffset = m_size;
+	DiscardForcely();
 }
 
 //-----------------------------------------------------------------------------------
@@ -174,9 +173,14 @@ void VertexBuffer::Unlock()
 		GetRenderer()->GetContext()->Unmap(m_buffer, 0);
 	}
 
-	m_resource = NULL;
+	m_resource = nullptr;
 	m_isLock = false;
 	m_ringBufferLock = false;
+}
+
+void VertexBuffer::DiscardForcely()
+{
+	m_vertexRingOffset = m_size;
 }
 
 //-----------------------------------------------------------------------------------

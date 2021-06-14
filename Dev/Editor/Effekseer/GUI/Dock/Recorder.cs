@@ -406,9 +406,9 @@ namespace Effekseer.GUI.Dock
 					}
 
 					var tempDirectory = System.IO.Directory.GetCurrentDirectory();
-					System.IO.Directory.SetCurrentDirectory(Program.StartDirectory);
+					System.IO.Directory.SetCurrentDirectory(Application.StartDirectory);
 
-					Utils.Logger.Write(string.Format("SetCurrentDirectory : {0}", Program.StartDirectory));
+					Utils.Logger.Write(string.Format("SetCurrentDirectory : {0}", Application.StartDirectory));
 
 					string errorMessage = string.Empty;
 
@@ -424,14 +424,7 @@ namespace Effekseer.GUI.Dock
                     recordingParameter.Transparence = (swig.TransparenceType)selectedAlphaIndex;
 					recordingParameter.Scale = Core.Recording.RecordingScale.Value;
 
-					if (Effekseer.Core.Language == Language.Japanese)
-					{
-						errorMessage = "保存に失敗しました。ファイルが他のアプリケーションで開かれている、もしくはスペックが足りません。";
-					}
-					else
-					{
-						errorMessage = "It failed to save. A file is opend by other application or lack of specification.";
-					}
+					errorMessage = MultiLanguageTextProvider.GetText("Error_FailedToSave");
 
 					bool recordResult = false;
 

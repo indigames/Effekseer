@@ -1,4 +1,4 @@
-SET RDIR=Effekseer150Win
+SET RDIR=EffekseerTool
 
 rmdir %RDIR%
 mkdir %RDIR%
@@ -12,6 +12,7 @@ mkdir %RDIR%\Tool
 copy Dev\release\Effekseer.exe %RDIR%\Tool\.
 copy Dev\release\Effekseer.exe.config %RDIR%\Tool\.
 copy Dev\release\EffekseerCore.dll %RDIR%\Tool\.
+copy Dev\release\EffekseerCoreGUI.dll %RDIR%\Tool\.
 copy Dev\release\EffekseerViewer.dll %RDIR%\Tool\.
 copy Dev\release\IronPython.dll %RDIR%\Tool\.
 copy Dev\release\IronPython.Modules.dll %RDIR%\Tool\.
@@ -27,8 +28,9 @@ mkdir %RDIR%\Tool\scripts\export
 copy Dev\release\scripts\export\Default.cs %RDIR%\Tool\scripts\export\.
 
 mkdir %RDIR%\Tool\tools
+copy Dev\release\tools\fbxToEffekseerCurveConverter.exe %RDIR%\Tool\tools\.
 copy Dev\release\tools\fbxToEffekseerModelConverter.exe %RDIR%\Tool\tools\.
-copy Dev\release\tools\mqoToEffekseerModelConverter.exe %RDIR%\Tool\tools\.
+copy Dev\release\tools\libfbxsdk.dll %RDIR%\Tool\tools\.
 
 copy Dev\release\tools\EffekseerMaterialCompilerDX9.dll %RDIR%\Tool\tools\.
 copy Dev\release\tools\EffekseerMaterialCompilerDX11.dll %RDIR%\Tool\tools\.

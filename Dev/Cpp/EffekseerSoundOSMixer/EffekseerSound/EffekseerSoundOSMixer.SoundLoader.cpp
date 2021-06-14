@@ -16,11 +16,11 @@ namespace EffekseerSound
 //----------------------------------------------------------------------------------
 //
 //----------------------------------------------------------------------------------
-SoundLoader::SoundLoader(SoundImplemented* sound, ::Effekseer::FileInterface* fileInterface)
+SoundLoader::SoundLoader(const SoundImplementedRef& sound, ::Effekseer::FileInterface* fileInterface)
 	: m_sound(sound)
 	, m_fileInterface(fileInterface)
 {
-	if (m_fileInterface == NULL)
+	if (m_fileInterface == nullptr)
 	{
 		m_fileInterface = &m_defaultFileInterface;
 	}
@@ -36,12 +36,12 @@ SoundLoader::~SoundLoader()
 //----------------------------------------------------------------------------------
 //
 //----------------------------------------------------------------------------------
-void* SoundLoader::Load(const EFK_CHAR* path)
+::Effekseer::SoundDataRef SoundLoader::Load(const char16_t* path)
 {
-	assert(path != NULL);
+	assert(path != nullptr);
 
 	std::unique_ptr<::Effekseer::FileReader> reader(m_fileInterface->OpenRead(path));
-	if (reader.get() == NULL)
+	if (reader.get() == nullptr)
 		return nullptr;
 
 	size_t size = reader->GetLength();
@@ -51,20 +51,27 @@ void* SoundLoader::Load(const EFK_CHAR* path)
 	return Load(data.get(), (int32_t)size);
 }
 
-void* SoundLoader::Load(const void* data, int32_t size)
+::Effekseer::SoundDataRef SoundLoader::Load(const void* data, int32_t size)
 {
-	return m_sound->GetDevice()->CreateSound(data, (int32_t)size, false);
+	osm::Sound* osmSound = m_sound->GetDevice()->CreateSound(data, (int32_t)size, false);
+	if (osmSound == nullptr)
+	{
+		return nullptr;
+	}
+
+	auto soundData = ::Effekseer::MakeRefPtr<SoundData>();
+	soundData->osmSound = osmSound;
+	return soundData;
 }
 
-void SoundLoader::Unload(void* data)
+void SoundLoader::Unload(::Effekseer::SoundDataRef soundData)
 {
-	SoundData* soundData = (SoundData*)data;
-	if (soundData == NULL)
+	if (soundData != nullptr)
 	{
-		return;
+		m_sound->StopData(soundData);
+		SoundData* soundDataImpl = (SoundData*)soundData.Get();
+		ES_SAFE_RELEASE(soundDataImpl->osmSound);
 	}
-	m_sound->StopData(soundData);
-	soundData->Release();
 }
 
 //----------------------------------------------------------------------------------

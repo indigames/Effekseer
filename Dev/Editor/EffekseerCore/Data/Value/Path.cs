@@ -68,6 +68,13 @@ namespace Effekseer.Data.Value
 			_abspath = abspath;
 
 			DefaultValue = _abspath;
+
+#if DEBUG
+			if(abspath != string.Empty && !System.IO.Path.IsPathRooted(abspath))
+			{
+				throw new Exception(string.Format("{0} is not absolute path", abspath));
+			}
+#endif
 		}
 
 		public string GetAbsolutePath()
@@ -157,24 +164,24 @@ namespace Effekseer.Data.Value
 			DefaultValue = abspath;
 		}
 
-		internal void SetAbsolutePathDirectly(string abspath)
+		internal void SetAbsolutePathDirectly(string abspath, bool skipCallback = false)
 		{
 			if (_abspath == abspath) return;
 
 			_abspath = abspath;
-			if (OnChanged != null)
+			if (!skipCallback && OnChanged != null)
 			{
 				OnChanged(this, new ChangedValueEventArgs(_abspath, ChangedValueType.Execute));
 			}
 		}
 
-		internal void SetRelativePathDirectly(string relative_path)
+		internal void SetRelativePathDirectly(string relative_path, bool skipCallback = false)
 		{
 			if (_basepath.AbsolutePath == string.Empty) SetAbsolutePathDirectly(relative_path);
 			Uri basepath = new Uri(_basepath.AbsolutePath);
 			Uri path = new Uri(basepath, relative_path);
 			var absolute_path = path.LocalPath;
-			SetAbsolutePathDirectly(absolute_path);
+			SetAbsolutePathDirectly(absolute_path, skipCallback);
 		}
 	}
 }

@@ -24,7 +24,6 @@
 
 #include "efkMat.Editor.h"
 
-#include <GUI/JapaneseFont.h>
 #include <efkMat.CommandManager.h>
 #include <efkMat.StringContainer.h>
 
@@ -33,11 +32,18 @@
 #include <IO/IO.h>
 #include <algorithm>
 
+#include <GUI/Misc.h>
+#include <IO/CSVReader.h>
+
 #include <spdlog/sinks/basic_file_sink.h>
 #include <spdlog/spdlog.h>
 
+#include <fstream>
+#include <iostream>
+#include <sstream>
+
 #ifdef WIN32
-#include <Windows.h>
+#include <windows.h>
 #include <direct.h>
 #else
 #include <sys/types.h>
@@ -84,7 +90,7 @@ std::string GetExecutingDirectory()
 	char buf[260];
 
 #ifdef _WIN32
-	int len = GetModuleFileNameA(NULL, buf, 260);
+	int len = GetModuleFileNameA(nullptr, buf, 260);
 	if (len <= 0)
 		return "";
 #elif defined(__APPLE__)
@@ -156,34 +162,52 @@ void GLFLW_CloseCallback(GLFWwindow* w)
 	}
 }
 
+void ChangeLanguage(const std::string& key)
+{
+	auto loadLanguage = [](const std::string& k, const std::string& filename) {
+		const auto languageFilePath = GetExecutingDirectory() + "resources/languages/" + k + "/" + filename;
+
+		std::ifstream f(languageFilePath);
+		if (!f.is_open())
+		{
+			return;
+		}
+
+		auto str = std::string((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+		auto csv = Effekseer::Editor::ReadCSV(str);
+
+		for (const auto& line : csv)
+		{
+			if (line.size() < 2)
+				continue;
+
+			if (line[0] == "")
+				continue;
+
+			EffekseerMaterial::StringContainer::AddValue(line[0].c_str(), line[1].c_str());
+		}
+	};
+
+	EffekseerMaterial::StringContainer::Clear();
+	loadLanguage("en", "Base.csv");
+	loadLanguage("en", "EffekseerMaterialEditor.csv");
+
+	if (key != "en")
+	{
+		loadLanguage(key, "Base.csv");
+		loadLanguage(key, "EffekseerMaterialEditor.csv");
+	}
+}
+
 void ChangeLanguage(Effekseer::SystemLanguage language)
 {
-
-	FILE* fp = nullptr;
-
 	if (language == Effekseer::SystemLanguage::Japanese)
 	{
-		auto path = GetExecutingDirectory() + "resources/languages/effekseer_material_ja.json";
-		fp = fopen(path.c_str(), "rb");
+		ChangeLanguage("ja");
 	}
 	else
 	{
-		auto path = GetExecutingDirectory() + "resources/languages/effekseer_material_en.json";
-		fp = fopen(path.c_str(), "rb");
-	}
-
-	if (fp != nullptr)
-	{
-		fseek(fp, 0, SEEK_END);
-		auto size = ftell(fp);
-		fseek(fp, 0, SEEK_SET);
-		std::vector<char> data;
-		data.resize(size);
-		fread(data.data(), size, 1, fp);
-		fclose(fp);
-
-		EffekseerMaterial::StringContainer::Clear();
-		EffekseerMaterial::StringContainer::LoadFromJsonStr(data.data());
+		ChangeLanguage("en");
 	}
 }
 
@@ -194,6 +218,20 @@ int mainLoop(int argc, char* argv[])
 	if (argc >= 2 && std::string(argv[1]) == "ipc")
 	{
 		ipcMode = true;
+	}
+
+	std::string languageKey;
+
+	if (argc >= 2)
+	{
+		for (int i = 1; i < argc; i++)
+		{
+			if (std::string(argv[i - 1]) == "--language" || std::string(argv[i - 1]) == "-l")
+			{
+				languageKey = argv[i];
+				break;
+			}
+		}
 	}
 
 	SetCurrentDir(GetExecutingDirectory().c_str());
@@ -268,8 +306,9 @@ int mainLoop(int argc, char* argv[])
 
 	glfwMainWindow = mainWindow->GetGLFWWindows();
 	bool isDpiDirtied = true;
+	bool isFontUpdated = true;
 
-	mainWindow->DpiChanged = [&](float scale) -> void { isDpiDirtied = true; };
+	mainWindow->DpiChanged = [&](float scale) -> void { isDpiDirtied = true; isFontUpdated = true; };
 
 	glfwSetWindowCloseCallback(glfwMainWindow, GLFLW_CloseCallback);
 
@@ -302,6 +341,10 @@ int mainLoop(int argc, char* argv[])
 	std::string imguiConfigPath = GetExecutingDirectory() + "imgui.material.ini";
 	ImGui::GetIO().IniFilename = imguiConfigPath.c_str();
 
+	if (languageKey != "")
+	{
+		config->Language = languageKey;
+	}
 	ChangeLanguage(config->Language);
 
 	editor = std::make_shared<EffekseerMaterial::Editor>(graphics);
@@ -343,11 +386,22 @@ int mainLoop(int argc, char* argv[])
 			style.Colors[ImGuiCol_TextDisabled] = ImVec4(0.50f, 0.50f, 0.50f, 1.00f);
 			style.Colors[ImGuiCol_WindowBg] = ImVec4(0.1f, 0.1f, 0.1f, 0.9f);
 
+			isDpiDirtied = false;
+		}
+
+		if (isFontUpdated)
+		{
 			ImGui_ImplOpenGL3_DestroyFontsTexture();
 			io.Fonts->Clear();
-			io.Fonts->AddFontFromFileTTF(
-				"resources/GenShinGothic-Monospace-Normal.ttf", 20 * mainWindow->GetDPIScale(), nullptr, glyphRangesJapanese);
-			isDpiDirtied = false;
+
+			Effekseer::Editor::AddFontFromFileTTF(
+				EffekseerMaterial::StringContainer::GetValue("Font_Normal").c_str(),
+				"resources/languages/characterTable.txt",
+				EffekseerMaterial::StringContainer::GetValue("CharacterTable").c_str(),
+				20,
+				mainWindow->GetDPIScale());
+
+			isFontUpdated = false;
 		}
 
 		glfwPollEvents();
@@ -370,7 +424,7 @@ int mainLoop(int argc, char* argv[])
 				else if (commandDataTOMaterialEditor.Type == IPC::CommandType::OpenOrCreateMaterial)
 				{
 					spdlog::trace("ICP - Receive - OpenOrCreateMaterial : {}", (const char*)(commandDataTOMaterialEditor.str.data()));
-					if (!editor->LoadOrSelect(commandDataTOMaterialEditor.str.data()))
+					if (editor->LoadOrSelect(commandDataTOMaterialEditor.str.data()) == EffekseerMaterial::ErrorCode::NotFound)
 					{
 						editor->New();
 						editor->SaveAs(commandDataTOMaterialEditor.str.data());
@@ -480,10 +534,12 @@ int mainLoop(int argc, char* argv[])
 					if (ImGui::MenuItem("Japanese"))
 					{
 						ChangeLanguage(Effekseer::SystemLanguage::Japanese);
+						isFontUpdated = true;
 					}
 					else if (ImGui::MenuItem("English"))
 					{
 						ChangeLanguage(Effekseer::SystemLanguage::English);
+						isFontUpdated = true;
 					}
 
 					ImGui::EndMenu();
@@ -508,7 +564,7 @@ int mainLoop(int argc, char* argv[])
 			const float oldWindowRounding = ImGui::GetStyle().WindowRounding;
 			ImGui::GetStyle().WindowRounding = 0;
 
-			const bool visible = ImGui::Begin("MaterialEditor", NULL, ImVec2(0, 0), 1.0f, flags);
+			const bool visible = ImGui::Begin("MaterialEditor", nullptr, flags);
 			ImGui::GetStyle().WindowRounding = oldWindowRounding;
 
 			if (visible)
@@ -678,8 +734,17 @@ int mainLoop(int argc, char* argv[])
 
 				if (uobj != nullptr)
 				{
-					ImGui::Text(uobj->GetPreview()->VS.c_str());
-					ImGui::Text(uobj->GetPreview()->PS.c_str());
+					if (ImGui::TreeNode("VS"))
+					{
+						ImGui::Text(uobj->GetPreview()->VS.c_str());
+						ImGui::TreePop();
+					}
+
+					if (ImGui::TreeNode("PS"))
+					{
+						ImGui::Text(uobj->GetPreview()->PS.c_str());
+						ImGui::TreePop();
+					}
 				}
 			}
 
@@ -765,7 +830,13 @@ int mainLoop(int argc, char* argv[])
 }
 
 #if defined(NDEBUG) && defined(_WIN32)
-int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInst, LPSTR lpszCmdLine, int nShowCmd) { return mainLoop(__argc, __argv); }
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInst, LPSTR lpszCmdLine, int nShowCmd)
+{
+	return mainLoop(__argc, __argv);
+}
 #else
-int main(int argc, char* argv[]) { return mainLoop(argc, argv); }
+int main(int argc, char* argv[])
+{
+	return mainLoop(argc, argv);
+}
 #endif

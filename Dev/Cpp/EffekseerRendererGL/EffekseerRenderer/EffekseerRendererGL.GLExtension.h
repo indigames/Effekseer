@@ -61,25 +61,23 @@
 #include "EffekseerRendererGL.Base.Pre.h"
 #include <stddef.h>
 
-//-----------------------------------------------------------------------------------
-//
-//-----------------------------------------------------------------------------------
-namespace EffekseerRendererGL
-{
-namespace GLExt
-{
-//-----------------------------------------------------------------------------------
-//
-//-----------------------------------------------------------------------------------
+#if defined(_WIN32) || defined(EMSCRIPTEN)
+typedef ptrdiff_t GLsizeiptr;
+typedef ptrdiff_t GLintptr;
+typedef char GLchar;
 
 #define GL_ELEMENT_ARRAY_BUFFER 0x8893
 #define GL_STREAM_DRAW 0x88E0
 #define GL_DYNAMIC_DRAW 0x88E8
 #define GL_FUNC_ADD 0x8006
+#define GL_MIN 0x8007
 #define GL_MAX 0x8008
+#define GL_FUNC_SUBTRACT 0x800A
 #define GL_FUNC_REVERSE_SUBTRACT 0x800B
 #define GL_CLAMP_TO_EDGE 0x812F
 #define GL_TEXTURE0 0x84C0
+#define GL_BLEND_SRC_ALPHA 0x80CB
+#define GL_BLEND_DST_ALPHA 0x80CA
 #define GL_BLEND_SRC_RGB 0x80C9
 #define GL_BLEND_DST_RGB 0x80C8
 #define GL_BLEND_EQUATION 0x8009
@@ -89,14 +87,11 @@ namespace GLExt
 #define GL_FRAGMENT_SHADER 0x8B30
 #define GL_COMPILE_STATUS 0x8B81
 #define GL_LINK_STATUS 0x8B82
+#define GL_CURRENT_PROGRAM 0x8B8D
 
 #define GL_VERTEX_ARRAY_BINDING 0x85B5
 #define GL_ARRAY_BUFFER_BINDING 0x8894
 #define GL_ELEMENT_ARRAY_BUFFER_BINDING 0x8895
-
-#define GL_COMPRESSED_RGBA_S3TC_DXT1_EXT 0x83F1
-#define GL_COMPRESSED_RGBA_S3TC_DXT3_EXT 0x83F2
-#define GL_COMPRESSED_RGBA_S3TC_DXT5_EXT 0x83F3
 #define GL_SRGB8_ALPHA8 0x8C43
 
 #define GL_FRAMEBUFFER_SRGB 0x8DB9
@@ -108,19 +103,76 @@ namespace GLExt
 #define GL_MAP_FLUSH_EXPLICIT_BIT 0x0010
 #define GL_MAP_UNSYNCHRONIZED_BIT 0x0020
 
+#define GL_R8 0x8229
+#define GL_R16F 0x822D
+#define GL_R32F 0x822E
+#define GL_RG 0x8227
+#define GL_BGRA 0x80E1
+#define GL_RG16F 0x822f
+
+#define GL_HALF_FLOAT 0x140b
+
+#define GL_RGBA16F 0x881a
+#define GL_RGBA32F 0x8814
+
+#define GL_DEPTH24_STENCIL8 0x88F0
+#define GL_DEPTH32F_STENCIL8 0x8CAD
+#define GL_DEPTH_COMPONENT24 0x81A6
+#define GL_DEPTH_COMPONENT32 0x81A7
+
+#define GL_DEPTH_STENCIL 0x84F9
+
+#define GL_FRAMEBUFFER 0x8D40
+#define GL_FRAMEBUFFER_BINDING 0x8CA6
+
+#define GL_RENDERBUFFER 0x8D41
+#define GL_RENDERBUFFER_BINDING 0x8CA7
+
+#define GL_COLOR_ATTACHMENT0 0x8CE0
+#define GL_COLOR_ATTACHMENT1 0x8CE1
+#define GL_COLOR_ATTACHMENT2 0x8CE2
+#define GL_COLOR_ATTACHMENT3 0x8CE3
+#define GL_COLOR_ATTACHMENT4 0x8CE4
+#define GL_COLOR_ATTACHMENT5 0x8CE5
+#define GL_COLOR_ATTACHMENT6 0x8CE6
+#define GL_COLOR_ATTACHMENT7 0x8CE7
+#define GL_COLOR_ATTACHMENT8 0x8CE8
+#define GL_COLOR_ATTACHMENT9 0x8CE9
+#define GL_COLOR_ATTACHMENT10 0x8CEA
+#define GL_COLOR_ATTACHMENT11 0x8CEB
+#define GL_COLOR_ATTACHMENT12 0x8CEC
+#define GL_COLOR_ATTACHMENT13 0x8CED
+#define GL_COLOR_ATTACHMENT14 0x8CEE
+#define GL_COLOR_ATTACHMENT15 0x8CEF
+#define GL_DEPTH_ATTACHMENT 0x8D00
+#define GL_STENCIL_ATTACHMENT 0x8D20
+
+#define GL_RED 0x1903
+
+#define GL_MAX_VARYING_VECTORS 0x8DFC
+
+#endif
+
+#define GL_COMPRESSED_RGBA_S3TC_DXT1_EXT 0x83F1
+#define GL_COMPRESSED_RGBA_S3TC_DXT3_EXT 0x83F2
+#define GL_COMPRESSED_RGBA_S3TC_DXT5_EXT 0x83F3
+#define GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT1_EXT 0x8C4D
+#define GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT3_EXT 0x8C4E
+#define GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT5_EXT 0x8C4F
+
+// TODO why redifinition
 //#ifndef GL_WRITE_ONLY
 #define GL_WRITE_ONLY 0x000088b9
 //#endif
 
-#if defined(__APPLE__) || defined(__ANDROID__)
-#else
-typedef ptrdiff_t GLsizeiptr;
-typedef ptrdiff_t GLintptr;
-typedef char GLchar;
-#endif
+
+namespace EffekseerRendererGL
+{
+namespace GLExt
+{
 
 OpenGLDeviceType GetDeviceType();
-bool Initialize(OpenGLDeviceType deviceType);
+bool Initialize(OpenGLDeviceType deviceType, bool isExtensionsEnabled);
 bool IsSupportedVertexArray();
 bool IsSupportedBufferRange();
 bool IsSupportedMapBuffer();
@@ -173,8 +225,36 @@ void* glMapBuffer(GLenum target, GLenum access);
 void* glMapBufferRange(GLenum target, GLintptr offset, GLsizeiptr length, GLbitfield access);
 GLboolean glUnmapBuffer(GLenum target);
 
+void glDrawElementsInstanced(GLenum mode,
+							 GLsizei count,
+							 GLenum type,
+							 const void* indices,
+							 GLsizei primcount);
+
 void glCompressedTexImage2D(
 	GLenum target, GLint level, GLenum internalformat, GLsizei width, GLsizei height, GLint border, GLsizei imageSize, const void* data);
+
+void glGenFramebuffers(GLsizei n, GLuint* ids);
+
+void glBindFramebuffer(GLenum target, GLuint framebuffer);
+
+void glDeleteFramebuffers(GLsizei n, GLuint* framebuffers);
+
+void glFramebufferTexture2D(GLenum target,
+							GLenum attachment,
+							GLenum textarget,
+							GLuint texture,
+							GLint level);
+
+void glGenRenderbuffers(GLsizei n, GLuint* renderbuffers);
+
+void glBindRenderbuffer(GLenum target, GLuint renderbuffer);
+
+void glDeleteRenderbuffers(GLsizei n, GLuint* renderbuffers);
+
+void glRenderbufferStorageMultisample(GLenum target, GLsizei samples, GLenum internalformat, GLsizei width, GLsizei height);
+
+void glDrawBuffers(GLsizei n, const GLenum* bufs);
 
 //----------------------------------------------------------------------------------
 //

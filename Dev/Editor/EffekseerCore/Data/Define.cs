@@ -25,7 +25,17 @@ namespace Effekseer.Data
 		Global,
 		Local,
 	}
-    public enum ParentEffectType : int
+
+	public enum ModelReferenceType
+	{
+		[Key(key = "ModelReferenceType_File")]
+		File = 0,
+		[Key(key = "ModelReferenceType_ProdecualModel")]
+		ProceduralModel = 1,
+	}
+
+
+	public enum ParentEffectType : int
 	{
 		[Key(key = "BasicSettings_ParentEffectType_NotBind")]
 		NotBind = 0,
@@ -77,15 +87,75 @@ namespace Effekseer.Data
 
 	public enum CullingValues : int
 	{
-		[Name(value = "表表示", language = Language.Japanese)]
-		[Name(value = "Front view", language = Language.English)]
+		[Key(key = "CullingType_Front")]
 		Front = 0,
-		[Name(value = "裏表示", language = Language.Japanese)]
-		[Name(value = "Back view", language = Language.English)]
+		[Key(key = "CullingType_Back")]
 		Back = 1,
-		[Name(value = "両面表示", language = Language.Japanese)]
-		[Name(value = "Double-sided", language = Language.English)]
+		[Key(key = "CullingType_Double")]
 		Double = 2,
+	}
+
+	public enum EasingType : int
+	{
+		[Key(key = "Easing_LeftRightSpeed")]
+		LeftRightSpeed = 0,
+
+		[Key(key = "Easing_Linear")]
+		Linear = 1,
+
+		[Key(key = "Easing_EaseInQuadratic")]
+		EaseInQuadratic = 10,
+
+		[Key(key = "Easing_EaseOutQuadratic")]
+		EaseOutQuadratic = 11,
+
+		[Key(key = "Easing_EaseInOutQuadratic")]
+		EaseInOutQuadratic = 12,
+
+		[Key(key = "Easing_EaseInCubic")]
+		EaseInCubic = 20,
+
+		[Key(key = "Easing_EaseOutCubic")]
+		EaseOutCubic = 21,
+
+		[Key(key = "Easing_EaseInOutCubic")]
+		EaseInOutCubic = 22,
+
+		[Key(key = "Easing_EaseInQuartic")]
+		EaseInQuartic = 30,
+
+		[Key(key = "Easing_EaseOutQuartic")]
+		EaseOutQuartic = 31,
+
+		[Key(key = "Easing_EaseInOutQuartic")]
+		EaseInOutQuartic = 32,
+
+		[Key(key = "Easing_EaseInQuintic")]
+		EaseInQuintic = 40,
+
+		[Key(key = "Easing_EaseOutQuintic")]
+		EaseOutQuintic = 41,
+
+		[Key(key = "Easing_EaseInOutQuintic")]
+		EaseInOutQuintic = 42,
+
+		[Key(key = "Easing_EaseInBack")]
+		EaseInBack = 50,
+
+		[Key(key = "Easing_EaseOutBack")]
+		EaseOutBack = 51,
+
+		[Key(key = "Easing_EaseInOutBack")]
+		EaseInOutBack = 52,
+
+		[Key(key = "Easing_EaseInBounce")]
+		EaseInBounce = 60,
+
+		[Key(key = "Easing_EaseOutBounce")]
+		EaseOutBounce = 61,
+
+		[Key(key = "Easing_EaseInOutBounce")]
+		EaseInOutBounce = 62,
 	}
 
 	public enum EasingStart : int
@@ -150,8 +220,7 @@ namespace Effekseer.Data
 
 	public enum TrackSizeType : int
 	{
-		[Name(value = "固定", language = Language.Japanese)]
-		[Name(value = "Fixed", language = Language.English)]
+		[Key(key = "TrackSizeType_Fixed")]
 		Fixed = 0,
 	}
 
@@ -221,43 +290,106 @@ namespace Effekseer.Data
 		}
 	}
 
-    public class FloatEasingParamater
-    {
+	public class FloatEasingParamater
+	{
+		const int EasingTypeGroup = 200;
+		const int MiddlePoint = 300;
+		const int RandomGroup = 400;
+		const int IndividualType = 500;
+
 		[Key(key = "Easing_Start")]
 		public Value.FloatWithRandom Start
-        {
-            get;
-            private set;
-        }
+		{
+			get;
+			private set;
+		}
 
 		[Key(key = "Easing_End")]
 		public Value.FloatWithRandom End
-        {
-            get;
-            private set;
-        }
+		{
+			get;
+			private set;
+		}
+
+		[Key(key = "Easing_TYpe")]
+		[Selector(ID = EasingTypeGroup)]
+		public Value.Enum<EasingType> Type
+		{
+			get;
+			private set;
+		}
 
 		[Key(key = "Easing_StartSpeed")]
+		[Selected(ID = EasingTypeGroup, Value = (int)EasingType.LeftRightSpeed)]
 		public Value.Enum<EasingStart> StartSpeed
-        {
-            get;
-            private set;
-        }
+		{
+			get;
+			private set;
+		}
 
 		[Key(key = "Easing_EndSpeed")]
+		[Selected(ID = EasingTypeGroup, Value = (int)EasingType.LeftRightSpeed)]
 		public Value.Enum<EasingEnd> EndSpeed
-        {
-            get;
-            private set;
-        }
+		{
+			get;
+			private set;
+		}
 
-        internal FloatEasingParamater(float value = 0.0f, float max = float.MaxValue, float min = float.MinValue)
+		[Selector(ID = MiddlePoint)]
+		[Key(key = "Easing_IsMiddleEnabled")]
+		public Value.Boolean IsMiddleEnabled { get; private set; }
+
+		[Selected(ID = MiddlePoint, Value = 0)]
+		[Key(key = "Easing_Middle")]
+		public Value.FloatWithRandom Middle
+		{
+			get;
+			private set;
+		}
+
+		[Key(key = "Easing_IsRandomGroupEnabled")]
+		[Selector(ID = RandomGroup)]
+
+		public Value.Boolean IsRandomGroupEnabled { get; private set; }
+
+		/// <summary>
+		/// 1.6 or later
+		/// </summary>
+		[Key(key = "Easing_RandomGroup_A")]
+		[Selected(ID = RandomGroup, Value = 0)]
+		public Value.Int RandomGroupA { get; private set; }
+
+		[Key(key = "Easing_IsIndividualTypeEnabled")]
+		[Selector(ID = IndividualType)]
+		public Value.Boolean IsIndividualTypeEnabled { get; private set; }
+
+		[Key(key = "Easing_IndividualType_A")]
+		[Selected(ID = IndividualType, Value = 0)]
+		public Value.Enum<EasingType> Type_A
+		{
+			get;
+			private set;
+		}
+
+		internal FloatEasingParamater(float value = 0.0f, float max = float.MaxValue, float min = float.MinValue)
         {
+			Type = new Value.Enum<EasingType>();
+
             Start = new Value.FloatWithRandom(value, max, min);
             End = new Value.FloatWithRandom(value, max, min);
             StartSpeed = new Value.Enum<EasingStart>(EasingStart.Start);
             EndSpeed = new Value.Enum<EasingEnd>(EasingEnd.End);
-        }
+
+			IsMiddleEnabled = new Value.Boolean(false);
+			Middle = new Value.FloatWithRandom(value, max, min);
+
+			IsRandomGroupEnabled = new Value.Boolean(false);
+
+			RandomGroupA = new Value.Int(0);
+
+			IsIndividualTypeEnabled = new Value.Boolean(false);
+			Type_A = new Value.Enum<EasingType>(EasingType.Linear);
+		}
     }
 
     public class Vector2DEasingParamater
@@ -301,6 +433,11 @@ namespace Effekseer.Data
 
 	public class Vector3DEasingParamater
 	{
+		const int EasingTypeGroup = 200;
+		const int MiddlePoint = 300;
+		const int RandomGroup = 400;
+		const int IndividualType = 500;
+
 		[Key(key = "Easing_Start")]
 		public Value.Vector3DWithRandom Start
 		{
@@ -315,15 +452,100 @@ namespace Effekseer.Data
 			private set;
 		}
 
+		/// <summary>
+		/// 1.6 or later
+		/// </summary>
+		[Selector(ID = EasingTypeGroup)]
+		[Key(key = "Easing_Type")]
+		public Value.Enum<EasingType> Type
+		{
+			get;
+			private set;
+		}
+
+
 		[Key(key = "Easing_StartSpeed")]
+		[Selected(ID = EasingTypeGroup, Value = (int)EasingType.LeftRightSpeed)]
 		public Value.Enum<EasingStart> StartSpeed
 		{
 			get;
 			private set;
 		}
 
+		// TODO : selector
 		[Key(key = "Easing_EndSpeed")]
+		[Selected(ID = EasingTypeGroup, Value = (int)EasingType.LeftRightSpeed)]
 		public Value.Enum<EasingEnd> EndSpeed
+		{
+			get;
+			private set;
+		}
+
+		[Key(key = "Easing_IsMiddleEnabled")]
+		[Selector(ID = MiddlePoint)]
+		public Value.Boolean IsMiddleEnabled { get; private set; }
+
+
+		/// <summary>
+		/// 1.6 or later
+		/// </summary>
+		[Key(key = "Easing_Middle")]
+		[Selected(ID = MiddlePoint, Value = 0)]
+		public Value.Vector3DWithRandom Middle
+		{
+			get;
+			private set;
+		}
+
+		[Key(key = "Easing_IsRandomGroupEnabled")]
+		[Selector(ID = RandomGroup)]
+
+		public Value.Boolean IsRandomGroupEnabled { get; private set; }
+
+		/// <summary>
+		/// 1.6 or later
+		/// </summary>
+		[Key(key = "Easing_RandomGroup_X")]
+		[Selected(ID = RandomGroup, Value = 0)]
+		public Value.Int RandomGroupX { get; private set; }
+
+		/// <summary>
+		/// 1.6 or later
+		/// </summary>
+		[Key(key = "Easing_RandomGroup_Y")]
+		[Selected(ID = RandomGroup, Value = 0)]
+		public Value.Int RandomGroupY { get; private set; }
+
+		/// <summary>
+		/// 1.6 or later
+		/// </summary>
+		[Key(key = "Easing_RandomGroup_Z")]
+		[Selected(ID = RandomGroup, Value = 0)]
+		public Value.Int RandomGroupZ { get; private set; }
+
+		[Key(key = "Easing_IsIndividualTypeEnabled")]
+		[Selector(ID = IndividualType)]
+		public Value.Boolean IsIndividualTypeEnabled { get; private set; }
+
+		[Key(key = "Easing_IndividualType_X")]
+		[Selected(ID = IndividualType, Value = 0)]
+		public Value.Enum<EasingType> TypeX
+		{
+			get;
+			private set;
+		}
+
+		[Key(key = "Easing_IndividualType_Y")]
+		[Selected(ID = IndividualType, Value = 0)]
+		public Value.Enum<EasingType> TypeY
+		{
+			get;
+			private set;
+		}
+
+		[Key(key = "Easing_IndividualType_Z")]
+		[Selected(ID = IndividualType, Value = 0)]
+		public Value.Enum<EasingType> TypeZ
 		{
 			get;
 			private set;
@@ -331,10 +553,24 @@ namespace Effekseer.Data
 
 		internal Vector3DEasingParamater(float defaultX = 0.0f, float defaultY = 0.0f, float defaultZ = 0.0f)
 		{
+			Type = new Value.Enum<EasingType>();
 			Start = new Value.Vector3DWithRandom(defaultX, defaultY, defaultZ);
+			Middle = new Value.Vector3DWithRandom(defaultX, defaultY, defaultZ);
 			End = new Value.Vector3DWithRandom(defaultX, defaultY, defaultZ);
 			StartSpeed = new Value.Enum<EasingStart>(EasingStart.Start);
 			EndSpeed = new Value.Enum<EasingEnd>(EasingEnd.End);
+
+			IsMiddleEnabled = new Value.Boolean(false);
+			IsRandomGroupEnabled = new Value.Boolean(false);
+
+			RandomGroupX = new Value.Int(0);
+			RandomGroupY = new Value.Int(1);
+			RandomGroupZ = new Value.Int(2);
+
+			IsIndividualTypeEnabled = new Value.Boolean(false);
+			TypeX = new Value.Enum<EasingType>(EasingType.Linear);
+			TypeY = new Value.Enum<EasingType>(EasingType.Linear);
+			TypeZ = new Value.Enum<EasingType>(EasingType.Linear);
 		}
 	}
 
@@ -480,6 +716,12 @@ namespace Effekseer.Data
 		}
 	}
 
+	public enum TreeNodeType
+	{
+		Large,
+		Small,
+	}
+
 	/// <summary>
 	/// For collection to create a treenode in GUI
 	/// </summary>
@@ -500,6 +742,18 @@ namespace Effekseer.Data
 			get;
 			set;
 		}
+
+		public string enabledFlag
+		{
+			get;
+			set;
+		}
+
+		public TreeNodeType type
+		{
+			get;
+			set;
+		} = TreeNodeType.Large;
 	}
 
 	/// <summary>
@@ -514,6 +768,7 @@ namespace Effekseer.Data
 		public bool IsShown = true;
 		public int SelfSelectorID = -1;
 		public string TreeNodeID = null;
+		public TreeNodeType TreeNodeType = TreeNodeType.Large;
 
 		/// <summary>
 		/// If this value is larger than 0, target selector id is used to show it.
@@ -583,10 +838,6 @@ namespace Effekseer.Data
 			else
 			{
 				ret.Title = NameAttribute.GetName(attributes);
-				//if (!string.IsNullOrEmpty(ret.Title.ToString()))
-				//{
-				//	System.IO.File.AppendAllText("kv.csv", nameKey + ","  + "\"" + ret.Title.ToString() + "\"" + "\r\n");
-				//}
 			}
 
 			var descKey = key + "_Desc";
@@ -599,27 +850,22 @@ namespace Effekseer.Data
 			{
 				ret.Description = new MultiLanguageString(descKey);
 			}
-			else
-			{
-				ret.Description = DescriptionAttribute.GetDescription(attributes);
-
-				//if(!string.IsNullOrEmpty(ret.Description.ToString()))
-				//{
-				//	System.IO.File.AppendAllText("kv.csv", descKey + "," + "\"" + ret.Description.ToString() + "\"" + "\r\n");
-				//}
-			}
 
 			var treeNode = attributes.OfType<TreeNodeAttribute>().FirstOrDefault();
 
 			if (treeNode != null)
 			{
 				ret.TreeNodeID = treeNode.id;
+				ret.TreeNodeType = treeNode.type;
 
 				if (MultiLanguageTextProvider.HasKey(treeNode.key))
 				{
 					ret.Title = new MultiLanguageString(treeNode.key);
 				}
-
+				else if (MultiLanguageTextProvider.HasKey(treeNode.key + "_Name"))
+				{
+					ret.Title = new MultiLanguageString(treeNode.key + "_Name");
+				}
 			}
 
 			return ret;
@@ -639,5 +885,10 @@ namespace Effekseer.Data
 	public interface IResettableValue
 	{
 		void ResetValue();
+	}
+
+	public interface IValueChangedFromDefault
+	{
+		bool IsValueChangedFromDefault { get; }
 	}
 }

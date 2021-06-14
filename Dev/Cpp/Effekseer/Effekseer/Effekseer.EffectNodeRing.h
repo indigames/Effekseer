@@ -27,11 +27,14 @@ struct RingSingleParameter
 		Parameter_DWORD = 0x7fffffff,
 	} type;
 
-	union {
+	union
+	{
 		float fixed;
 		random_float random;
-		easing_float easing;
 	};
+
+	// TODO : make variant after C++17
+	ParameterEasingFloat easing{Version16Alpha9, Version16Alpha9};
 };
 
 //----------------------------------------------------------------------------------
@@ -48,7 +51,8 @@ struct RingLocationParameter
 		Parameter_DWORD = 0x7fffffff,
 	} type;
 
-	union {
+	union
+	{
 		struct
 		{
 			vector2d location;
@@ -79,7 +83,8 @@ struct RingColorParameter
 		Parameter_DWORD = 0x7fffffff,
 	} type;
 
-	union {
+	union
+	{
 		Color fixed;
 		random_color random;
 		easing_color easing;
@@ -92,7 +97,8 @@ struct RingColorParameter
 struct RingSingleValues
 {
 	float current;
-	union {
+	union
+	{
 		struct
 		{
 
@@ -103,11 +109,7 @@ struct RingSingleValues
 
 		} random;
 
-		struct
-		{
-			float start;
-			float end;
-		} easing;
+		InstanceEasing<float> easing;
 	};
 };
 
@@ -116,9 +118,10 @@ struct RingSingleValues
 //----------------------------------------------------------------------------------
 struct RingLocationValues
 {
-	Vec2f current;
+	SIMD::Vec2f current;
 
-	union {
+	union
+	{
 		struct
 		{
 
@@ -126,15 +129,15 @@ struct RingLocationValues
 
 		struct
 		{
-			Vec2f start;
-			Vec2f velocity;
-			Vec2f acceleration;
+			SIMD::Vec2f start;
+			SIMD::Vec2f velocity;
+			SIMD::Vec2f acceleration;
 		} pva;
 
 		struct
 		{
-			Vec2f start;
-			Vec2f end;
+			SIMD::Vec2f start;
+			SIMD::Vec2f end;
 		} easing;
 	};
 };
@@ -147,7 +150,8 @@ struct RingColorValues
 	Color current;
 	Color original;
 
-	union {
+	union
+	{
 		struct
 		{
 			Color _color;
@@ -234,17 +238,17 @@ public:
 	{
 	}
 
-	void LoadRendererParameter(unsigned char*& pos, Setting* setting) override;
+	void LoadRendererParameter(unsigned char*& pos, const SettingRef& setting) override;
 
-	void BeginRendering(int32_t count, Manager* manager) override;
+	void BeginRendering(int32_t count, Manager* manager, void* userData) override;
 
-	void Rendering(const Instance& instance, const Instance* next_instance, Manager* manager) override;
+	void Rendering(const Instance& instance, const Instance* next_instance, Manager* manager, void* userData) override;
 
-	void EndRendering(Manager* manager) override;
+	void EndRendering(Manager* manager, void* userData) override;
 
-	void InitializeRenderedInstance(Instance& instance, Manager* manager) override;
+	void InitializeRenderedInstance(Instance& instance, InstanceGroup& instanceGroup, Manager* manager) override;
 
-	void UpdateRenderedInstance(Instance& instance, Manager* manager) override;
+	void UpdateRenderedInstance(Instance& instance, InstanceGroup& instanceGroup, Manager* manager) override;
 
 	eEffectNodeType GetType() const override
 	{

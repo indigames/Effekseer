@@ -33,8 +33,8 @@ static ID3DBlob* CompileVertexShader(const char* vertexShaderText,
 	hr = D3DCompile(vertexShaderText,
 					strlen(vertexShaderText),
 					vertexShaderFileName,
-					macro.size() > 0 ? (D3D_SHADER_MACRO*)&macro[0] : NULL,
-					NULL,
+					macro.size() > 0 ? (D3D_SHADER_MACRO*)&macro[0] : nullptr,
+					nullptr,
 					"main",
 					"vs_3_0",
 					flag,
@@ -53,7 +53,7 @@ static ID3DBlob* CompileVertexShader(const char* vertexShaderText,
 			log += "Unknown error\n";
 		}
 
-		if (error != NULL)
+		if (error != nullptr)
 		{
 			log += (const char*)error->GetBufferPointer();
 			error->Release();
@@ -83,8 +83,8 @@ static ID3DBlob* CompilePixelShader(const char* vertexShaderText,
 	hr = D3DCompile(vertexShaderText,
 					strlen(vertexShaderText),
 					vertexShaderFileName,
-					macro.size() > 0 ? (D3D_SHADER_MACRO*)&macro[0] : NULL,
-					NULL,
+					macro.size() > 0 ? (D3D_SHADER_MACRO*)&macro[0] : nullptr,
+					nullptr,
 					"main",
 					"ps_3_0",
 					flag,
@@ -103,7 +103,7 @@ static ID3DBlob* CompilePixelShader(const char* vertexShaderText,
 			log += "Unknown error\n";
 		}
 
-		if (error != NULL)
+		if (error != nullptr)
 		{
 			log += (const char*)error->GetBufferPointer();
 			error->Release();
@@ -126,9 +126,9 @@ static ID3DBlob* CompilePixelShader(const char* vertexShaderText,
 namespace Effekseer
 {
 
-const int32_t ModelRendererInstanceCount = 10;
+const int32_t DX9_ModelRendererInstanceCount = 10;
 
-class CompiledMaterialBinaryDX9 : public CompiledMaterialBinary, ReferenceObject
+class CompiledMaterialBinaryDX9 : public CompiledMaterialBinary, public ReferenceObject
 {
 private:
 	std::array<std::vector<uint8_t>, static_cast<int32_t>(MaterialShaderType::Max)> vertexShaders_;
@@ -161,7 +161,7 @@ public:
 
 	int32_t GetVertexShaderSize(MaterialShaderType type) const override
 	{
-		return vertexShaders_.at(static_cast<int>(type)).size();
+		return static_cast<int32_t>(vertexShaders_.at(static_cast<int>(type)).size());
 	}
 
 	const uint8_t* GetPixelShaderData(MaterialShaderType type) const override
@@ -171,7 +171,7 @@ public:
 
 	int32_t GetPixelShaderSize(MaterialShaderType type) const override
 	{
-		return pixelShaders_.at(static_cast<int>(type)).size();
+		return static_cast<int32_t>(pixelShaders_.at(static_cast<int>(type)).size());
 	}
 
 	int AddRef() override
@@ -190,7 +190,7 @@ public:
 	}
 };
 
-CompiledMaterialBinary* MaterialCompilerDX9::Compile(Material* material, int32_t maximumTextureCount)
+CompiledMaterialBinary* MaterialCompilerDX9::Compile(MaterialFile* materialFile, int32_t maximumTextureCount)
 {
 	auto binary = new CompiledMaterialBinaryDX9();
 
@@ -242,7 +242,7 @@ CompiledMaterialBinary* MaterialCompilerDX9::Compile(Material* material, int32_t
 		return ret;
 	};
 
-	auto saveBinary = [&material, &binary, &convertToVectorVS, &convertToVectorPS, &maximumTextureCount](MaterialShaderType type) {
+	auto saveBinary = [&materialFile, &binary, &convertToVectorVS, &convertToVectorPS, &maximumTextureCount](MaterialShaderType type) {
 		auto generator = DirectX::ShaderGenerator(DX9::material_common_define,
 												  DX9::material_common_vs_functions,
 												  DX9::material_sprite_vs_pre,
@@ -260,13 +260,13 @@ CompiledMaterialBinary* MaterialCompilerDX9::Compile(Material* material, int32_t
 												  DX9::g_material_ps_suf2_refraction,
 												  DirectX::ShaderGeneratorTarget::DirectX9);
 
-		auto shader = generator.GenerateShader(material, type, maximumTextureCount, 0, ModelRendererInstanceCount);
+		auto shader = generator.GenerateShader(materialFile, type, maximumTextureCount, 0, DX9_ModelRendererInstanceCount);
 
 		binary->SetVertexShaderData(type, convertToVectorVS(shader.CodeVS));
 		binary->SetPixelShaderData(type, convertToVectorPS(shader.CodePS));
 	};
 
-	if (material->GetHasRefraction())
+	if (materialFile->GetHasRefraction())
 	{
 		saveBinary(MaterialShaderType::Refraction);
 		saveBinary(MaterialShaderType::RefractionModel);
@@ -278,9 +278,9 @@ CompiledMaterialBinary* MaterialCompilerDX9::Compile(Material* material, int32_t
 	return binary;
 }
 
-CompiledMaterialBinary* MaterialCompilerDX9::Compile(Material* material)
+CompiledMaterialBinary* MaterialCompilerDX9::Compile(MaterialFile* materialFile)
 {
-	return Compile(material, Effekseer::UserTextureSlotMax);
+	return Compile(materialFile, Effekseer::UserTextureSlotMax);
 }
 
 } // namespace Effekseer

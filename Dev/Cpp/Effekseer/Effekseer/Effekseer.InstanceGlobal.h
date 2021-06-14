@@ -8,8 +8,8 @@
 #include "Effekseer.Base.h"
 #include "Effekseer.Color.h"
 #include "Effekseer.Random.h"
-#include "SIMD/Effekseer.Mat43f.h"
-#include "SIMD/Effekseer.Vec3f.h"
+#include "SIMD/Mat43f.h"
+#include "SIMD/Vec3f.h"
 
 //----------------------------------------------------------------------------------
 //
@@ -38,12 +38,14 @@ private:
 	float m_updatedFrame;
 
 	InstanceContainer* m_rootContainer;
-	Vec3f m_targetLocation;
+	SIMD::Vec3f m_targetLocation = SIMD::Vec3f(0.0f, 0.0f, 0.0f);
 
 	RandObject m_randObjects;
 	std::array<float, 4> dynamicInputParameters;
 
 	float nextDeltaFrame_ = 0.0f;
+
+	void* m_userData = nullptr;
 
 	//! placement new
 	static void* operator new(size_t size);
@@ -72,6 +74,11 @@ public:
 
 	std::array<float, 4> GetDynamicEquationResult(int32_t index);
 
+	const std::array<float, 4>& GetDynamicInputParameters() const
+	{
+		return dynamicInputParameters;
+	}
+
 	RandObject& GetRandObject()
 	{
 		return m_randObjects;
@@ -90,8 +97,17 @@ public:
 	InstanceContainer* GetRootContainer() const;
 	void SetRootContainer(InstanceContainer* container);
 
-	const Vec3f& GetTargetLocation() const;
+	const SIMD::Vec3f& GetTargetLocation() const;
 	void SetTargetLocation(const Vector3D& location);
+
+	void SetUserData(void* userData)
+	{
+		m_userData = userData;
+	}
+	void* GetUserData() const
+	{
+		return m_userData;
+	}
 };
 //----------------------------------------------------------------------------------
 //

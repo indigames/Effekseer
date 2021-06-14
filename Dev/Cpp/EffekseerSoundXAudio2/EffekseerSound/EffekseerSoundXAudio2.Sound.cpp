@@ -20,21 +20,21 @@ const int32_t DefaultSampleRate = 44100;
 //----------------------------------------------------------------------------------
 //
 //----------------------------------------------------------------------------------
-Sound* Sound::Create(IXAudio2* xaudio2, int32_t num1chVoices, int32_t num2chVoices)
+SoundRef Sound::Create(IXAudio2* xaudio2, int32_t num1chVoices, int32_t num2chVoices)
 {
-	SoundImplemented* sound = new SoundImplemented();
+	auto sound = Effekseer::MakeRefPtr<SoundImplemented>();
 	if (sound->Initialize(xaudio2, num1chVoices, num2chVoices))
 	{
 		return sound;
 	}
-	return NULL;
+	return nullptr;
 }
 
 //----------------------------------------------------------------------------------
 //
 //----------------------------------------------------------------------------------
 SoundImplemented::SoundImplemented()
-	: m_xaudio2(NULL)
+	: m_xaudio2(nullptr)
 	, m_mute(false)
 {
 	memset(m_voiceContainer, 0, sizeof(m_voiceContainer));
@@ -107,23 +107,23 @@ void SoundImplemented::SetListener(const ::Effekseer::Vector3D& pos, const ::Eff
 //----------------------------------------------------------------------------------
 void SoundImplemented::Destroy()
 {
-	delete this;
+	Release();
 }
 
 //----------------------------------------------------------------------------------
 //
 //----------------------------------------------------------------------------------
-::Effekseer::SoundPlayer* SoundImplemented::CreateSoundPlayer()
+::Effekseer::SoundPlayerRef SoundImplemented::CreateSoundPlayer()
 {
-	return new SoundPlayer(this);
+	return ::Effekseer::MakeRefPtr<SoundPlayer>(SoundImplementedRef::FromPinned(this));
 }
 
 //----------------------------------------------------------------------------------
 //
 //----------------------------------------------------------------------------------
-::Effekseer::SoundLoader* SoundImplemented::CreateSoundLoader(::Effekseer::FileInterface* fileInterface)
+::Effekseer::SoundLoaderRef SoundImplemented::CreateSoundLoader(::Effekseer::FileInterface* fileInterface)
 {
-	return new SoundLoader(this, fileInterface);
+	return ::Effekseer::MakeRefPtr<SoundLoader>(SoundImplementedRef::FromPinned(this), fileInterface);
 }
 
 //----------------------------------------------------------------------------------
@@ -150,12 +150,12 @@ void SoundImplemented::SetMute(bool mute)
 //----------------------------------------------------------------------------------
 SoundVoice* SoundImplemented::GetVoice(int32_t channel)
 {
-	IXAudio2SourceVoice* voice = NULL;
+	IXAudio2SourceVoice* voice = nullptr;
 	if (channel >= 1 && channel <= 2)
 	{
 		return m_voiceContainer[channel - 1]->GetVoice();
 	}
-	return NULL;
+	return nullptr;
 }
 
 //----------------------------------------------------------------------------------
@@ -198,7 +198,7 @@ bool SoundImplemented::CheckPlayingTag(::Effekseer::SoundTag tag)
 //----------------------------------------------------------------------------------
 //
 //----------------------------------------------------------------------------------
-void SoundImplemented::StopData(SoundData* soundData)
+void SoundImplemented::StopData(const ::Effekseer::SoundDataRef& soundData)
 {
 	for (int i = 0; i < 2; i++)
 	{

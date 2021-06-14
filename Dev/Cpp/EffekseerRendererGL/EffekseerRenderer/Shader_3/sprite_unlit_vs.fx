@@ -12,15 +12,16 @@ struct VS_Input
 
 struct VS_Output
 {
-    vec4 Position;
+    vec4 PosVS;
     vec4 Color;
     vec2 UV;
+    vec4 PosP;
 };
 
 struct VS_ConstantBuffer
 {
     mat4 mCamera;
-    mat4 mProj;
+    mat4 mCameraProj;
     vec4 mUVInversed;
     vec4 mflipbookParameter;
 };
@@ -30,21 +31,20 @@ uniform VS_ConstantBuffer CBVS0;
 layout(location = 0) in vec3 Input_Pos;
 layout(location = 1) in vec4 Input_Color;
 layout(location = 2) in vec2 Input_UV;
-out vec4 _VSPS_Color;
-out vec2 _VSPS_UV;
+centroid out vec4 _VSPS_Color;
+centroid out vec2 _VSPS_UV;
+out vec4 _VSPS_PosP;
 
 VS_Output _main(VS_Input Input)
 {
-    VS_Output Output = VS_Output(vec4(0.0), vec4(0.0), vec2(0.0));
-    vec4 pos4 = vec4(Input.Pos.x, Input.Pos.y, Input.Pos.z, 1.0);
-    vec4 cameraPos = pos4 * CBVS0.mCamera;
-    cameraPos /= vec4(cameraPos.w);
-    Output.Position = cameraPos * CBVS0.mProj;
-    vec4 cameraPosU = cameraPos + vec4(0.0, 1.0, 0.0, 0.0);
-    vec4 cameraPosR = cameraPos + vec4(1.0, 0.0, 0.0, 0.0);
+    VS_Output Output = VS_Output(vec4(0.0), vec4(0.0), vec2(0.0), vec4(0.0));
+    vec4 worldPos = vec4(Input.Pos.x, Input.Pos.y, Input.Pos.z, 1.0);
+    Output.PosVS = worldPos * CBVS0.mCameraProj;
     Output.Color = Input.Color;
-    Output.UV = Input.UV;
-    Output.UV.y = CBVS0.mUVInversed.x + (CBVS0.mUVInversed.y * Input.UV.y);
+    vec2 uv1 = Input.UV;
+    uv1.y = CBVS0.mUVInversed.x + (CBVS0.mUVInversed.y * uv1.y);
+    Output.UV = uv1;
+    Output.PosP = Output.PosVS;
     return Output;
 }
 
@@ -55,8 +55,9 @@ void main()
     Input.Color = Input_Color;
     Input.UV = Input_UV;
     VS_Output flattenTemp = _main(Input);
-    gl_Position = flattenTemp.Position;
+    gl_Position = flattenTemp.PosVS;
     _VSPS_Color = flattenTemp.Color;
     _VSPS_UV = flattenTemp.UV;
+    _VSPS_PosP = flattenTemp.PosP;
 }
 

@@ -3,7 +3,7 @@
 namespace Effekseer
 {
 
-class CompiledMaterialBinaryInternal : public CompiledMaterialBinary, ReferenceObject
+class CompiledMaterialBinaryInternal : public CompiledMaterialBinary, public ReferenceObject
 {
 private:
 	std::array<std::vector<uint8_t>, static_cast<int32_t>(MaterialShaderType::Max)> vertexShaders_;
@@ -21,27 +21,27 @@ public:
 
 	void SetVertexShaderData(MaterialShaderType type, const std::vector<uint8_t>& data)
 	{
-		vertexShaders_.at(static_cast<int>(type)) = data;
+		vertexShaders_.at(static_cast<size_t>(type)) = data;
 	}
 
 	void SetPixelShaderData(MaterialShaderType type, const std::vector<uint8_t>& data)
 	{
-		pixelShaders_.at(static_cast<int>(type)) = data;
+		pixelShaders_.at(static_cast<size_t>(type)) = data;
 	}
 
 	const uint8_t* GetVertexShaderData(MaterialShaderType type) const override
 	{
-		return vertexShaders_.at(static_cast<int>(type)).data();
+		return vertexShaders_.at(static_cast<size_t>(type)).data();
 	}
 
 	int32_t GetVertexShaderSize(MaterialShaderType type) const override
 	{
-		return static_cast<int32_t>(vertexShaders_.at(static_cast<int>(type)).size());
+		return static_cast<int32_t>(vertexShaders_.at(static_cast<size_t>(type)).size());
 	}
 
 	const uint8_t* GetPixelShaderData(MaterialShaderType type) const override
 	{
-		return pixelShaders_.at(static_cast<int>(type)).data();
+		return pixelShaders_.at(static_cast<size_t>(type)).data();
 	}
 
 	int32_t GetPixelShaderSize(MaterialShaderType type) const override
@@ -90,8 +90,14 @@ bool CompiledMaterial::Load(const uint8_t* data, int32_t size)
 	memcpy(&version, data + offset, 4);
 	offset += sizeof(int);
 
-	// bacause of camera position node, structure of uniform is changed
-	if (version == 0)
+	// bacause of camera position node, structure of uniform is changed, etc
+	if (version < OldestSupportVersion)
+	{
+		return false;
+	}
+
+	// Too new
+	if (version > LatestSupportVersion)
 	{
 		return false;
 	}

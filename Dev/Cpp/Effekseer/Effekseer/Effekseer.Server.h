@@ -2,6 +2,7 @@
 #ifndef __EFFEKSEER_SERVER_H__
 #define __EFFEKSEER_SERVER_H__
 
+#if !(defined(__EFFEKSEER_NETWORK_DISABLED__))
 #if !(defined(_PSVITA) || defined(_XBOXONE))
 
 //----------------------------------------------------------------------------------
@@ -64,7 +65,7 @@ public:
 		\~English	an effect to be edit
 		\~Japanese	編集される対象のエフェクト
 	*/
-	virtual void Register(const EFK_CHAR* key, Effect* effect) = 0;
+	virtual void Register(const char16_t* key, const EffectRef& effect) = 0;
 
 	/**
 		@brief
@@ -74,7 +75,7 @@ public:
 		\~English	an effect registered
 		\~Japanese	登録されているエフェクト
 	*/
-	virtual void Unregister(Effect* effect) = 0;
+	virtual void Unregister(const EffectRef& effect) = 0;
 
 	/**
 		@brief
@@ -89,28 +90,14 @@ public:
 
 	*/
 	virtual void
-	Update(Manager** managers = nullptr, int32_t managerCount = 0, ReloadingThreadType reloadingThreadType = ReloadingThreadType::Main) = 0;
+	Update(ManagerRef* managers = nullptr, int32_t managerCount = 0, ReloadingThreadType reloadingThreadType = ReloadingThreadType::Main) = 0;
 
 	/**
 		@brief
 		\~English	Specify root path to load materials
 		\~Japanese	素材のルートパスを設定する。
 	*/
-	virtual void SetMaterialPath(const EFK_CHAR* materialPath) = 0;
-
-	/**
-		@brief
-		\~English	deprecated
-		\~Japanese	非推奨
-	*/
-	virtual void Regist(const EFK_CHAR* key, Effect* effect) = 0;
-
-	/**
-		@brief
-		\~English	deprecated
-		\~Japanese	非推奨
-	*/
-	virtual void Unregist(Effect* effect) = 0;
+	virtual void SetMaterialPath(const char16_t* materialPath) = 0;
 };
 
 //----------------------------------------------------------------------------------
@@ -122,5 +109,6 @@ public:
 //----------------------------------------------------------------------------------
 
 #endif // #if !( defined(_PSVITA) || defined(_XBOXONE) )
+#endif
 
 #endif // __EFFEKSEER_SERVER_H__

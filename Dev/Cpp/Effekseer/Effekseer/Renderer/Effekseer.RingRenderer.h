@@ -10,9 +10,9 @@
 #include "../Effekseer.Matrix43.h"
 #include "../Effekseer.Vector2D.h"
 #include "../Effekseer.Vector3D.h"
-#include "../SIMD/Effekseer.Mat43f.h"
-#include "../SIMD/Effekseer.Vec2f.h"
-#include "../SIMD/Effekseer.Vec3f.h"
+#include "../SIMD/Mat43f.h"
+#include "../SIMD/Vec2f.h"
+#include "../SIMD/Vec3f.h"
 
 //----------------------------------------------------------------------------------
 //
@@ -23,46 +23,37 @@ namespace Effekseer
 //
 //----------------------------------------------------------------------------------
 
-class RingRenderer
+class RingRenderer : public ReferenceObject
 {
 public:
 	struct NodeParameter
 	{
 		Effect* EffectPointer;
-		// int32_t				ColorTextureIndex;
-		// AlphaBlendType			AlphaBlend;
-		// TextureFilterType	TextureFilter;
-		// TextureWrapType	TextureWrap;
 		bool ZTest;
 		bool ZWrite;
 		BillboardType Billboard;
 		int32_t VertexCount;
 		bool IsRightHand;
+		float Maginification = 1.0f;
+
 		float StartingFade = 0.0f;
 		float EndingFade = 0.0f;
-		// bool				Distortion;
-		// float				DistortionIntensity;
 
 		NodeRendererDepthParameter* DepthParameterPtr = nullptr;
 		NodeRendererBasicParameter* BasicParameterPtr = nullptr;
 
-		// RendererMaterialType MaterialType = RendererMaterialType::Default;
-		// MaterialParameter* MaterialParameterPtr = nullptr;
-
-		// float				DepthOffset;
-		// bool				IsDepthOffsetScaledWithCamera;
-		// bool				IsDepthOffsetScaledWithParticleScale;
-
 		NodeRendererBasicParameter BasicParameter;
 
 		bool EnableViewOffset = false;
+
+		RefPtr<RenderingUserData> UserData;
 	};
 
 	struct InstanceParameter
 	{
-		Mat43f SRTMatrix43;
-		Vec2f OuterLocation;
-		Vec2f InnerLocation;
+		SIMD::Mat43f SRTMatrix43;
+		SIMD::Vec2f OuterLocation;
+		SIMD::Vec2f InnerLocation;
 		float ViewingAngleStart;
 		float ViewingAngleEnd;
 		float CenterRatio;

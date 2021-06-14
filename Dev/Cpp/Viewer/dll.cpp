@@ -27,36 +27,6 @@
 #pragma comment(lib, "d3d11.lib")
 #pragma comment(lib, "d3dcompiler.lib")
 
-#define NONDLL 1
-
-#ifdef _WIN32
-#define MSWIN32 1
-#define BGDWIN32 1
-#endif
-#include <gd.h>
-#include <gdfontmb.h>
-
-const float DistanceBase = 15.0f;
-const float OrthoScaleBase = 16.0f;
-const float ZoomDistanceFactor = 1.125f;
-const float MaxZoom = 40.0f;
-const float MinZoom = -40.0f;
-
-static float g_RotX = 30.0f;
-static float g_RotY = -30.0f;
-static Effekseer::Vector3D g_lightDirection = Effekseer::Vector3D(1, 1, 1);
-static float g_Zoom = 0.0f;
-const float PI = 3.14159265f;
-
-static bool g_mouseRotDirectionInvX = false;
-static bool g_mouseRotDirectionInvY = false;
-
-static bool g_mouseSlideDirectionInvX = false;
-static bool g_mouseSlideDirectionInvY = false;
-
-static int g_lastViewWidth = 0;
-static int g_lastViewHeight = 0;
-
 bool Combine(const char16_t* rootPath, const char16_t* treePath, char16_t* dst, int dst_length)
 {
 	int rootPathLength = 0;
@@ -164,17 +134,17 @@ bool Combine(const char16_t* rootPath, const char16_t* treePath, char16_t* dst, 
 	return true;
 }
 
-void SetZoom(float zoom)
+void Native::SetZoom(float zoom)
 {
 	g_Zoom = Effekseer::Max(MinZoom, Effekseer::Min(MaxZoom, zoom));
 }
 
-float GetDistance()
+float Native::GetDistance()
 {
 	return DistanceBase * powf(ZoomDistanceFactor, g_Zoom);
 }
 
-float GetOrthoScale()
+float Native::GetOrthoScale()
 {
 	return OrthoScaleBase / powf(ZoomDistanceFactor, g_Zoom);
 }
@@ -199,7 +169,7 @@ ViewerParamater::ViewerParamater()
 	, CullingZ(0)
 
 	, Distortion(Effekseer::Tool::DistortionType::Current)
-	, RenderingMode(RenderMode::Normal)
+	, RenderingMode(Effekseer::Tool::RenderingMethodType::Normal)
 	, ViewerMode(ViewMode::_3D)
 
 {
@@ -207,44 +177,28 @@ ViewerParamater::ViewerParamater()
 
 static Effekseer::Manager::DrawParameter drawParameter;
 
-static ::Effekseer::Effect* effect_ = NULL;
-static ::EffekseerTool::Sound* sound_ = NULL;
-static std::map<std::u16string, Effekseer::TextureData*> m_textures;
-static std::map<std::u16string, Effekseer::Model*> m_models;
+static ::EffekseerTool::Sound* sound_ = nullptr;
+static std::map<std::u16string, Effekseer::TextureRef> m_textures;
+static std::map<std::u16string, Effekseer::ModelRef> m_models;
 static std::map<std::u16string, std::shared_ptr<efk::ImageResource>> g_imageResources;
-static std::map<std::u16string, Effekseer::MaterialData*> g_materials_;
+static std::map<std::u16string, Effekseer::MaterialRef> g_materials_;
 
 static ::Effekseer::Vector3D g_focus_position;
 
-static ::Effekseer::Client* g_client = NULL;
+static ::Effekseer::Client* g_client = nullptr;
 
 static efk::DeviceType g_deviceType = efk::DeviceType::OpenGL;
 
 Native::TextureLoader::TextureLoader(efk::Graphics* graphics, Effekseer::ColorSpaceType colorSpaceType)
 {
-	if (g_deviceType == efk::DeviceType::OpenGL)
-	{
-		m_originalTextureLoader = EffekseerRendererGL::CreateTextureLoader(nullptr, colorSpaceType);
-	}
-#ifdef _WIN32
-	else if (g_deviceType == efk::DeviceType::DirectX11)
-	{
-		auto g = static_cast<efk::GraphicsDX11*>(graphics);
-		m_originalTextureLoader = EffekseerRendererDX11::CreateTextureLoader(g->GetDevice(), g->GetContext(), nullptr, colorSpaceType);
-	}
-	else
-	{
-		assert(0);
-	}
-#endif
+	m_originalTextureLoader = EffekseerRenderer::CreateTextureLoader(graphics->GetGraphicsDevice(), nullptr, colorSpaceType);
 }
 
 Native::TextureLoader::~TextureLoader()
 {
-	ES_SAFE_DELETE(m_originalTextureLoader);
 }
 
-Effekseer::TextureData* Native::TextureLoader::Load(const EFK_CHAR* path, ::Effekseer::TextureType textureType)
+Effekseer::TextureRef Native::TextureLoader::Load(const char16_t* path, ::Effekseer::TextureType textureType)
 {
 	char16_t dst[260];
 	Combine(RootPath.c_str(), (const char16_t*)path, dst, 260);
@@ -257,7 +211,7 @@ Effekseer::TextureData* Native::TextureLoader::Load(const EFK_CHAR* path, ::Effe
 	}
 	else
 	{
-		auto t = m_originalTextureLoader->Load((EFK_CHAR*)dst, textureType);
+		auto t = m_originalTextureLoader->Load((char16_t*)dst, textureType);
 
 		if (t != nullptr)
 		{
@@ -270,12 +224,12 @@ Effekseer::TextureData* Native::TextureLoader::Load(const EFK_CHAR* path, ::Effe
 	return nullptr;
 }
 
-void Native::TextureLoader::Unload(Effekseer::TextureData* data)
+void Native::TextureLoader::Unload(Effekseer::TextureRef data)
 {
 	// m_originalTextureLoader->Unload(data);
 }
 
-Native::SoundLoader::SoundLoader(Effekseer::SoundLoader* loader)
+Native::SoundLoader::SoundLoader(Effekseer::SoundLoaderRef loader)
 	: m_loader(loader)
 {
 }
@@ -284,17 +238,17 @@ Native::SoundLoader::~SoundLoader()
 {
 }
 
-void* Native::SoundLoader::Load(const EFK_CHAR* path)
+::Effekseer::SoundDataRef Native::SoundLoader::Load(const char16_t* path)
 {
-	EFK_CHAR dst[260];
+	char16_t dst[260];
 	Combine(RootPath.c_str(), (const char16_t*)path, (char16_t*)dst, 260);
 
 	return m_loader->Load(dst);
 }
 
-void Native::SoundLoader::Unload(void* handle)
+void Native::SoundLoader::Unload(::Effekseer::SoundDataRef soundData)
 {
-	m_loader->Unload(handle);
+	m_loader->Unload(soundData);
 }
 
 Native::ModelLoader::ModelLoader(efk::Graphics* graphics)
@@ -306,13 +260,13 @@ Native::ModelLoader::~ModelLoader()
 {
 }
 
-void* Native::ModelLoader::Load(const EFK_CHAR* path)
+Effekseer::ModelRef Native::ModelLoader::Load(const char16_t* path)
 {
 	char16_t dst[260];
 	Combine(RootPath.c_str(), (const char16_t*)path, dst, 260);
 
 	std::u16string key(dst);
-	Effekseer::Model* model = NULL;
+	Effekseer::ModelRef model = nullptr;
 
 	if (m_models.count(key) > 0)
 	{
@@ -320,49 +274,22 @@ void* Native::ModelLoader::Load(const EFK_CHAR* path)
 	}
 	else
 	{
-		if (g_deviceType == efk::DeviceType::OpenGL)
+		auto loader = ::EffekseerRenderer::CreateModelLoader(graphics_->GetGraphicsDevice());
+		auto m = loader->Load((const char16_t*)dst);
+
+		if (m != nullptr)
 		{
-			auto loader = ::EffekseerRendererGL::CreateModelLoader();
-			auto m = (Effekseer::Model*)loader->Load((const EFK_CHAR*)dst);
-
-			if (m != nullptr)
-			{
-				m_models[key] = m;
-			}
-
-			ES_SAFE_DELETE(loader);
-
-			return m;
+			m_models[key] = m;
 		}
-#ifdef _WIN32
-		else if (g_deviceType == efk::DeviceType::DirectX11)
-		{
-			auto g = static_cast<efk::GraphicsDX11*>(graphics_);
-			auto loader = ::EffekseerRendererDX11::CreateModelLoader(g->GetDevice());
-			auto m = (Effekseer::Model*)loader->Load((const EFK_CHAR*)dst);
 
-			if (m != nullptr)
-			{
-				m_models[key] = m;
-			}
-
-			ES_SAFE_DELETE(loader);
-
-			return m;
-		}
-		else
-		{
-			assert(0);
-			return nullptr;
-		}
-#endif
+		return m;
 	}
 }
 
-void Native::ModelLoader::Unload(void* data)
+void Native::ModelLoader::Unload(Effekseer::ModelRef data)
 {
 	/*
-	if( data != NULL )
+	if( data != nullptr )
 	{
 		IDirect3DTexture9* texture = (IDirect3DTexture9*)data;
 		texture->Release();
@@ -370,17 +297,16 @@ void Native::ModelLoader::Unload(void* data)
 	*/
 }
 
-Native::MaterialLoader::MaterialLoader(EffekseerRenderer::Renderer* renderer)
+Native::MaterialLoader::MaterialLoader(const EffekseerRenderer::RendererRef& renderer)
 {
 	loader_ = renderer->CreateMaterialLoader();
 }
 
 Native::MaterialLoader::~MaterialLoader()
 {
-	ES_SAFE_DELETE(loader_);
 }
 
-Effekseer::MaterialData* Native::MaterialLoader::Load(const EFK_CHAR* path)
+Effekseer::MaterialRef Native::MaterialLoader::Load(const char16_t* path)
 {
 	if (loader_ == nullptr)
 	{
@@ -399,7 +325,7 @@ Effekseer::MaterialData* Native::MaterialLoader::Load(const EFK_CHAR* path)
 	else
 	{
 		std::shared_ptr<Effekseer::StaticFile> staticFile;
-		::Effekseer::MaterialData* t = nullptr;
+		::Effekseer::MaterialRef t = nullptr;
 
 		if (staticFile == nullptr)
 		{
@@ -438,14 +364,12 @@ void Native::MaterialLoader::ReleaseAll()
 	materialFiles_.clear();
 }
 
-::Effekseer::Effect* Native::GetEffect()
+::Effekseer::EffectRef Native::GetEffect()
 {
 	return effect_;
 }
 
 Native::Native()
-	: m_time(0)
-	, m_step(1)
 {
 	g_client = Effekseer::Client::Create();
 
@@ -461,7 +385,6 @@ Native::~Native()
 	spdlog::trace("Begin Native::~Native()");
 
 	ES_SAFE_DELETE(g_client);
-	ES_SAFE_RELEASE(setting_);
 
 	commandQueueToMaterialEditor_->Stop();
 	commandQueueToMaterialEditor_.reset();
@@ -475,7 +398,6 @@ Native::~Native()
 bool Native::CreateWindow_Effekseer(void* pHandle, int width, int height, bool isSRGBMode, efk::DeviceType deviceType)
 {
 	spdlog::trace("Begin Native::CreateWindow_Effekseer");
-	m_isSRGBMode = isSRGBMode;
 	g_deviceType = deviceType;
 
 	// because internal buffer is 16bit
@@ -497,7 +419,7 @@ bool Native::CreateWindow_Effekseer(void* pHandle, int width, int height, bool i
 #endif
 	spdlog::trace("OK new ::efk::Graphics");
 
-	if (!graphics_->Initialize(pHandle, width, height, m_isSRGBMode))
+	if (!graphics_->Initialize(pHandle, width, height))
 	{
 		spdlog::trace("Graphics::Initialize(false)");
 		ES_SAFE_DELETE(graphics_);
@@ -517,15 +439,16 @@ bool Native::CreateWindow_Effekseer(void* pHandle, int width, int height, bool i
 			{
 				setting_ = Effekseer::Setting::Create();
 
-				m_textureLoader = new TextureLoader(graphics_,
-													isSRGBMode ? ::Effekseer::ColorSpaceType::Linear : ::Effekseer::ColorSpaceType::Gamma);
+				textureLoader_ = Effekseer::RefPtr<TextureLoader>(new TextureLoader(graphics_,
+																					isSRGBMode ? ::Effekseer::ColorSpaceType::Linear : ::Effekseer::ColorSpaceType::Gamma));
 
-				setting_->SetTextureLoader(m_textureLoader);
+				setting_->SetTextureLoader(textureLoader_);
 
-				// TODO : refactor
-				setting_->SetModelLoader(new ModelLoader(graphics_));
+				modelLoader_ = Effekseer::RefPtr<ModelLoader>(new ModelLoader(graphics_));
 
-				setting_->SetCurveLoader(new ::Effekseer::CurveLoader());
+				setting_->SetModelLoader(modelLoader_);
+
+				setting_->SetCurveLoader(Effekseer::CurveLoaderRef(new ::Effekseer::CurveLoader()));
 			}
 
 			//manager_->SetSetting(setting_);
@@ -558,7 +481,8 @@ bool Native::CreateWindow_Effekseer(void* pHandle, int width, int height, bool i
 	{
 		mainScreen_->GetMamanager()->SetSoundPlayer(sound_->GetSound()->CreateSoundPlayer());
 
-		setting_->SetSoundLoader(new SoundLoader(sound_->GetSound()->CreateSoundLoader()));
+		soundLoader_ = Effekseer::RefPtr<SoundLoader>(new SoundLoader(sound_->GetSound()->CreateSoundLoader()));
+		setting_->SetSoundLoader(soundLoader_);
 	}
 
 	if (mainScreen_ != nullptr && sound_ != nullptr)
@@ -566,8 +490,8 @@ bool Native::CreateWindow_Effekseer(void* pHandle, int width, int height, bool i
 		mainScreen_->SetSound(sound_);
 	}
 
-	// TODO : refactor
-	mainScreen_->GetMamanager()->GetSetting()->SetMaterialLoader(new MaterialLoader(mainScreen_->GetRenderer()));
+	materialLoader_ = Effekseer::RefPtr<MaterialLoader>(new MaterialLoader(mainScreen_->GetRenderer()));
+	mainScreen_->GetMamanager()->GetSetting()->SetMaterialLoader(materialLoader_);
 
 	spdlog::trace("End Native::CreateWindow_Effekseer (true)");
 
@@ -585,13 +509,15 @@ bool Native::UpdateWindow()
 	::Effekseer::Matrix43 mat, mat_rot_x, mat_rot_y;
 	mat_rot_x.RotationX(-g_RotX / 180.0f * PI);
 
+	drawParameter.IsSortingEffectsEnabled = true;
+
 	if (viewPointCtrl_.IsRightHand)
 	{
 		mat_rot_y.RotationY(-g_RotY / 180.0f * PI);
 		::Effekseer::Matrix43::Multiple(mat, mat_rot_x, mat_rot_y);
 		::Effekseer::Vector3D::Transform(position, position, mat);
 
-		Effekseer::Vector3D::Normal(drawParameter.CameraDirection, position);
+		Effekseer::Vector3D::Normal(drawParameter.CameraFrontDirection, -position);
 
 		position.X += g_focus_position.X;
 		position.Y += g_focus_position.Y;
@@ -612,7 +538,7 @@ bool Native::UpdateWindow()
 		::Effekseer::Vector3D temp_focus = g_focus_position;
 		temp_focus.Z = -temp_focus.Z;
 
-		Effekseer::Vector3D::Normal(drawParameter.CameraDirection, position);
+		Effekseer::Vector3D::Normal(drawParameter.CameraFrontDirection, -position);
 
 		position.X += temp_focus.X;
 		position.Y += temp_focus.Y;
@@ -672,33 +598,41 @@ bool Native::DestroyWindow()
 
 	g_imageResources.clear();
 
-	ES_SAFE_RELEASE(effect_);
-
 	mainScreen_.reset();
 
 	ES_SAFE_DELETE(graphics_);
+
+	textureLoader_.Reset();
+	effect_.Reset();
+	setting_.Reset();
+	materialLoader_.Reset();
 
 	return true;
 }
 
 bool Native::LoadEffect(void* pData, int size, const char16_t* Path)
 {
-	assert(effect_ == NULL);
+	assert(effect_ == nullptr);
 
 	//handles_.clear();
 
-	((TextureLoader*)setting_->GetTextureLoader())->RootPath = std::u16string(Path);
-	((ModelLoader*)setting_->GetModelLoader())->RootPath = std::u16string(Path);
-	((MaterialLoader*)setting_->GetMaterialLoader())->RootPath = std::u16string(Path);
+	if (textureLoader_ != nullptr)
+		textureLoader_->RootPath = std::u16string(Path);
+	if (modelLoader_ != nullptr)
+		modelLoader_->RootPath = std::u16string(Path);
+	if (materialLoader_ != nullptr)
+		materialLoader_->RootPath = std::u16string(Path);
+	if (soundLoader_ != nullptr)
+		soundLoader_->RootPath = std::u16string(Path);
 
-	SoundLoader* soundLoader = (SoundLoader*)setting_->GetSoundLoader();
-	if (soundLoader)
+	// To release caches
+	if (effect_ != nullptr)
 	{
-		soundLoader->RootPath = std::u16string(Path);
+		effect_->UnloadResources();
 	}
 
 	effect_ = Effekseer::Effect::Create(setting_, pData, size);
-	assert(effect_ != NULL);
+	assert(effect_ != nullptr);
 
 	if (mainScreen_ != nullptr)
 	{
@@ -715,7 +649,14 @@ bool Native::RemoveEffect()
 		mainScreen_->Reset();
 	}
 
-	ES_SAFE_RELEASE(effect_);
+	// To release caches
+	if (effect_ != nullptr)
+	{
+		effect_->UnloadResources();
+	}
+
+	effect_.Reset();
+
 	return true;
 }
 
@@ -783,12 +724,12 @@ bool Native::Rotate(float x, float y)
 
 bool Native::Slide(float x, float y)
 {
-	if (::g_mouseSlideDirectionInvX)
+	if (g_mouseSlideDirectionInvX)
 	{
 		x = -x;
 	}
 
-	if (::g_mouseSlideDirectionInvY)
+	if (g_mouseSlideDirectionInvY)
 	{
 		y = -y;
 	}
@@ -838,12 +779,11 @@ bool Native::SetRandomSeed(int seed)
 
 void* Native::RenderView(int32_t width, int32_t height)
 {
-	mainScreen_->GetRenderer()->SetRenderMode((Effekseer::RenderMode)viewPointCtrl_.RenderingMode);
 	viewPointCtrl_.SetScreenSize(width, height);
 	mainScreenConfig_.DrawParameter = drawParameter;
 	mainScreenConfig_.CameraMatrix = viewPointCtrl_.GetCameraMatrix();
 	mainScreenConfig_.ProjectionMatrix = viewPointCtrl_.GetProjectionMatrix();
-	mainScreenConfig_.RenderMode = viewPointCtrl_.RenderingMode;
+	mainScreenConfig_.RenderingMethod = viewPointCtrl_.RenderingMode;
 	mainScreen_->SetConfig(mainScreenConfig_);
 	mainScreen_->Resize(Effekseer::Tool::Vector2DI(width, height));
 	mainScreen_->Render();
@@ -856,7 +796,7 @@ bool Native::BeginRecord(const RecordingParameter& recordingParameter)
 		return false;
 
 	recorder.reset(new Effekseer::Tool::Recorder());
-	return recorder->Begin(mainScreen_, graphics_, setting_, recordingParameter, Effekseer::Tool::Vector2DI(mainScreen_->GuideWidth, mainScreen_->GuideHeight), m_isSRGBMode, behavior_, effect_);
+	return recorder->Begin(mainScreen_, graphics_, setting_, recordingParameter, Effekseer::Tool::Vector2DI(mainScreen_->GuideWidth, mainScreen_->GuideHeight), mainScreen_->GetIsSRGBMode(), behavior_, effect_);
 }
 
 bool Native::StepRecord(int frames)
@@ -937,7 +877,7 @@ ViewerParamater Native::GetViewerParamater()
 	paramater.RateOfMagnification = viewPointCtrl_.RateOfMagnification;
 
 	paramater.Distortion = (Effekseer::Tool::DistortionType)mainScreenConfig_.Distortion;
-	paramater.RenderingMode = (RenderMode)viewPointCtrl_.RenderingMode;
+	paramater.RenderingMode = viewPointCtrl_.RenderingMode;
 
 	return paramater;
 }
@@ -971,7 +911,7 @@ void Native::SetViewerParamater(ViewerParamater& paramater)
 
 	mainScreen_->RendersGuide = paramater.RendersGuide;
 	mainScreenConfig_.Distortion = (Effekseer::Tool::DistortionType)paramater.Distortion;
-	viewPointCtrl_.RenderingMode = (::Effekseer::RenderMode)paramater.RenderingMode;
+	viewPointCtrl_.RenderingMode = paramater.RenderingMode;
 }
 
 Effekseer::Tool::ViewerEffectBehavior Native::GetEffectBehavior()
@@ -1014,7 +954,7 @@ bool Native::InvalidateTextureCache()
 		auto it_end = m_textures.end();
 		while (it != it_end)
 		{
-			m_textureLoader->GetOriginalTextureLoader()->Unload((*it).second);
+			textureLoader_->GetOriginalTextureLoader()->Unload((*it).second);
 			++it;
 		}
 		m_textures.clear();
@@ -1025,17 +965,25 @@ bool Native::InvalidateTextureCache()
 		auto it_end = m_models.end();
 		while (it != it_end)
 		{
-			ES_SAFE_DELETE((*it).second);
+			modelLoader_->Unload((*it).second);
 			++it;
 		}
 		m_models.clear();
 	}
 
+	if (materialLoader_ != nullptr)
 	{
-		((MaterialLoader*)setting_->GetMaterialLoader())->ReleaseAll();
+		materialLoader_->ReleaseAll();
 	}
 
 	return true;
+}
+
+void Native::SetGroundParameters(bool shown, float height, int32_t extent)
+{
+	mainScreenConfig_.IsGroundShown = shown;
+	mainScreenConfig_.GroundHeight = height;
+	mainScreenConfig_.GroundExtent = extent;
 }
 
 void Native::SetIsGridShown(bool value, bool xy, bool xz, bool yz)
@@ -1077,7 +1025,7 @@ void Native::SetMouseInverseFlag(bool rotX, bool rotY, bool slideX, bool slideY)
 
 void Native::SetStep(int32_t step)
 {
-	m_step = step;
+	mainScreen_->SetStep(step);
 }
 
 bool Native::StartNetwork(const char* host, uint16_t port)
@@ -1097,14 +1045,12 @@ bool Native::IsConnectingNetwork()
 
 void Native::SendDataByNetwork(const char16_t* key, void* data, int size, const char16_t* path)
 {
-	g_client->Reload((const EFK_CHAR*)key, data, size);
+	g_client->Reload((const char16_t*)key, data, size);
 }
 
 void Native::SetLightDirection(float x, float y, float z)
 {
-	g_lightDirection = Effekseer::Vector3D(x, y, z);
-
-	Effekseer::Vector3D temp = g_lightDirection;
+	Effekseer::Vector3D temp = Effekseer::Vector3D(x, y, z);
 
 	if (!viewPointCtrl_.IsRightHand)
 	{
@@ -1167,25 +1113,8 @@ efk::ImageResource* Native::LoadImageResource(const char16_t* path)
 		return it->second.get();
 	}
 
-	std::shared_ptr<Effekseer::TextureLoader> loader = nullptr;
-	if (g_deviceType == efk::DeviceType::OpenGL)
-	{
-		auto r = (EffekseerRendererGL::Renderer*)mainScreen_->GetRenderer();
-		loader = std::shared_ptr<Effekseer::TextureLoader>(EffekseerRendererGL::CreateTextureLoader());
-	}
-#ifdef _WIN32
-	else if (g_deviceType == efk::DeviceType::DirectX11)
-	{
-		auto r = (EffekseerRendererDX11::Renderer*)mainScreen_->GetRenderer();
-		loader = std::shared_ptr<Effekseer::TextureLoader>(EffekseerRendererDX11::CreateTextureLoader(r->GetDevice(), r->GetContext()));
-	}
-	else
-	{
-		assert(0);
-	}
-#endif
-
-	auto resource = std::make_shared<efk::ImageResource>(loader);
+	auto loader = EffekseerRenderer::CreateTextureLoader(graphics_->GetGraphicsDevice());
+	auto resource = std::make_shared<efk::ImageResource>(g_deviceType, loader);
 	resource->SetPath(path);
 
 	if (resource->Validate())
@@ -1263,7 +1192,7 @@ void Native::OpenOrCreateMaterial(const char16_t* path)
 
 	char u8path[260];
 
-	Effekseer::ConvertUtf16ToUtf8((int8_t*)u8path, 260, (int16_t*)path);
+	Effekseer::ConvertUtf16ToUtf8(u8path, 260, path);
 
 	IPC::CommandData commandData;
 	commandData.Type = IPC::CommandType::OpenOrCreateMaterial;
@@ -1304,7 +1233,7 @@ void Native::SetFileLogger(const char16_t* path)
 	auto fileLogger = spdlog::basic_logger_mt("logger", wpath.generic_string().c_str());
 #else
 	char cpath[512];
-	Effekseer::ConvertUtf16ToUtf8(reinterpret_cast<int8_t*>(cpath), 512, reinterpret_cast<const int16_t*>(path));
+	Effekseer::ConvertUtf16ToUtf8(cpath, 512, path);
 	auto fileLogger = spdlog::basic_logger_mt("logger", cpath);
 #endif
 
@@ -1319,7 +1248,7 @@ void Native::SetFileLogger(const char16_t* path)
 	spdlog::trace("End Native::SetFileLogger");
 }
 
-EffekseerRenderer::Renderer* Native::GetRenderer()
+const EffekseerRenderer::RendererRef& Native::GetRenderer()
 {
 	return mainScreen_->GetRenderer();
 }

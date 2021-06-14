@@ -7,11 +7,11 @@
 //----------------------------------------------------------------------------------
 #include "Effekseer.Base.h"
 
-#include "SIMD/Effekseer.Mat43f.h"
-#include "SIMD/Effekseer.Mat44f.h"
-#include "SIMD/Effekseer.Vec2f.h"
-#include "SIMD/Effekseer.Vec3f.h"
-#include "SIMD/Effekseer.Vec4f.h"
+#include "SIMD/Mat43f.h"
+#include "SIMD/Mat44f.h"
+#include "SIMD/Vec2f.h"
+#include "SIMD/Vec3f.h"
+#include "SIMD/Vec4f.h"
 
 #include "Effekseer.Color.h"
 #include "Effekseer.IntrusiveList.h"
@@ -38,18 +38,18 @@ struct InstanceCustomData
 	{
 		struct
 		{
-			Vec2f start;
-			Vec2f end;
+			SIMD::Vec2f start;
+			SIMD::Vec2f end;
 		} easing;
 
 		struct
 		{
-			Vec2f value;
+			SIMD::Vec2f value;
 		} random;
 
 		struct
 		{
-			Vec2f offset;
+			SIMD::Vec2f offset;
 		} fcruve;
 
 		struct
@@ -72,16 +72,17 @@ protected:
 	InstanceCustomData customDataValues1;
 	InstanceCustomData customDataValues2;
 
-	Vec3f prevPosition_;
+	SIMD::Vec3f prevPosition_;
+	SIMD::Vec3f prevGlobalPosition_;
 
-	Vec3f parentPosition_;
-	Vec3f steeringVec_;
+	SIMD::Vec3f parentPosition_;
+	SIMD::Vec3f steeringVec_;
 
 public:
 	static const int32_t ChildrenMax = 16;
 
 	// マネージャ
-	Manager* m_pManager;
+	ManagerImplemented* m_pManager;
 
 	// パラメーター
 	EffectNodeImplemented* m_pEffectNode;
@@ -103,20 +104,8 @@ public:
 	// Random generator
 	RandObject m_randObject;
 
-	// グローバル位置
-	Vec3f m_GlobalPosition;
-	Vec3f m_GlobalVelocity;
+	LocalForceFieldInstance forceField_;
 
-	// グローバル位置補正
-	Vec3f m_GlobalRevisionLocation;
-	Vec3f m_GlobalRevisionVelocity;
-
-#ifdef OLD_LF
-	//! for noise
-	Vec3f modifyWithNoise_;
-#else
-	LocalForceFieldInstance localForceField_;
-#endif
 	// Color for binding
 	Color ColorInheritance;
 
@@ -133,25 +122,28 @@ public:
 	{
 		struct
 		{
-			Vec3f location;
+			SIMD::Vec3f location;
 		} fixed;
 
 		struct
 		{
-			Vec3f location;
-			Vec3f velocity;
-			Vec3f acceleration;
+			SIMD::Vec3f location;
+			SIMD::Vec3f velocity;
+			SIMD::Vec3f acceleration;
 		} random;
 
+		InstanceEasing<SIMD::Vec3f> easing;
+		/*
 		struct
 		{
-			Vec3f start;
-			Vec3f end;
+			SIMD::Vec3f start;
+			SIMD::Vec3f end;
 		} easing;
+		*/
 
 		struct
 		{
-			Vec3f offset;
+			SIMD::Vec3f offset;
 		} fcruve;
 
 		struct
@@ -165,26 +157,29 @@ public:
 	{
 		struct
 		{
-			Vec3f rotation;
+			SIMD::Vec3f rotation;
 		} fixed;
 
 		struct
 		{
-			Vec3f rotation;
-			Vec3f velocity;
-			Vec3f acceleration;
+			SIMD::Vec3f rotation;
+			SIMD::Vec3f velocity;
+			SIMD::Vec3f acceleration;
 		} random;
 
+		InstanceEasing<SIMD::Vec3f> easing;
+		/*
 		struct
 		{
-			Vec3f start;
-			Vec3f end;
+			SIMD::Vec3f start;
+			SIMD::Vec3f end;
 		} easing;
+		*/
 
 		struct
 		{
 			float rotation;
-			Vec3f axis;
+			SIMD::Vec3f axis;
 
 			union
 			{
@@ -195,17 +190,13 @@ public:
 					float acceleration;
 				} random;
 
-				struct
-				{
-					float start;
-					float end;
-				} easing;
+				InstanceEasing<float> easing;
 			};
 		} axis;
 
 		struct
 		{
-			Vec3f offset;
+			SIMD::Vec3f offset;
 		} fcruve;
 
 	} rotation_values;
@@ -214,21 +205,25 @@ public:
 	{
 		struct
 		{
-			Vec3f scale;
+			SIMD::Vec3f scale;
 		} fixed;
 
 		struct
 		{
-			Vec3f scale;
-			Vec3f velocity;
-			Vec3f acceleration;
+			SIMD::Vec3f scale;
+			SIMD::Vec3f velocity;
+			SIMD::Vec3f acceleration;
 		} random;
 
+		InstanceEasing<SIMD::Vec3f> easing;
+
+		/*
 		struct
 		{
-			Vec3f start;
-			Vec3f end;
+			SIMD::Vec3f start;
+			SIMD::Vec3f end;
 		} easing;
+		*/
 
 		struct
 		{
@@ -237,16 +232,17 @@ public:
 			float acceleration;
 		} single_random;
 
-		struct
-		{
-			float start;
-			float end;
-		} single_easing;
+		InstanceEasing<float> single_easing;
 
 		struct
 		{
-			Vec3f offset;
+			SIMD::Vec3f offset;
 		} fcruve;
+
+		struct
+		{
+			float offset;
+		} single_fcruve;
 
 	} scaling_values;
 
@@ -282,43 +278,16 @@ public:
 	RectF uvAreaOffsets[ParameterRendererCommon::UVParameterNum];
 
 	// Scroll speed for UV
-	Vec2f uvScrollSpeeds[ParameterRendererCommon::UVParameterNum];
-
-	// The number of generated chiledren. (fixed size)
-	int32_t m_fixedGeneratedChildrenCount[ChildrenMax];
-
-	// The number of maximum generated chiledren. (fixed size)
-	int32_t fixedMaxGenerationChildrenCount_[ChildrenMax];
-
-	// The time to generate next child.  (fixed size)
-	float m_fixedNextGenerationTime[ChildrenMax];
-
-	// The number of generated chiledren. (flexible size)
-	int32_t* m_flexibleGeneratedChildrenCount;
-
-	// The number of maximum generated chiledren. (flexible size)
-	int32_t* flexibleMaxGenerationChildrenCount_ = nullptr;
-
-	// The time to generate next child.  (flexible size)
-	float* m_flexibleNextGenerationTime;
-
-	// The number of generated chiledren. (actually used)
-	int32_t* m_generatedChildrenCount;
-
-	// The number of maximum generated chiledren. (actually used)
-	int32_t* maxGenerationChildrenCount = nullptr;
-
-	// The time to generate next child.  (actually used)
-	float* m_nextGenerationTime;
+	SIMD::Vec2f uvScrollSpeeds[ParameterRendererCommon::UVParameterNum];
 
 	// Spawning Method matrix
-	Mat43f m_GenerationLocation;
+	SIMD::Mat43f m_GenerationLocation;
 
-	// 変換用行列
-	Mat43f m_GlobalMatrix43;
+	// a transform matrix in the world coordinate
+	SIMD::Mat43f m_GlobalMatrix43;
 
-	// 親の変換用行列
-	Mat43f m_ParentMatrix;
+	// parent's transform matrix
+	SIMD::Mat43f m_ParentMatrix;
 
 	// FirstUpdate実行前
 	bool m_IsFirstTime;
@@ -355,11 +324,7 @@ public:
 			float end_threshold;
 		} four_point_interpolation;
 
-		struct
-		{
-			float start;
-			float end;
-		} easing;
+		InstanceEasing<float> easing;
 
 		struct
 		{
@@ -370,38 +335,8 @@ public:
 
 	float m_AlphaThreshold;
 
-	//! calculate dynamic equation and assign a result
-	template <typename T, typename U>
-	void ApplyEq(T& dstParam, Effect* e, InstanceGlobal* instg, IRandObject* rand, int dpInd, const U& originalParam);
-
-	//! calculate dynamic equation and return a result
-	template <typename S>
-	Vec3f ApplyEq(Effect* e,
-				  InstanceGlobal* instg,
-				  IRandObject* rand,
-				  const int& dpInd,
-				  const Vec3f& originalParam,
-				  const S& scale,
-				  const S& scaleInv);
-
-	//! calculate dynamic equation and return a result
-	random_float ApplyEq(Effect* e, InstanceGlobal* instg, IRandObject* rand, const RefMinMax& dpInd, random_float originalParam);
-
-	//! calculate dynamic equation and return a result
-	template <typename S>
-	random_vector3d ApplyEq(Effect* e,
-							InstanceGlobal* instg,
-							IRandObject* rand,
-							const RefMinMax& dpInd,
-							random_vector3d originalParam,
-							const S& scale,
-							const S& scaleInv);
-
-	//! calculate dynamic equation and return a result
-	random_int ApplyEq(Effect* e, InstanceGlobal* instg, IRandObject* rand, const RefMinMax& dpInd, random_int originalParam);
-
 	// コンストラクタ
-	Instance(Manager* pManager, EffectNode* pEffectNode, InstanceContainer* pContainer, InstanceGroup* pGroup);
+	Instance(ManagerImplemented* pManager, EffectNodeImplemented* pEffectNode, InstanceContainer* pContainer, InstanceGroup* pGroup);
 
 	// デストラクタ
 	virtual ~Instance();
@@ -426,12 +361,12 @@ public:
 	/**
 		@brief	行列の取得
 	*/
-	const Mat43f& GetGlobalMatrix43() const;
+	const SIMD::Mat43f& GetGlobalMatrix43() const;
 
 	/**
 		@brief	初期化
 	*/
-	void Initialize(Instance* parent, int32_t instanceNumber, const Mat43f& globalMatrix);
+	void Initialize(Instance* parent, int32_t instanceNumber, const SIMD::Mat43f& globalMatrix);
 
 	/**
 		@brief	初回の更新
@@ -446,7 +381,7 @@ public:
 	/**
 		@brief	Draw instance
 	*/
-	void Draw(Instance* next);
+	void Draw(Instance* next, void* userData);
 
 	/**
 		@brief	破棄
@@ -467,6 +402,8 @@ public:
 		return m_randObject;
 	}
 
+	bool AreChildrenActive() const;
+
 private:
 	/**
 		@brief	行列の更新
@@ -477,11 +414,6 @@ private:
 		@brief	行列の更新
 	*/
 	void CalculateParentMatrix(float deltaFrame);
-
-	/**
-		@brief	絶対パラメータの反映
-	*/
-	void ModifyMatrixFromLocationAbs(float deltaFrame);
 
 	void ApplyDynamicParameterToFixedLocation();
 

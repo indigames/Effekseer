@@ -102,38 +102,33 @@ void main()
 class DistortingCallbackVulkan : public EffekseerRenderer::DistortingCallback
 {
 	EffectPlatformVulkan* platform_ = nullptr;
-	::EffekseerRenderer::Renderer* renderer_ = nullptr;
-	Effekseer::TextureData* textureData_ = nullptr;
+	Effekseer::Backend::TextureRef texture_ = nullptr;
 
 public:
-	DistortingCallbackVulkan(EffectPlatformVulkan* platform, ::EffekseerRenderer::Renderer* renderer)
-		: platform_(platform), renderer_(renderer)
+	DistortingCallbackVulkan(EffectPlatformVulkan* platform)
+		: platform_(platform)
 	{
 	}
 
 	virtual ~DistortingCallbackVulkan()
 	{
-
-		if (textureData_ != nullptr)
-		{
-			EffekseerRendererVulkan::DeleteTextureData(renderer_, textureData_);
-		}
+		texture_.Reset();
 	}
 
-	virtual bool OnDistorting() override
+	virtual bool OnDistorting(EffekseerRenderer::Renderer* renderer) override
 	{
 
-		if (textureData_ == nullptr)
+		if (texture_ == nullptr)
 		{
 			auto tex = (LLGI::TextureVulkan*)(platform_->GetCheckedTexture());
 			EffekseerRendererVulkan::VulkanImageInfo info;
 			info.image = static_cast<VkImage>(tex->GetImage());
 			info.format = static_cast<VkFormat>(tex->GetVulkanFormat());
 			info.aspect = VK_IMAGE_ASPECT_COLOR_BIT;
-			textureData_ = EffekseerRendererVulkan::CreateTextureData(renderer_, info);
+			texture_ = EffekseerRendererVulkan::CreateTexture(renderer->GetGraphicsDevice(), info);
 		}
 
-		renderer_->SetBackgroundTexture(textureData_);
+		renderer->SetBackground(texture_);
 
 		return true;
 	}
@@ -160,7 +155,7 @@ void EffectPlatformVulkan::CreateShaders()
 	{
 		LLGI::DataStructure d;
 		d.Data = b.data();
-		d.Size = b.size();
+		d.Size = static_cast<int32_t>(b.size());
 		data_vs.push_back(d);
 	}
 
@@ -168,15 +163,15 @@ void EffectPlatformVulkan::CreateShaders()
 	{
 		LLGI::DataStructure d;
 		d.Data = b.data();
-		d.Size = b.size();
+		d.Size = static_cast<int32_t>(b.size());
 		data_ps.push_back(d);
 	}
 
-	shader_vs_ = graphics_->CreateShader(data_vs.data(), data_vs.size());
-	shader_ps_ = graphics_->CreateShader(data_ps.data(), data_ps.size());
+	shader_vs_ = graphics_->CreateShader(data_vs.data(), static_cast<int32_t>(data_vs.size()));
+	shader_ps_ = graphics_->CreateShader(data_ps.data(), static_cast<int32_t>(data_ps.size()));
 }
 
-EffekseerRenderer::Renderer* EffectPlatformVulkan::CreateRenderer()
+EffekseerRenderer::RendererRef EffectPlatformVulkan::CreateRenderer()
 {
 	auto g = static_cast<LLGI::GraphicsVulkan*>(graphics_);
 	auto p = static_cast<LLGI::PlatformVulkan*>(platform_);
@@ -194,10 +189,10 @@ EffekseerRenderer::Renderer* EffectPlatformVulkan::CreateRenderer()
 													  renderPassInfo,
 													  10000);
 
-	renderer->SetDistortingCallback(new DistortingCallbackVulkan(this, renderer));
+	renderer->SetDistortingCallback(new DistortingCallbackVulkan(this));
 
-	sfMemoryPoolEfk_ = EffekseerRendererVulkan::CreateSingleFrameMemoryPool(renderer);
-	commandListEfk_ = EffekseerRendererVulkan::CreateCommandList(renderer, sfMemoryPoolEfk_);
+	sfMemoryPoolEfk_ = EffekseerRenderer::CreateSingleFrameMemoryPool(renderer->GetGraphicsDevice());
+	commandListEfk_ = EffekseerRenderer::CreateCommandList(renderer->GetGraphicsDevice(), sfMemoryPoolEfk_);
 
 	CreateResources();
 
@@ -214,7 +209,7 @@ void EffectPlatformVulkan::BeginRendering()
 {
 	EffectPlatformLLGI::BeginRendering();
 
-	auto cl = static_cast<LLGI::CommandListVulkan*>(commandList_);
+	auto cl = static_cast<LLGI::CommandListVulkan*>(commandList_.get());
 	EffekseerRendererVulkan::BeginCommandList(commandListEfk_, static_cast<VkCommandBuffer>(cl->GetCommandBuffer()));
 	GetRenderer()->SetCommandList(commandListEfk_);
 }

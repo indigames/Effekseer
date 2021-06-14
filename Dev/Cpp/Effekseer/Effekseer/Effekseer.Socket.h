@@ -11,7 +11,19 @@
 #include <stdio.h>
 
 #if defined(_WIN32) && !defined(_PS4)
-#include <windows.h>
+
+#ifdef __EFFEKSEER_FOR_UE4__
+#include "Windows/AllowWindowsPlatformTypes.h"
+#endif
+#define _WINSOCK_DEPRECATED_NO_WARNINGS
+#define _WINSOCKAPI_
+#include <winsock2.h>
+#pragma comment(lib, "ws2_32.lib")
+
+#ifdef __EFFEKSEER_FOR_UE4__
+#include "Windows/HideWindowsPlatformTypes.h"
+#endif
+
 #else
 #include <arpa/inet.h>
 #include <netinet/in.h>
@@ -55,18 +67,6 @@ typedef struct in_addr IN_ADDR;
 typedef struct sockaddr_in SOCKADDR_IN;
 typedef struct sockaddr SOCKADDR;
 
-#endif
-
-#if defined(_WIN32) && !defined(_PS4)
-static void Sleep_(int32_t ms)
-{
-	Sleep(ms);
-}
-#else
-static void Sleep_(int32_t ms)
-{
-	usleep(1000 * ms);
-}
 #endif
 
 class Socket

@@ -54,6 +54,7 @@ class"
 
 %apply bool *INOUT { bool* p_open }
 %apply bool *INOUT { bool* p_selected }
+%apply bool *INOUT { bool* p_checked }
 
 %apply int INOUT[] { int* v_current_min }
 %apply int INOUT[] { int* v_current_max }
@@ -92,6 +93,13 @@ class"
 %shared_ptr(Effekseer::StaticFile);
 %shared_ptr(Effekseer::IO);
 %shared_ptr(Effekseer::IOCallback);
+
+// Timeline
+%apply int *INOUT { int* frameMin }
+%apply int *INOUT { int* frameMax }
+%apply int *INOUT { int* currentFrame }
+%apply int *INOUT { int* selectedEntry }
+%apply int *INOUT { int* firstFrame }
 
 //-----------------------------------------------------------------------------------
 //

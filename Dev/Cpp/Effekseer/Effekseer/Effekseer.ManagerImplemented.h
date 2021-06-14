@@ -26,7 +26,7 @@ private:
 	class alignas(32) DrawSet
 	{
 	public:
-		Effect* ParameterPointer;
+		EffectRef ParameterPointer;
 		InstanceContainer* InstanceContainerPointer;
 		InstanceGlobal* GlobalPointer;
 		Culling3D::Object* CullingObjectPointer;
@@ -41,8 +41,11 @@ private:
 		bool GoingToStopRoot;
 		EffectInstanceRemovingCallback RemovingCallback;
 
-		Mat43f BaseMatrix;
-		Mat43f GlobalMatrix;
+		Matrix43 Rotation;
+		Vector3D Scaling = { 1.f, 1.f, 1.f };
+
+		SIMD::Mat43f BaseMatrix;
+		SIMD::Mat43f GlobalMatrix;
 
 		float Speed;
 
@@ -66,11 +69,11 @@ private:
 		//! a bit mask for group
 		int64_t GroupMask = 0;
 
-		DrawSet(Effect* effect, InstanceContainer* pContainer, InstanceGlobal* pGlobal)
+		DrawSet(const EffectRef& effect, InstanceContainer* pContainer, InstanceGlobal* pGlobal)
 			: ParameterPointer(effect)
 			, InstanceContainerPointer(pContainer)
 			, GlobalPointer(pGlobal)
-			, CullingObjectPointer(NULL)
+			, CullingObjectPointer(nullptr)
 			, IsPaused(false)
 			, IsShown(true)
 			, IsAutoDrawing(true)
@@ -79,29 +82,31 @@ private:
 			, DoUseBaseMatrix(false)
 			, GoingToStop(false)
 			, GoingToStopRoot(false)
-			, RemovingCallback(NULL)
+			, RemovingCallback(nullptr)
 			, Speed(1.0f)
 			, Self(-1)
 		{
+			Rotation.Indentity();
 		}
 
 		DrawSet()
-			: ParameterPointer(NULL)
-			, InstanceContainerPointer(NULL)
-			, GlobalPointer(NULL)
-			, CullingObjectPointer(NULL)
+			: ParameterPointer(nullptr)
+			, InstanceContainerPointer(nullptr)
+			, GlobalPointer(nullptr)
+			, CullingObjectPointer(nullptr)
 			, IsPaused(false)
 			, IsShown(true)
 			, IsRemoving(false)
 			, IsParameterChanged(false)
 			, DoUseBaseMatrix(false)
-			, RemovingCallback(NULL)
+			, RemovingCallback(nullptr)
 			, Speed(1.0f)
 			, Self(-1)
 		{
+			Rotation.Indentity();
 		}
 
-		Mat43f* GetEnabledGlobalMatrix();
+		SIMD::Mat43f* GetEnabledGlobalMatrix();
 
 		void CopyMatrixFromInstanceToRoot();
 	};
@@ -162,14 +167,17 @@ private:
 	//! objects on rendering
 	CustomAlignedVector<DrawSet> m_renderingDrawSets;
 
+	//! objects on rendering temporaly (sorted)
+	CustomAlignedVector<DrawSet> sortedRenderingDrawSets_;
+
 	//! objects on rendering
 	CustomAlignedMap<Handle, DrawSet> m_renderingDrawSetMaps;
 
 	// mutex for rendering
-	std::mutex m_renderingMutex;
+	std::recursive_mutex m_renderingMutex;
 	bool m_isLockedWithRenderingMutex = false;
 
-	Setting* m_setting;
+	SettingRef m_setting;
 
 	int m_updateTime;
 	int m_drawTime;
@@ -182,17 +190,17 @@ private:
 	std::set<Handle> m_culledObjectSets;
 	bool m_culled;
 
-	SpriteRenderer* m_spriteRenderer;
+	SpriteRendererRef m_spriteRenderer;
 
-	RibbonRenderer* m_ribbonRenderer;
+	RibbonRendererRef m_ribbonRenderer;
 
-	RingRenderer* m_ringRenderer;
+	RingRendererRef m_ringRenderer;
 
-	ModelRenderer* m_modelRenderer;
+	ModelRendererRef m_modelRenderer;
 
-	TrackRenderer* m_trackRenderer;
+	TrackRendererRef m_trackRenderer;
 
-	SoundPlayer* m_soundPlayer;
+	SoundPlayerRef m_soundPlayer;
 
 	MallocFunc m_MallocFunc;
 
@@ -202,7 +210,10 @@ private:
 
 	int m_randMax;
 
-	Handle AddDrawSet(Effect* effect, InstanceContainer* pInstanceContainer, InstanceGlobal* pGlobalPointer);
+	std::queue<std::pair<SoundTag, SoundPlayer::InstanceParameter>> m_requestedSounds;
+	std::mutex m_soundMutex;
+
+	Handle AddDrawSet(const EffectRef& effect, InstanceContainer* pInstanceContainer, InstanceGlobal* pGlobalPointer);
 
 	void StopStoppingEffects();
 
@@ -217,25 +228,27 @@ private:
 
 	void ExecuteEvents();
 
+	void ExecuteSounds();
+
+	void StoreSortingDrawSets(const Manager::DrawParameter& drawParameter);
+
 public:
 	ManagerImplemented(int instance_max, bool autoFlip);
 
 	virtual ~ManagerImplemented();
 
-	Instance* CreateInstance(EffectNode* pEffectNode, InstanceContainer* pContainer, InstanceGroup* pGroup);
+	Instance* CreateInstance(EffectNodeImplemented* pEffectNode, InstanceContainer* pContainer, InstanceGroup* pGroup);
 
-	InstanceGroup* CreateInstanceGroup(EffectNode* pEffectNode, InstanceContainer* pContainer, InstanceGlobal* pGlobal);
+	InstanceGroup* CreateInstanceGroup(EffectNodeImplemented* pEffectNode, InstanceContainer* pContainer, InstanceGlobal* pGlobal);
 	void ReleaseGroup(InstanceGroup* group);
 
 	InstanceContainer*
-	CreateInstanceContainer(EffectNode* pEffectNode, InstanceGlobal* pGlobal, bool isRoot, const Mat43f& rootMatrix, Instance* pParent);
+	CreateInstanceContainer(EffectNode* pEffectNode, InstanceGlobal* pGlobal, bool isRoot, const SIMD::Mat43f& rootMatrix, Instance* pParent);
 	void ReleaseInstanceContainer(InstanceContainer* container);
-
-	void Destroy() override;
 
 	void LaunchWorkerThreads(uint32_t threadCount) override;
 
-	virtual uintptr_t GetWorkerThreadHandle(uint32_t threadID) override;
+	ThreadNativeHandleType GetWorkerThreadHandle(uint32_t threadID) override;
 
 	uint32_t GetSequenceNumber() const;
 
@@ -259,57 +272,57 @@ public:
 
 	void SetCoordinateSystem(CoordinateSystem coordinateSystem) override;
 
-	SpriteRenderer* GetSpriteRenderer() override;
+	SpriteRendererRef GetSpriteRenderer() override;
 
-	void SetSpriteRenderer(SpriteRenderer* renderer) override;
+	void SetSpriteRenderer(SpriteRendererRef renderer) override;
 
-	RibbonRenderer* GetRibbonRenderer() override;
+	RibbonRendererRef GetRibbonRenderer() override;
 
-	void SetRibbonRenderer(RibbonRenderer* renderer) override;
+	void SetRibbonRenderer(RibbonRendererRef renderer) override;
 
-	RingRenderer* GetRingRenderer() override;
+	RingRendererRef GetRingRenderer() override;
 
-	void SetRingRenderer(RingRenderer* renderer) override;
+	void SetRingRenderer(RingRendererRef renderer) override;
 
-	ModelRenderer* GetModelRenderer() override;
+	ModelRendererRef GetModelRenderer() override;
 
-	void SetModelRenderer(ModelRenderer* renderer) override;
+	void SetModelRenderer(ModelRendererRef renderer) override;
 
-	TrackRenderer* GetTrackRenderer() override;
+	TrackRendererRef GetTrackRenderer() override;
 
-	void SetTrackRenderer(TrackRenderer* renderer) override;
+	void SetTrackRenderer(TrackRendererRef renderer) override;
 
-	Setting* GetSetting() override;
+	const SettingRef& GetSetting() const override;
 
-	void SetSetting(Setting* setting) override;
+	void SetSetting(const SettingRef& setting) override;
 
-	EffectLoader* GetEffectLoader() override;
+	EffectLoaderRef GetEffectLoader() override;
 
-	void SetEffectLoader(EffectLoader* effectLoader) override;
+	void SetEffectLoader(EffectLoaderRef effectLoader) override;
 
-	TextureLoader* GetTextureLoader() override;
+	TextureLoaderRef GetTextureLoader() override;
 
-	void SetTextureLoader(TextureLoader* textureLoader) override;
+	void SetTextureLoader(TextureLoaderRef textureLoader) override;
 
-	SoundPlayer* GetSoundPlayer() override;
+	SoundPlayerRef GetSoundPlayer() override;
 
-	void SetSoundPlayer(SoundPlayer* soundPlayer) override;
+	void SetSoundPlayer(SoundPlayerRef soundPlayer) override;
 
-	SoundLoader* GetSoundLoader() override;
+	SoundLoaderRef GetSoundLoader() override;
 
-	void SetSoundLoader(SoundLoader* soundLoader) override;
+	void SetSoundLoader(SoundLoaderRef soundLoader) override;
 
-	ModelLoader* GetModelLoader() override;
+	ModelLoaderRef GetModelLoader() override;
 
-	void SetModelLoader(ModelLoader* modelLoader) override;
+	void SetModelLoader(ModelLoaderRef modelLoader) override;
 
-	MaterialLoader* GetMaterialLoader() override;
+	MaterialLoaderRef GetMaterialLoader() override;
 
-	void SetMaterialLoader(MaterialLoader* loader) override;
+	void SetMaterialLoader(MaterialLoaderRef loader) override;
 
-	CurveLoader* GetCurveLoader() override;
+	CurveLoaderRef GetCurveLoader() override;
 
-	void SetCurveLoader(CurveLoader* loader) override;
+	void SetCurveLoader(CurveLoaderRef loader) override;
 
 	void StopEffect(Handle handle) override;
 
@@ -317,7 +330,7 @@ public:
 
 	void StopRoot(Handle handle) override;
 
-	void StopRoot(Effect* effect) override;
+	void StopRoot(const EffectRef& effect) override;
 
 	bool Exists(Handle handle) override;
 
@@ -383,6 +396,8 @@ public:
 
 	void SetAutoDrawing(Handle handle, bool autoDraw) override;
 
+	void SetUserData(Handle handle, void* userData) override;
+
 	void Flip() override;
 
 	void Update(float deltaFrame) override;
@@ -427,9 +442,9 @@ public:
 
 	void DrawHandleFront(Handle handle, const Manager::DrawParameter& drawParameter) override;
 
-	Handle Play(Effect* effect, float x, float y, float z) override;
+	Handle Play(const EffectRef& effect, float x, float y, float z) override;
 
-	Handle Play(Effect* effect, const Vector3D& position, int32_t startFrame) override;
+	Handle Play(const EffectRef& effect, const Vector3D& position, int32_t startFrame) override;
 
 	int GetCameraCullingMaskToShowAllEffects() override;
 
@@ -439,9 +454,9 @@ public:
 
 	int32_t GetRestInstancesCount() const override;
 
-	void BeginReloadEffect(Effect* effect, bool doLockThread);
+	void BeginReloadEffect(const EffectRef& effect, bool doLockThread);
 
-	void EndReloadEffect(Effect* effect, bool doLockThread);
+	void EndReloadEffect(const EffectRef& effect, bool doLockThread);
 
 	void CreateCullingWorld(float xsize, float ysize, float zsize, int32_t layerCount) override;
 
@@ -460,6 +475,17 @@ public:
 	virtual int Release() override
 	{
 		return ReferenceObject::Release();
+	}
+
+	void LockRendering() override;
+
+	void UnlockRendering() override;
+
+	void RequestToPlaySound(Instance* instance, const EffectNodeImplemented* node);
+
+	ManagerImplemented* GetImplemented() override
+	{
+		return this;
 	}
 };
 

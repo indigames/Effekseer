@@ -74,11 +74,11 @@ namespace Effekseer.GUI.Dock
 
 		override protected void UpdateInternal()
 		{
-			float showHideButtonOffset = 48 * Manager.DpiScale;
+			float showHideButtonOffset = Manager.NativeManager.GetTextLineHeight();
 
 			isPopupShown = false;
 
-			var windowSize = Manager.NativeManager.GetWindowSize();
+			var windowSize = Manager.NativeManager.GetContentRegionAvail();
 			Manager.NativeManager.Columns(2);
 			Manager.NativeManager.SetColumnOffset(1, Math.Max(0, windowSize.X - showHideButtonOffset));
 
@@ -435,7 +435,7 @@ namespace Effekseer.GUI.Dock
 
         public void Update()
         {
-			var flag = swig.TreeNodeFlags.OpenOnArrow | swig.TreeNodeFlags.OpenOnDoubleClick | swig.TreeNodeFlags.DefaultOpen;
+			var flag = swig.TreeNodeFlags.OpenOnArrow | swig.TreeNodeFlags.OpenOnDoubleClick | swig.TreeNodeFlags.DefaultOpen | swig.TreeNodeFlags.SpanFullWidth;
 
 			if(Core.SelectedNode == this.Node)
 			{
@@ -473,7 +473,7 @@ namespace Effekseer.GUI.Dock
 			}
 
 			// Extend clickable space
-			var label = icon + " " + Node.Name + "                                                                " + id;
+			var label = icon + " " + Node.Name + id;
 			IsExpanding = Manager.NativeManager.TreeNodeEx(label, flag);
 
 			SelectNodeIfClicked();

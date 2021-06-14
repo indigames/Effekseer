@@ -1,20 +1,14 @@
-﻿
+﻿#include "Effekseer.EffectNodeModel.h"
 
-//----------------------------------------------------------------------------------
-//
-//----------------------------------------------------------------------------------
 #include "Effekseer.Effect.h"
 #include "Effekseer.EffectNode.h"
 #include "Effekseer.Manager.h"
 #include "Effekseer.Vector3D.h"
-#include "SIMD/Effekseer.SIMDUtils.h"
+#include "SIMD/Utils.h"
 
 #include "Effekseer.Instance.h"
 #include "Effekseer.InstanceContainer.h"
 #include "Effekseer.InstanceGlobal.h"
-
-#include "Effekseer.EffectNodeModel.h"
-
 #include "Renderer/Effekseer.ModelRenderer.h"
 
 #include "Effekseer.Setting.h"
@@ -27,7 +21,7 @@ namespace Effekseer
 //----------------------------------------------------------------------------------
 //
 //----------------------------------------------------------------------------------
-void EffectNodeModel::LoadRendererParameter(unsigned char*& pos, Setting* setting)
+void EffectNodeModel::LoadRendererParameter(unsigned char*& pos, const SettingRef& setting)
 {
 	int32_t type = 0;
 	memcpy(&type, pos, sizeof(int));
@@ -35,27 +29,45 @@ void EffectNodeModel::LoadRendererParameter(unsigned char*& pos, Setting* settin
 	assert(type == GetType());
 	EffekseerPrintDebug("Renderer : Model\n");
 
-	AlphaBlend = RendererCommon.AlphaBlend;
-
-	if (m_effect->GetVersion() >= 7)
+	if (m_effect->GetVersion() >= Version16Alpha3)
 	{
-		float Magnification;
-		memcpy(&Magnification, pos, sizeof(float));
-		pos += sizeof(float);
+		memcpy(&Mode, pos, sizeof(int));
+		pos += sizeof(int);
+	}
+	else
+	{
+		Mode = ModelReferenceType::File;
 	}
 
-	memcpy(&ModelIndex, pos, sizeof(int));
-	pos += sizeof(int);
-
-	if (m_effect->GetVersion() < 15)
+	if (Mode == ModelReferenceType::File)
 	{
-		memcpy(&NormalTextureIndex, pos, sizeof(int));
+		AlphaBlend = RendererCommon.AlphaBlend;
+
+		if (m_effect->GetVersion() >= 7)
+		{
+			float Magnification;
+			memcpy(&Magnification, pos, sizeof(float));
+			pos += sizeof(float);
+		}
+
+		memcpy(&ModelIndex, pos, sizeof(int));
 		pos += sizeof(int);
-		EffekseerPrintDebug("NormalTextureIndex : %d\n", NormalTextureIndex);
-		RendererCommon.Texture2Index = NormalTextureIndex;
-		RendererCommon.BasicParameter.Texture2Index = NormalTextureIndex;
-		RendererCommon.BasicParameter.TextureFilter2 = RendererCommon.BasicParameter.TextureFilter1;
-		RendererCommon.BasicParameter.TextureWrap2 = RendererCommon.BasicParameter.TextureWrap1;
+
+		if (m_effect->GetVersion() < 15)
+		{
+			memcpy(&NormalTextureIndex, pos, sizeof(int));
+			pos += sizeof(int);
+			EffekseerPrintDebug("NormalTextureIndex : %d\n", NormalTextureIndex);
+			RendererCommon.Texture2Index = NormalTextureIndex;
+			RendererCommon.BasicParameter.TextureIndexes[1] = NormalTextureIndex;
+			RendererCommon.BasicParameter.TextureFilters[1] = RendererCommon.BasicParameter.TextureFilters[0];
+			RendererCommon.BasicParameter.TextureWraps[1] = RendererCommon.BasicParameter.TextureWraps[0];
+		}
+	}
+	else if (Mode == ModelReferenceType::Procedural)
+	{
+		memcpy(&ModelIndex, pos, sizeof(int));
+		pos += sizeof(int);
 	}
 
 	if (m_effect->GetVersion() >= 12)
@@ -87,7 +99,7 @@ void EffectNodeModel::LoadRendererParameter(unsigned char*& pos, Setting* settin
 
 	AllColor.load(pos, m_effect->GetVersion());
 
-	if (m_effect->GetVersion() >= 1600)
+	if (Version16Alpha3 > m_effect->GetVersion() && m_effect->GetVersion() >= Version16Alpha1)
 	{
 		int FalloffFlag = 0;
 		memcpy(&FalloffFlag, pos, sizeof(int));
@@ -96,23 +108,19 @@ void EffectNodeModel::LoadRendererParameter(unsigned char*& pos, Setting* settin
 
 		if (EnableFalloff)
 		{
-			memcpy(&FalloffParam, pos, sizeof(ModelRenderer::FalloffParameter));
-			pos += sizeof(ModelRenderer::FalloffParameter);
+			memcpy(&FalloffParam, pos, sizeof(FalloffParameter));
+			pos += sizeof(FalloffParameter);
 		}
 	}
-	else
-	{
-		EnableFalloff = false;
-	}
 }
 
 //----------------------------------------------------------------------------------
 //
 //----------------------------------------------------------------------------------
-void EffectNodeModel::BeginRendering(int32_t count, Manager* manager)
+void EffectNodeModel::BeginRendering(int32_t count, Manager* manager, void* userData)
 {
-	ModelRenderer* renderer = manager->GetModelRenderer();
-	if (renderer != NULL)
+	ModelRendererRef renderer = manager->GetModelRenderer();
+	if (renderer != nullptr)
 	{
 		ModelRenderer::NodeParameter nodeParameter;
 		// nodeParameter.TextureFilter = RendererCommon.FilterType;
@@ -125,6 +133,7 @@ void EffectNodeModel::BeginRendering(int32_t count, Manager* manager)
 		nodeParameter.Billboard = Billboard;
 		nodeParameter.Magnification = m_effect->GetMaginification();
 		nodeParameter.IsRightHand = manager->GetCoordinateSystem() == CoordinateSystem::RH;
+		nodeParameter.Maginification = GetEffect()->GetMaginification();
 
 		nodeParameter.DepthParameterPtr = &DepthValues.DepthParameter;
 		// nodeParameter.DepthOffset = DepthValues.DepthOffset;
@@ -137,18 +146,21 @@ void EffectNodeModel::BeginRendering(int32_t count, Manager* manager)
 		nodeParameter.FalloffParam = FalloffParam;
 		nodeParameter.EnableViewOffset = (TranslationType == ParameterTranslationType_ViewOffset);
 
-		renderer->BeginRendering(nodeParameter, count, m_userData);
+		nodeParameter.IsProceduralMode = Mode == ModelReferenceType::Procedural;
+		nodeParameter.UserData = GetRenderingUserData();
+
+		renderer->BeginRendering(nodeParameter, count, userData);
 	}
 }
 
 //----------------------------------------------------------------------------------
 //
 //----------------------------------------------------------------------------------
-void EffectNodeModel::Rendering(const Instance& instance, const Instance* next_instance, Manager* manager)
+void EffectNodeModel::Rendering(const Instance& instance, const Instance* next_instance, Manager* manager, void* userData)
 {
 	const InstanceValues& instValues = instance.rendererValues.model;
-	ModelRenderer* renderer = manager->GetModelRenderer();
-	if (renderer != NULL)
+	ModelRendererRef renderer = manager->GetModelRenderer();
+	if (renderer != nullptr)
 	{
 		ModelRenderer::NodeParameter nodeParameter;
 		// nodeParameter.TextureFilter = RendererCommon.FilterType;
@@ -161,6 +173,7 @@ void EffectNodeModel::Rendering(const Instance& instance, const Instance* next_i
 		nodeParameter.Billboard = Billboard;
 		nodeParameter.Magnification = m_effect->GetMaginification();
 		nodeParameter.IsRightHand = manager->GetCoordinateSystem() == CoordinateSystem::RH;
+		nodeParameter.Maginification = GetEffect()->GetMaginification();
 
 		nodeParameter.DepthParameterPtr = &DepthValues.DepthParameter;
 		// nodeParameter.DepthOffset = DepthValues.DepthOffset;
@@ -172,6 +185,8 @@ void EffectNodeModel::Rendering(const Instance& instance, const Instance* next_i
 		nodeParameter.FalloffParam = FalloffParam;
 
 		nodeParameter.EnableViewOffset = (TranslationType == ParameterTranslationType_ViewOffset);
+
+		nodeParameter.IsProceduralMode = Mode == ModelReferenceType::Procedural;
 
 		ModelRenderer::InstanceParameter instanceParameter;
 		instanceParameter.SRTMatrix43 = instance.GetGlobalMatrix43();
@@ -212,17 +227,19 @@ void EffectNodeModel::Rendering(const Instance& instance, const Instance* next_i
 		}
 
 		nodeParameter.BasicParameterPtr = &RendererCommon.BasicParameter;
-		renderer->Rendering(nodeParameter, instanceParameter, m_userData);
+		nodeParameter.UserData = GetRenderingUserData();
+
+		renderer->Rendering(nodeParameter, instanceParameter, userData);
 	}
 }
 
 //----------------------------------------------------------------------------------
 //
 //----------------------------------------------------------------------------------
-void EffectNodeModel::EndRendering(Manager* manager)
+void EffectNodeModel::EndRendering(Manager* manager, void* userData)
 {
-	ModelRenderer* renderer = manager->GetModelRenderer();
-	if (renderer != NULL)
+	ModelRendererRef renderer = manager->GetModelRenderer();
+	if (renderer != nullptr)
 	{
 		ModelRenderer::NodeParameter nodeParameter;
 		// nodeParameter.TextureFilter = RendererCommon.FilterType;
@@ -235,6 +252,7 @@ void EffectNodeModel::EndRendering(Manager* manager)
 		nodeParameter.Billboard = Billboard;
 		nodeParameter.Magnification = m_effect->GetMaginification();
 		nodeParameter.IsRightHand = manager->GetSetting()->GetCoordinateSystem() == CoordinateSystem::RH;
+		nodeParameter.Maginification = GetEffect()->GetMaginification();
 
 		nodeParameter.DepthParameterPtr = &DepthValues.DepthParameter;
 		// nodeParameter.DepthOffset = DepthValues.DepthOffset;
@@ -248,14 +266,18 @@ void EffectNodeModel::EndRendering(Manager* manager)
 
 		nodeParameter.EnableViewOffset = (TranslationType == ParameterTranslationType_ViewOffset);
 
-		renderer->EndRendering(nodeParameter, m_userData);
+		nodeParameter.IsProceduralMode = Mode == ModelReferenceType::Procedural;
+
+		nodeParameter.UserData = GetRenderingUserData();
+
+		renderer->EndRendering(nodeParameter, userData);
 	}
 }
 
 //----------------------------------------------------------------------------------
 //
 //----------------------------------------------------------------------------------
-void EffectNodeModel::InitializeRenderedInstance(Instance& instance, Manager* manager)
+void EffectNodeModel::InitializeRenderedInstance(Instance& instance, InstanceGroup& instanceGroup, Manager* manager)
 {
 	IRandObject& rand = instance.GetRandObject();
 	InstanceValues& instValues = instance.rendererValues.model;
@@ -305,7 +327,7 @@ void EffectNodeModel::InitializeRenderedInstance(Instance& instance, Manager* ma
 //----------------------------------------------------------------------------------
 //
 //----------------------------------------------------------------------------------
-void EffectNodeModel::UpdateRenderedInstance(Instance& instance, Manager* manager)
+void EffectNodeModel::UpdateRenderedInstance(Instance& instance, InstanceGroup& instanceGroup, Manager* manager)
 {
 	InstanceValues& instValues = instance.rendererValues.model;
 

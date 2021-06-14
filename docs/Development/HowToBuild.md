@@ -8,7 +8,7 @@ Requirements
 
 - git
 - git-lfs [Download](https://git-lfs.github.com/)
-- Visual Studio 2015 or later
+- Visual Studio 2017 or later
 - cmake (3.15 or later)
 
 ### macOS
@@ -16,7 +16,7 @@ Requirements
 - git
 - git-lfs
 - Xcode
-- mono
+- dotnet-core
 - Visual Studio for Mac (msbuild)
 - cmake
 
@@ -27,7 +27,8 @@ Requirements
 - git
 - git-lfs
 - g++
-- dotnet-core
+- [dotnet-core](https://docs.microsoft.com/en-us/dotnet/core/install/linux-ubuntu)
+
 - libx11-dev libgl1-mesa-dev libxrandr-dev libxi-dev x11proto-xf86vidmode-dev libx11-xcb-dev xorg-dev libglu1-mesa-dev libpulse-dev libgtk-3-dev libopenal-dev python3-distutils
 
 Get code and resources
@@ -110,3 +111,19 @@ python3 build.py
 cd Dev/release
 ./Effekseer
 ```
+
+## How to release
+
+* Windows
+
+Visual Studio 2017 are required.
+
+Please read ``` .github/workflows/build.yml ```
+
+* Mac
+
+Please read ``` .github/workflows/build.yml ```
+
+* Linux
+
+Please read ``` .github/workflows/build.yml ```

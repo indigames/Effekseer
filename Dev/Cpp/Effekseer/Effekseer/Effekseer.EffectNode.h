@@ -16,8 +16,11 @@
 #include "Effekseer.Effect.h"
 #include "ForceField/ForceFields.h"
 #include "Noise/CurlNoise.h"
+#include "Parameter/DynamicParameter.h"
+#include "Parameter/Easing.h"
 #include "Parameter/Effekseer.Parameters.h"
-#include "SIMD/Effekseer.SIMDUtils.h"
+#include "SIMD/Utils.h"
+#include "Utils/BinaryVersion.h"
 
 //----------------------------------------------------------------------------------
 //
@@ -48,13 +51,10 @@ enum class TranslationParentBindType : int32_t
 
 bool operator==(const TranslationParentBindType& lhs, const BindType& rhs);
 
-/**!
-	@brief indexes of dynamic parameter
-*/
-struct RefMinMax
+enum class ModelReferenceType : int32_t
 {
-	int32_t Max = -1;
-	int32_t Min = -1;
+	File,
+	Procedural,
 };
 
 //----------------------------------------------------------------------------------
@@ -290,7 +290,7 @@ struct LocationAbsParameter
 
 		} none;
 
-		Vec3f gravity;
+		SIMD::Vec3f gravity;
 
 		struct
 		{
@@ -366,7 +366,7 @@ struct ParameterRotationAxisPVA
 struct ParameterRotationAxisEasing
 {
 	random_vector3d axis;
-	easing_float easing;
+	ParameterEasingFloat easing{Version16Alpha9, Version16Alpha9};
 };
 
 //----------------------------------------------------------------------------------
@@ -380,6 +380,7 @@ enum ParameterScalingType
 	ParameterScalingType_SinglePVA = 3,
 	ParameterScalingType_SingleEasing = 4,
 	ParameterScalingType_FCurve = 5,
+	ParameterScalingType_SingleFCurve = 6,
 
 	ParameterScalingType_None = 0x7fffffff - 1,
 
@@ -492,6 +493,7 @@ struct ParameterGenerationLocation
 
 		struct
 		{
+			ModelReferenceType Reference;
 			int32_t index;
 			eModelType type;
 		} model;
@@ -537,8 +539,19 @@ struct ParameterGenerationLocation
 		}
 		else if (type == TYPE_MODEL)
 		{
-			memcpy(&model, pos, sizeof(model));
-			pos += sizeof(model);
+			model.Reference = ModelReferenceType::File;
+
+			if (version >= Version16Alpha3)
+			{
+				memcpy(&model.Reference, pos, sizeof(int32_t));
+				pos += sizeof(int32_t);
+			}
+
+			memcpy(&model.index, pos, sizeof(int32_t));
+			pos += sizeof(int32_t);
+
+			memcpy(&model.type, pos, sizeof(int32_t));
+			pos += sizeof(int32_t);
 		}
 		else if (type == TYPE_CIRCLE)
 		{
@@ -573,6 +586,7 @@ enum ParameterCustomDataType : int32_t
 	FCurve2D = 23,
 	Fixed4D = 40,
 	FCurveColor = 53,
+	DynamicInput = 60,
 	Unknown,
 };
 
@@ -668,6 +682,9 @@ struct ParameterCustomData
 			FCurveColor.Values = new FCurveVectorColor();
 			pos += FCurveColor.Values->Load(pos, version);
 		}
+		else if (Type == ParameterCustomDataType::DynamicInput)
+		{
+		}
 		else
 		{
 			assert(0);
@@ -703,45 +720,20 @@ struct ParameterRendererCommon
 	int32_t BlendUVDistortionTextureIndex = -1;
 
 	//! material index in MaterialType::File
-	MaterialParameter Material;
+	MaterialRenderData MaterialData;
 
 	AlphaBlendType AlphaBlend = AlphaBlendType::Opacity;
 
-	TextureFilterType FilterType = TextureFilterType::Nearest;
-
-	TextureWrapType WrapType = TextureWrapType::Repeat;
-
-	TextureFilterType Filter2Type = TextureFilterType::Nearest;
-
-	TextureWrapType Wrap2Type = TextureWrapType::Repeat;
-
-	TextureFilterType Filter3Type = TextureFilterType::Nearest;
-
-	TextureWrapType Wrap3Type = TextureWrapType::Repeat;
-
-	TextureFilterType Filter4Type = TextureFilterType::Nearest;
-
-	TextureWrapType Wrap4Type = TextureWrapType::Repeat;
-
-	TextureFilterType Filter5Type = TextureFilterType::Nearest;
-
-	TextureWrapType Wrap5Type = TextureWrapType::Repeat;
-
-	TextureFilterType Filter6Type = TextureFilterType::Nearest;
-
-	TextureWrapType Wrap6Type = TextureWrapType::Repeat;
+	std::array<TextureFilterType, TextureSlotMax> FilterTypes;
+	std::array<TextureWrapType, TextureSlotMax> WrapTypes;
 
 	float UVDistortionIntensity = 1.0f;
 
 	int32_t TextureBlendType = -1;
 
-	TextureFilterType Filter7Type = TextureFilterType::Nearest;
-
-	TextureWrapType Wrap7Type = TextureWrapType::Repeat;
-
 	float BlendUVDistortionIntensity = 1.0f;
 
-	int32_t EmissiveScaling = 1;
+	float EmissiveScaling = 1.0f;
 
 	bool ZWrite = false;
 
@@ -870,6 +862,9 @@ struct ParameterRendererCommon
 		{
 			UVTypes[i] = UV_DEFAULT;
 		}
+
+		FilterTypes.fill(TextureFilterType::Nearest);
+		WrapTypes.fill(TextureWrapType::Repeat);
 	}
 
 	~ParameterRendererCommon()
@@ -906,12 +901,12 @@ struct ParameterRendererCommon
 			{
 				if (version >= 1600)
 				{
-					memcpy(&EmissiveScaling, pos, sizeof(int));
-					pos += sizeof(int);
+					memcpy(&EmissiveScaling, pos, sizeof(float));
+					pos += sizeof(float);
 				}
 				else
 				{
-					EmissiveScaling = 1;
+					EmissiveScaling = 1.0f;
 				}
 			}
 
@@ -944,7 +939,7 @@ struct ParameterRendererCommon
 			}
 			else
 			{
-				memcpy(&Material.MaterialIndex, pos, sizeof(int));
+				memcpy(&MaterialData.MaterialIndex, pos, sizeof(int));
 				pos += sizeof(int);
 
 				int32_t textures = 0;
@@ -953,15 +948,21 @@ struct ParameterRendererCommon
 				memcpy(&textures, pos, sizeof(int));
 				pos += sizeof(int);
 
-				Material.MaterialTextures.resize(textures);
-				memcpy(Material.MaterialTextures.data(), pos, sizeof(MaterialTextureParameter) * textures);
+				MaterialData.MaterialTextures.resize(textures);
+				if (MaterialData.MaterialTextures.size() > 0)
+				{
+					memcpy(MaterialData.MaterialTextures.data(), pos, sizeof(MaterialTextureParameter) * textures);
+				}
 				pos += (sizeof(MaterialTextureParameter) * textures);
 
 				memcpy(&uniforms, pos, sizeof(int));
 				pos += sizeof(int);
 
-				Material.MaterialUniforms.resize(uniforms);
-				memcpy(Material.MaterialUniforms.data(), pos, sizeof(float) * 4 * uniforms);
+				MaterialData.MaterialUniforms.resize(uniforms);
+				if (MaterialData.MaterialUniforms.size() > 0)
+				{
+					memcpy(MaterialData.MaterialUniforms.data(), pos, sizeof(float) * 4 * uniforms);
+				}
 				pos += (sizeof(float) * 4 * uniforms);
 			}
 		}
@@ -974,74 +975,44 @@ struct ParameterRendererCommon
 		memcpy(&AlphaBlend, pos, sizeof(int));
 		pos += sizeof(int);
 
-		memcpy(&FilterType, pos, sizeof(int));
+		memcpy(&FilterTypes[0], pos, sizeof(int));
 		pos += sizeof(int);
 
-		memcpy(&WrapType, pos, sizeof(int));
+		memcpy(&WrapTypes[0], pos, sizeof(int));
 		pos += sizeof(int);
 
 		if (version >= 15)
 		{
-			memcpy(&Filter2Type, pos, sizeof(int));
+			memcpy(&FilterTypes[1], pos, sizeof(int));
 			pos += sizeof(int);
 
-			memcpy(&Wrap2Type, pos, sizeof(int));
+			memcpy(&WrapTypes[1], pos, sizeof(int));
 			pos += sizeof(int);
 		}
 		else
 		{
-			Filter2Type = FilterType;
-			Wrap2Type = WrapType;
+			FilterTypes[1] = FilterTypes[0];
+			WrapTypes[1] = WrapTypes[0];
 		}
 
 		if (version >= 1600)
 		{
-			memcpy(&Filter3Type, pos, sizeof(int));
-			pos += sizeof(int);
+			for (size_t i = 2; i < 7; i++)
+			{
+				memcpy(&FilterTypes[i], pos, sizeof(int));
+				pos += sizeof(int);
 
-			memcpy(&Wrap3Type, pos, sizeof(int));
-			pos += sizeof(int);
-
-			memcpy(&Filter4Type, pos, sizeof(int));
-			pos += sizeof(int);
-
-			memcpy(&Wrap4Type, pos, sizeof(int));
-			pos += sizeof(int);
-
-			memcpy(&Filter5Type, pos, sizeof(int));
-			pos += sizeof(int);
-
-			memcpy(&Wrap5Type, pos, sizeof(int));
-			pos += sizeof(int);
-
-			memcpy(&Filter6Type, pos, sizeof(int));
-			pos += sizeof(int);
-
-			memcpy(&Wrap6Type, pos, sizeof(int));
-			pos += sizeof(int);
-
-			memcpy(&Filter7Type, pos, sizeof(int));
-			pos += sizeof(int);
-
-			memcpy(&Wrap7Type, pos, sizeof(int));
-			pos += sizeof(int);
+				memcpy(&WrapTypes[i], pos, sizeof(int));
+				pos += sizeof(int);
+			}
 		}
 		else
 		{
-			Filter3Type = FilterType;
-			Wrap3Type = WrapType;
-
-			Filter4Type = FilterType;
-			Wrap4Type = WrapType;
-
-			Filter5Type = FilterType;
-			Wrap5Type = WrapType;
-
-			Filter6Type = FilterType;
-			Wrap6Type = WrapType;
-
-			Filter7Type = FilterType;
-			Wrap7Type = WrapType;
+			for (size_t i = 2; i < 7; i++)
+			{
+				FilterTypes[i] = FilterTypes[0];
+				WrapTypes[i] = WrapTypes[0];
+			}
 		}
 
 		if (version >= 5)
@@ -1222,32 +1193,18 @@ struct ParameterRendererCommon
 
 		// copy to basic parameter
 		BasicParameter.AlphaBlend = AlphaBlend;
-		BasicParameter.TextureFilter1 = FilterType;
-		BasicParameter.TextureFilter2 = Filter2Type;
-		BasicParameter.TextureFilter3 = Filter3Type;
-		BasicParameter.TextureFilter4 = Filter4Type;
-		BasicParameter.TextureFilter5 = Filter5Type;
-		BasicParameter.TextureFilter6 = Filter6Type;
-		BasicParameter.TextureFilter7 = Filter7Type;
-
-		BasicParameter.TextureWrap1 = WrapType;
-		BasicParameter.TextureWrap2 = Wrap2Type;
-
-		BasicParameter.TextureWrap3 = Wrap3Type;
-		BasicParameter.TextureWrap4 = Wrap4Type;
-		BasicParameter.TextureWrap5 = Wrap5Type;
-		BasicParameter.TextureWrap6 = Wrap6Type;
-		BasicParameter.TextureWrap7 = Wrap7Type;
+		BasicParameter.TextureFilters = FilterTypes;
+		BasicParameter.TextureWraps = WrapTypes;
 
 		BasicParameter.DistortionIntensity = DistortionIntensity;
 		BasicParameter.MaterialType = MaterialType;
-		BasicParameter.Texture1Index = ColorTextureIndex;
-		BasicParameter.Texture2Index = Texture2Index;
-		BasicParameter.Texture3Index = AlphaTextureIndex;
-		BasicParameter.Texture4Index = UVDistortionTextureIndex;
-		BasicParameter.Texture5Index = BlendTextureIndex;
-		BasicParameter.Texture6Index = BlendAlphaTextureIndex;
-		BasicParameter.Texture7Index = BlendUVDistortionTextureIndex;
+		BasicParameter.TextureIndexes[0] = ColorTextureIndex;
+		BasicParameter.TextureIndexes[1] = Texture2Index;
+		BasicParameter.TextureIndexes[2] = AlphaTextureIndex;
+		BasicParameter.TextureIndexes[3] = UVDistortionTextureIndex;
+		BasicParameter.TextureIndexes[4] = BlendTextureIndex;
+		BasicParameter.TextureIndexes[5] = BlendAlphaTextureIndex;
+		BasicParameter.TextureIndexes[6] = BlendUVDistortionTextureIndex;
 
 		BasicParameter.UVDistortionIntensity = UVDistortionIntensity;
 
@@ -1272,17 +1229,17 @@ struct ParameterRendererCommon
 
 		if (BasicParameter.MaterialType == RendererMaterialType::File)
 		{
-			BasicParameter.MaterialParameterPtr = &Material;
+			BasicParameter.MaterialRenderDataPtr = &MaterialData;
 		}
 		else
 		{
-			BasicParameter.MaterialParameterPtr = nullptr;
+			BasicParameter.MaterialRenderDataPtr = nullptr;
 		}
 
 		if (BasicParameter.MaterialType != RendererMaterialType::Lighting)
 		{
-			BasicParameter.TextureFilter2 = TextureFilterType::Nearest;
-			BasicParameter.TextureWrap2 = TextureWrapType::Clamp;
+			BasicParameter.TextureFilters[1] = TextureFilterType::Nearest;
+			BasicParameter.TextureWraps[1] = TextureWrapType::Clamp;
 		}
 	}
 };
@@ -1299,50 +1256,37 @@ struct ParameterAlphaCutoff
 		FPI = FOUR_POINT_INTERPOLATION,
 	} Type;
 
-	union
+	struct
 	{
-		struct
-		{
-			int32_t RefEq;
-			float Threshold;
-		} Fixed;
+		int32_t RefEq = -1;
+		float Threshold = 0.0f;
+	} Fixed;
 
-		struct
-		{
-			random_float BeginThreshold;
-			random_int TransitionFrameNum;
-			random_float No2Threshold;
-			random_float No3Threshold;
-			random_int TransitionFrameNum2;
-			random_float EndThreshold;
-		} FourPointInterpolation;
+	struct
+	{
+		random_float BeginThreshold;
+		random_int TransitionFrameNum;
+		random_float No2Threshold;
+		random_float No3Threshold;
+		random_int TransitionFrameNum2;
+		random_float EndThreshold;
+	} FourPointInterpolation;
 
-		struct
-		{
-			RefMinMax RefEqS;
-			RefMinMax RefEqE;
-			easing_float Threshold;
-		} Easing;
+	ParameterEasingFloat Easing{Version16Alpha1, Version16Alpha1};
 
-		struct
-		{
-			FCurveScalar* Threshold;
-		} FCurve;
-	};
+	struct
+	{
+		FCurveScalar* Threshold;
+	} FCurve;
 
-	float EdgeThreshold;
-	Color EdgeColor;
-	int32_t EdgeColorScaling;
+	float EdgeThreshold = 0.0f;
+	Color EdgeColor = Color(0, 0, 0, 0);
+	float EdgeColorScaling = 0.0f;
 
-#pragma warning(push)
-#pragma warning(disable : 4582)
 	ParameterAlphaCutoff()
+		: Type(ParameterAlphaCutoff::EType::FIXED)
 	{
-		Type = ParameterAlphaCutoff::EType::FIXED;
-		Fixed.RefEq = -1;
-		Fixed.Threshold = 0;
 	}
-#pragma warning(pop)
 
 	~ParameterAlphaCutoff()
 	{
@@ -1370,7 +1314,7 @@ struct ParameterAlphaCutoff
 			memcpy(&FourPointInterpolation, pos, BufferSize);
 			break;
 		case Effekseer::ParameterAlphaCutoff::EType::EASING:
-			memcpy(&Easing, pos, BufferSize);
+			Easing.Load(pos, BufferSize, version);
 			break;
 		case Effekseer::ParameterAlphaCutoff::EType::F_CURVE:
 			FCurve.Threshold = new FCurveScalar();
@@ -1386,8 +1330,18 @@ struct ParameterAlphaCutoff
 		memcpy(&EdgeColor, pos, sizeof(Color));
 		pos += sizeof(int32_t);
 
-		memcpy(&EdgeColorScaling, pos, sizeof(int32_t));
-		pos += sizeof(int32_t);
+		if (version >= Version16Alpha7)
+		{
+			memcpy(&EdgeColorScaling, pos, sizeof(float));
+			pos += sizeof(float);
+		}
+		else
+		{
+			int32_t temp = 0;
+			memcpy(&temp, pos, sizeof(int32_t));
+			pos += sizeof(int32_t);
+			EdgeColorScaling = static_cast<float>(temp);
+		}
 	}
 };
 
@@ -1466,7 +1420,7 @@ enum eRenderingOrder
 @note
 エフェクトのノードの実体を生成する。
 */
-class EffectNodeImplemented : public EffectNode, public AlignedAllocationPolicy<16>
+class EffectNodeImplemented : public EffectNode, public SIMD::AlignedAllocationPolicy<16>
 {
 	friend class Manager;
 	friend class EffectImplemented;
@@ -1482,8 +1436,7 @@ protected:
 	// 子ノード
 	std::vector<EffectNodeImplemented*> m_Nodes;
 
-	// ユーザーデータ
-	void* m_userData;
+	RefPtr<RenderingUserData> renderingUserData_;
 
 	// コンストラクタ
 	EffectNodeImplemented(Effect* effect, unsigned char*& pos);
@@ -1491,8 +1444,7 @@ protected:
 	// デストラクタ
 	virtual ~EffectNodeImplemented();
 
-	// 読込
-	void LoadParameter(unsigned char*& pos, EffectNode* parent, Setting* setting);
+	void LoadParameter(unsigned char*& pos, EffectNode* parent, const SettingRef& setting);
 
 	// 初期化
 	void Initialize();
@@ -1520,22 +1472,19 @@ public:
 	ParameterTranslationType TranslationType;
 	ParameterTranslationFixed TranslationFixed;
 	ParameterTranslationPVA TranslationPVA;
-	ParameterTranslationEasing TranslationEasing;
+	ParameterEasingSIMDVec3 TranslationEasing;
+	// ParameterTranslationEasing TranslationEasing;
 	FCurveVector3D* TranslationFCurve;
 	ParameterTranslationNurbsCurve TranslationNurbsCurve;
 	ParameterTranslationViewOffset TranslationViewOffset;
-
-#ifdef OLD_LF
-	std::array<LocalForceFieldParameterOld, LocalFieldSlotMax> LocalForceFieldsOld;
-#else
 	LocalForceFieldParameter LocalForceField;
-#endif
-	LocationAbsParameter LocationAbs;
 
 	ParameterRotationType RotationType;
 	ParameterRotationFixed RotationFixed;
 	ParameterRotationPVA RotationPVA;
-	ParameterRotationEasing RotationEasing;
+
+	ParameterEasingSIMDVec3 RotationEasing;
+	// ParameterRotationEasing RotationEasing;
 	FCurveVector3D* RotationFCurve;
 
 	ParameterRotationAxisPVA RotationAxisPVA;
@@ -1544,10 +1493,12 @@ public:
 	ParameterScalingType ScalingType;
 	ParameterScalingFixed ScalingFixed;
 	ParameterScalingPVA ScalingPVA;
-	ParameterScalingEasing ScalingEasing;
+	ParameterEasingSIMDVec3 ScalingEasing;
+	// ParameterScalingEasing ScalingEasing;
 	ParameterScalingSinglePVA ScalingSinglePVA;
-	easing_float ScalingSingleEasing;
+	ParameterEasingFloat ScalingSingleEasing{Version16Alpha9, Version16Alpha9};
 	FCurveVector3D* ScalingFCurve;
+	FCurveScalar* ScalingSingleFCurve = nullptr;
 
 	ParameterGenerationLocation GenerationLocation;
 
@@ -1556,6 +1507,9 @@ public:
 	ParameterRendererCommon RendererCommon;
 
 	ParameterAlphaCutoff AlphaCutoff;
+
+	bool EnableFalloff = false;
+	FalloffParameter FalloffParam{};
 
 	ParameterSoundType SoundType;
 	ParameterSound Sound;
@@ -1580,32 +1534,29 @@ public:
 
 	EffectModelParameter GetEffectModelParameter() override;
 
-	/**
-	@brief	描画部分の読込
-	*/
-	virtual void LoadRendererParameter(unsigned char*& pos, Setting* setting);
+	virtual void LoadRendererParameter(unsigned char*& pos, const SettingRef& setting);
 
 	/**
 	@brief	描画開始
 	*/
-	virtual void BeginRendering(int32_t count, Manager* manager);
+	virtual void BeginRendering(int32_t count, Manager* manager, void* userData);
 
 	/**
 	@brief	グループ描画開始
 	*/
-	virtual void BeginRenderingGroup(InstanceGroup* group, Manager* manager);
+	virtual void BeginRenderingGroup(InstanceGroup* group, Manager* manager, void* userData);
 
-	virtual void EndRenderingGroup(InstanceGroup* group, Manager* manager);
+	virtual void EndRenderingGroup(InstanceGroup* group, Manager* manager, void* userData);
 
 	/**
 	@brief	描画
 	*/
-	virtual void Rendering(const Instance& instance, const Instance* next_instance, Manager* manager);
+	virtual void Rendering(const Instance& instance, const Instance* next_instance, Manager* manager, void* userData);
 
 	/**
 	@brief	描画終了
 	*/
-	virtual void EndRendering(Manager* manager);
+	virtual void EndRendering(Manager* manager, void* userData);
 
 	/**
 	@brief	インスタンスグループ描画時初期化
@@ -1615,22 +1566,17 @@ public:
 	/**
 	@brief	描画部分初期化
 	*/
-	virtual void InitializeRenderedInstance(Instance& instance, Manager* manager);
+	virtual void InitializeRenderedInstance(Instance& instance, InstanceGroup& instanceGroup, Manager* manager);
 
 	/**
 	@brief	描画部分更新
 	*/
-	virtual void UpdateRenderedInstance(Instance& instance, Manager* manager);
+	virtual void UpdateRenderedInstance(Instance& instance, InstanceGroup& instanceGroup, Manager* manager);
 
 	/**
 	@brief	描画部分更新
 	*/
 	virtual float GetFadeAlpha(const Instance& instance);
-
-	/**
-	@brief	サウンド再生
-	*/
-	virtual void PlaySound_(Instance& instance, SoundTag tag, Manager* manager);
 
 	EffectInstanceTerm CalculateInstanceTerm(EffectInstanceTerm& parentTerm) const override;
 
@@ -1645,6 +1591,16 @@ public:
 	virtual eEffectNodeType GetType() const
 	{
 		return EFFECT_NODE_TYPE_NONE;
+	}
+
+	RefPtr<RenderingUserData> GetRenderingUserData() override
+	{
+		return renderingUserData_;
+	}
+
+	void SetRenderingUserData(const RefPtr<RenderingUserData>& renderingUserData) override
+	{
+		renderingUserData_ = renderingUserData;
 	}
 };
 //----------------------------------------------------------------------------------

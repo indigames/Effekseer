@@ -4,7 +4,7 @@
 namespace EffekseerRendererLLGI
 {
 
-IndexBuffer::IndexBuffer(GraphicsDevice* graphicsDevice, LLGI::IndexBuffer* buffer, int maxCount, bool isDynamic, bool hasRefCount)
+IndexBuffer::IndexBuffer(Backend::GraphicsDevice* graphicsDevice, LLGI::IndexBuffer* buffer, int maxCount, bool isDynamic, bool hasRefCount)
 	: DeviceObject(graphicsDevice, hasRefCount)
 	, IndexBufferBase(maxCount, isDynamic)
 	, indexBuffer(buffer)
@@ -16,7 +16,7 @@ IndexBuffer::~IndexBuffer()
 	LLGI::SafeRelease(indexBuffer);
 }
 
-IndexBuffer* IndexBuffer::Create(GraphicsDevice* graphicsDevice, int maxCount, bool isDynamic, bool hasRefCount)
+IndexBuffer* IndexBuffer::Create(Backend::GraphicsDevice* graphicsDevice, int maxCount, bool isDynamic, bool hasRefCount)
 {
 	auto indexBuffer = graphicsDevice->GetGraphics()->CreateIndexBuffer(2, maxCount);
 	if (indexBuffer == nullptr)
@@ -38,7 +38,7 @@ void IndexBuffer::Unlock()
 {
 	assert(m_isLock);
 	indexBuffer->Unlock();
-	m_resource = NULL;
+	m_resource = nullptr;
 	m_isLock = false;
 }
 

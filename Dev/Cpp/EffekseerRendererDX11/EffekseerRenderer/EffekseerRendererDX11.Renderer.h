@@ -17,22 +17,36 @@ namespace EffekseerRendererDX11
 //
 //----------------------------------------------------------------------------------
 
-/**
-@brief	テクスチャ読込クラスを生成する。
-*/
-::Effekseer::TextureLoader* CreateTextureLoader(ID3D11Device* device,
-												ID3D11DeviceContext* context,
-												::Effekseer::FileInterface* fileInterface = nullptr,
-												::Effekseer::ColorSpaceType colorSpaceType = ::Effekseer::ColorSpaceType::Gamma);
+::Effekseer::Backend::GraphicsDeviceRef CreateGraphicsDevice(ID3D11Device* device,
+															 ID3D11DeviceContext* context);
+
+[[deprecated("please use EffekseerRenderer::CreateTextureLoader")]] ::Effekseer::TextureLoaderRef CreateTextureLoader(::Effekseer::Backend::GraphicsDeviceRef gprahicsDevice,
+																													  ::Effekseer::FileInterface* fileInterface = nullptr,
+																													  ::Effekseer::ColorSpaceType colorSpaceType = ::Effekseer::ColorSpaceType::Gamma);
+
+[[deprecated("please use EffekseerRenderer::CreateModelLoader")]] ::Effekseer::ModelLoaderRef CreateModelLoader(::Effekseer::Backend::GraphicsDeviceRef gprahicsDevice, ::Effekseer::FileInterface* fileInterface = nullptr);
+
+::Effekseer::Backend::TextureRef CreateTexture(::Effekseer::Backend::GraphicsDeviceRef gprahicsDevice, ID3D11ShaderResourceView* srv, ID3D11RenderTargetView* rtv, ID3D11DepthStencilView* dsv);
 
 /**
-@brief	モデル読込クラスを生成する。
-*/
-::Effekseer::ModelLoader* CreateModelLoader(ID3D11Device* device, ::Effekseer::FileInterface* fileInterface = NULL);
+		@brief	\~English	Properties in a texture
+				\~Japanese	テクスチャ内のプロパティ
 
-/**
-	@brief	描画クラス
+		@note	\~English	You need not to release pointers
+				\~Japanese	ポインタの解放する必要はない
 */
+struct TextureProperty
+{
+	ID3D11ShaderResourceView* ShaderResourceViewPtr = nullptr;
+	ID3D11RenderTargetView* RenderTargetViewPtr = nullptr;
+	ID3D11DepthStencilView* DepthStencilViewPtr = nullptr;
+};
+
+TextureProperty GetTextureProperty(::Effekseer::Backend::TextureRef texture);
+
+class Renderer;
+using RendererRef = ::Effekseer::RefPtr<Renderer>;
+
 class Renderer : public ::EffekseerRenderer::Renderer
 {
 protected:
@@ -45,95 +59,41 @@ protected:
 
 public:
 	/**
-		@brief	インスタンスを生成する。
-		@param	device		DirectXのデバイス
-		@param	context		DirectXのコンテキスト
-		@param	squareMaxCount	最大描画スプライト数
-		@param	depthFunc	奥行きの計算方法
+		@brief
+		\~english	Create an instance
+		\~japanese	インスタンスを生成する。
+		@param	device		Device of DirectX
+		@param	context		Context of DirectX
+		@param	squareMaxCount
+		\~english	the number of maximum sprites
+		\~japanese	最大描画スプライト数
+		@param	depthFunc	a func to compare a dpeth
 		@param	isMSAAEnabled whether is MSAA enabled
-		@return	インスタンス
+		@return	instance
 	*/
-	static Renderer* Create(ID3D11Device* device,
-							ID3D11DeviceContext* context,
-							int32_t squareMaxCount,
-							D3D11_COMPARISON_FUNC depthFunc = D3D11_COMPARISON_LESS_EQUAL,
-							bool isMSAAEnabled = false);
+	static RendererRef Create(ID3D11Device* device,
+							  ID3D11DeviceContext* context,
+							  int32_t squareMaxCount,
+							  D3D11_COMPARISON_FUNC depthFunc = D3D11_COMPARISON_LESS_EQUAL,
+							  bool isMSAAEnabled = false);
 
 	virtual ID3D11Device* GetDevice() = 0;
 
 	virtual ID3D11DeviceContext* GetContext() = 0;
 
 	/**
-		@brief	\~English	Get background
-				\~Japanese	背景を取得する
-	*/
-	virtual Effekseer::TextureData* GetBackground() = 0;
-
-	/**
 		@brief	\~English	Set background
 				\~Japanese	背景を設定する
 	*/
-	virtual void SetBackground(ID3D11ShaderResourceView* background) = 0;
-};
+	[[deprecated("please use EffekseerRenderer::SetBackground")]] virtual void SetBackground(ID3D11ShaderResourceView* background) = 0;
 
-//----------------------------------------------------------------------------------
-//
-//----------------------------------------------------------------------------------
-/**
-@brief	\~English	Model
-		\~Japanese	モデル
-*/
-class Model : public Effekseer::Model
-{
-private:
-	ID3D11Device* device_ = nullptr;
-
-public:
-	struct InternalModel
-	{
-		ID3D11Buffer* VertexBuffer;
-		ID3D11Buffer* IndexBuffer;
-		int32_t VertexCount;
-		int32_t IndexCount;
-		int32_t FaceCount;
-
-		InternalModel()
-		{
-			VertexBuffer = nullptr;
-			IndexBuffer = nullptr;
-			VertexCount = 0;
-			IndexCount = 0;
-			FaceCount = 0;
-		}
-
-		virtual ~InternalModel()
-		{
-			ES_SAFE_RELEASE(VertexBuffer);
-			ES_SAFE_RELEASE(IndexBuffer);
-		}
-	};
-
-	InternalModel* InternalModels = nullptr;
-	int32_t ModelCount;
-	bool IsLoadedOnGPU = false;
-
-	Model(uint8_t* data, int32_t size, ID3D11Device* device)
-		: Effekseer::Model(data, size)
-		, device_(device)
-		, InternalModels(nullptr)
-		, ModelCount(0)
-	{
-		this->m_vertexSize = sizeof(VertexWithIndex);
-		ES_SAFE_ADDREF(device_);
-	}
-
-	virtual ~Model()
-	{
-		ES_SAFE_DELETE_ARRAY(InternalModels);
-		ES_SAFE_RELEASE(device_);
-	}
-
-	bool LoadToGPU();
+	/**
+		@brief	\~English	Reset internal states for DefferedContext
+				\~Japanese	DefferedContextのために、内部の状態をリセットする。
+		@note	\~English	Please call before BeginRendering after FinishCommandList
+				\~Japanese	FinishCommandListの後でBeginRenderingの前に呼んでください。
+	*/
+	virtual void ResetStateForDefferedContext() = 0;
 };
 
 //----------------------------------------------------------------------------------

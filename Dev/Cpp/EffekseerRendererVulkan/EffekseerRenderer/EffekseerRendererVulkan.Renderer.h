@@ -24,11 +24,11 @@ struct RenderPassInformation
 	VkFormat DepthFormat = VK_FORMAT_UNDEFINED;
 };
 
-::EffekseerRenderer::GraphicsDevice* CreateDevice(
+::Effekseer::Backend::GraphicsDeviceRef CreateGraphicsDevice(
 	VkPhysicalDevice physicalDevice, VkDevice device, VkQueue transfarQueue, VkCommandPool transfarCommandPool, int32_t swapBufferCount);
 
-::EffekseerRenderer::Renderer*
-Create(::EffekseerRenderer::GraphicsDevice* graphicsDevice, RenderPassInformation renderPassInformation, int32_t squareMaxCount);
+::EffekseerRenderer::RendererRef
+Create(::Effekseer::Backend::GraphicsDeviceRef graphicsDevice, RenderPassInformation renderPassInformation, int32_t squareMaxCount);
 
 /**
 @brief	Create an instance
@@ -37,7 +37,7 @@ Create(::EffekseerRenderer::GraphicsDevice* graphicsDevice, RenderPassInformatio
 @param squareMaxCount	the number of maximum sprites
 @return	instance
 */
-::EffekseerRenderer::Renderer* Create(VkPhysicalDevice physicalDevice,
+::EffekseerRenderer::RendererRef Create(VkPhysicalDevice physicalDevice,
 									  VkDevice device,
 									  VkQueue transfarQueue,
 									  VkCommandPool transfarCommandPool,
@@ -45,31 +45,11 @@ Create(::EffekseerRenderer::GraphicsDevice* graphicsDevice, RenderPassInformatio
 									  RenderPassInformation renderPassInformation,
 									  int32_t squareMaxCount);
 
-Effekseer::TextureData* CreateTextureData(::EffekseerRenderer::Renderer* renderer, const VulkanImageInfo& info);
+Effekseer::Backend::TextureRef CreateTexture(::Effekseer::Backend::GraphicsDeviceRef graphicsDevice, const VulkanImageInfo& info);
 
-Effekseer::TextureData* CreateTextureData(::EffekseerRenderer::GraphicsDevice* graphicsDevice, const VulkanImageInfo& info);
+void BeginCommandList(Effekseer::RefPtr<EffekseerRenderer::CommandList> commandList, VkCommandBuffer nativeCommandList);
 
-void DeleteTextureData(::EffekseerRenderer::Renderer* renderer, Effekseer::TextureData* textureData);
-
-void DeleteTextureData(::EffekseerRenderer::GraphicsDevice* graphicsDevice, Effekseer::TextureData* textureData);
-
-void FlushAndWait(::EffekseerRenderer::Renderer* renderer);
-
-void FlushAndWait(::EffekseerRenderer::GraphicsDevice* graphicsDevice);
-
-EffekseerRenderer::CommandList* CreateCommandList(::EffekseerRenderer::Renderer* renderer,
-												  ::EffekseerRenderer::SingleFrameMemoryPool* memoryPool);
-
-EffekseerRenderer::CommandList* CreateCommandList(::EffekseerRenderer::GraphicsDevice* graphicsDevice,
-												  ::EffekseerRenderer::SingleFrameMemoryPool* memoryPool);
-
-EffekseerRenderer::SingleFrameMemoryPool* CreateSingleFrameMemoryPool(::EffekseerRenderer::Renderer* renderer);
-
-EffekseerRenderer::SingleFrameMemoryPool* CreateSingleFrameMemoryPool(::EffekseerRenderer::GraphicsDevice* graphicsDevice);
-
-void BeginCommandList(EffekseerRenderer::CommandList* commandList, VkCommandBuffer nativeCommandList);
-
-void EndCommandList(EffekseerRenderer::CommandList* commandList);
+void EndCommandList(Effekseer::RefPtr<EffekseerRenderer::CommandList> commandList);
 
 } // namespace EffekseerRendererVulkan
 

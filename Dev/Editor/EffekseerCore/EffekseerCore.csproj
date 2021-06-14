@@ -99,9 +99,13 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Binary\RenderData\AdvancedUvSerializer.cs" />
     <Compile Include="Binary\AlphaCutoffValues.cs" />
+    <Compile Include="Binary\RenderData\BasicUvSerializer.cs" />
     <Compile Include="Binary\CommonValues.cs" />
     <Compile Include="Binary\GenerationLocationValues.cs" />
+    <Compile Include="Binary\RenderData\MaterialSerializer.cs" />
+    <Compile Include="Binary\RendererCommonValues_Old.cs" />
     <Compile Include="Binary\RendererValues.cs" />
     <Compile Include="Binary\Exporter.cs" />
     <Compile Include="Binary\RotationValues.cs" />
@@ -111,19 +115,24 @@
     <Compile Include="Binary\Define.cs" />
     <Compile Include="Binary\SoundValues.cs" />
     <Compile Include="Binary\RendererCommonValues.cs" />
+    <Compile Include="Binary\RenderData\TextureValuesAggregator.cs" />
+    <Compile Include="Binary\RenderData\UvAggregator.cs" />
+    <Compile Include="Binary\RenderData\UvSerializer.cs" />
+    <Compile Include="Binary\RenderData\TextureInformationRepository.cs" />
+    <Compile Include="Data\Group\IToggleMode.cs" />
+    <Compile Include="Data\Group\IUvCommandValues.cs" />
     <Compile Include="Command\CommandManager.cs" />
     <Compile Include="Command\DelegateCommand.cs" />
     <Compile Include="Command\ICommand.cs" />
     <Compile Include="Core.cs" />
     <Compile Include="Data\AdvancedRenderCommonValues.cs" />
-    <Compile Include="Data\AdvancedRenderCommonValues2.cs" />
     <Compile Include="Data\DepthValues.cs" />
     <Compile Include="Data\Dynamic.cs" />
     <Compile Include="Data\EffectCullingValues.cs" />
     <Compile Include="Data\EffectBehaviorValues.cs" />
     <Compile Include="Data\EnvironmentValues.cs" />
     <Compile Include="Data\OptionValues.cs" />
-    <Compile Include="Data\PostEffectValues.cs" />
+    <Compile Include="Data\ProceduralModelValues.cs" />
     <Compile Include="Data\RecordingValues.cs" />
     <Compile Include="Data\RendererCommonValues.cs" />
     <Compile Include="Data\CommonValues.cs" />
@@ -152,6 +161,8 @@
     <Compile Include="Data\Value\FCurveVector3D.cs" />
     <Compile Include="Data\Value\Float.cs" />
     <Compile Include="Data\Value\FloatWithRandom.cs" />
+    <Compile Include="Data\Value\Int2.cs" />
+    <Compile Include="Data\Value\ObjectCollection.cs" />
     <Compile Include="Data\Value\PathForCurve.cs" />
     <Compile Include="Data\Value\PathForImage.cs" />
     <Compile Include="Data\Value\Int.cs" />

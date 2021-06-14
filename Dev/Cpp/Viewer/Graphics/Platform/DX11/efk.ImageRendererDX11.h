@@ -17,24 +17,24 @@ private:
 	struct Sprite
 	{
 		std::array<EffekseerRendererDX11::Vertex, 4> Verteies;
-		::Effekseer::TextureData* TexturePtr = nullptr;
+		::Effekseer::TextureRef TexturePtr = nullptr;
 	};
 
-	EffekseerRendererDX11::RendererImplemented* renderer = nullptr;
+	EffekseerRendererDX11::RendererImplementedRef renderer;
 	EffekseerRenderer::ShaderBase* shader = nullptr;
 	EffekseerRenderer::ShaderBase* shader_no_texture = nullptr;
 
 	std::vector<Sprite> sprites;
 
 public:
-	ImageRendererDX11(EffekseerRenderer::Renderer* renderer);
+	ImageRendererDX11(const EffekseerRenderer::RendererRef& renderer);
 
 	virtual ~ImageRendererDX11();
 
 	void Draw(const Effekseer::Vector3D positions[],
 			  const Effekseer::Vector2D uvs[],
 			  const Effekseer::Color colors[],
-			  ::Effekseer::TextureData* texturePtr) override;
+			  ::Effekseer::TextureRef texturePtr) override;
 
 	void Render() override;
 

@@ -706,6 +706,18 @@ SWIGEXPORT int SWIGSTDCALL CSharp_Effekseerfswig_ImageResource_GetHeight___(void
 }
 
 
+SWIGEXPORT int SWIGSTDCALL CSharp_Effekseerfswig_ImageResource_GetDeviceType___(void * jarg1) {
+  int jresult ;
+  efk::ImageResource *arg1 = (efk::ImageResource *) 0 ;
+  efk::DeviceType result;
+  
+  arg1 = (efk::ImageResource *)jarg1; 
+  result = (efk::DeviceType)((efk::ImageResource const *)arg1)->GetDeviceType();
+  jresult = (int)result; 
+  return jresult;
+}
+
+
 SWIGEXPORT void SWIGSTDCALL CSharp_Effekseerfswig_ViewerEffectBehavior_CountX_set___(void * jarg1, int jarg2) {
   Effekseer::Tool::ViewerEffectBehavior *arg1 = (Effekseer::Tool::ViewerEffectBehavior *) 0 ;
   int32_t arg2 ;
@@ -1958,10 +1970,10 @@ SWIGEXPORT int SWIGSTDCALL CSharp_Effekseerfswig_ViewerParamater_Distortion_get_
 
 SWIGEXPORT void SWIGSTDCALL CSharp_Effekseerfswig_ViewerParamater_RenderingMode_set___(void * jarg1, int jarg2) {
   ViewerParamater *arg1 = (ViewerParamater *) 0 ;
-  RenderMode arg2 ;
+  Effekseer::Tool::RenderingMethodType arg2 ;
   
   arg1 = (ViewerParamater *)jarg1; 
-  arg2 = (RenderMode)jarg2; 
+  arg2 = (Effekseer::Tool::RenderingMethodType)jarg2; 
   if (arg1) (arg1)->RenderingMode = arg2;
 }
 
@@ -1969,10 +1981,10 @@ SWIGEXPORT void SWIGSTDCALL CSharp_Effekseerfswig_ViewerParamater_RenderingMode_
 SWIGEXPORT int SWIGSTDCALL CSharp_Effekseerfswig_ViewerParamater_RenderingMode_get___(void * jarg1) {
   int jresult ;
   ViewerParamater *arg1 = (ViewerParamater *) 0 ;
-  RenderMode result;
+  Effekseer::Tool::RenderingMethodType result;
   
   arg1 = (ViewerParamater *)jarg1; 
-  result = (RenderMode) ((arg1)->RenderingMode);
+  result = (Effekseer::Tool::RenderingMethodType) ((arg1)->RenderingMode);
   jresult = (int)result; 
   return jresult;
 }
@@ -2698,6 +2710,20 @@ SWIGEXPORT unsigned int SWIGSTDCALL CSharp_Effekseerfswig_Native_InvalidateTextu
 }
 
 
+SWIGEXPORT void SWIGSTDCALL CSharp_Effekseerfswig_Native_SetGroundParameters___(void * jarg1, unsigned int jarg2, float jarg3, int jarg4) {
+  Native *arg1 = (Native *) 0 ;
+  bool arg2 ;
+  float arg3 ;
+  int32_t arg4 ;
+  
+  arg1 = (Native *)jarg1; 
+  arg2 = jarg2 ? true : false; 
+  arg3 = (float)jarg3; 
+  arg4 = (int32_t)jarg4; 
+  (arg1)->SetGroundParameters(arg2,arg3,arg4);
+}
+
+
 SWIGEXPORT void SWIGSTDCALL CSharp_Effekseerfswig_Native_SetIsGridShown___(void * jarg1, unsigned int jarg2, unsigned int jarg3, unsigned int jarg4, unsigned int jarg5) {
   Native *arg1 = (Native *) 0 ;
   bool arg2 ;
@@ -3362,6 +3388,18 @@ SWIGEXPORT unsigned int SWIGSTDCALL CSharp_Effekseerfswig_GUIManager_DoEvents___
   
   arg1 = (efk::GUIManager *)jarg1; 
   result = (bool)(arg1)->DoEvents();
+  jresult = result; 
+  return jresult;
+}
+
+
+SWIGEXPORT float SWIGSTDCALL CSharp_Effekseerfswig_GUIManager_GetDeltaSecond___(void * jarg1) {
+  float jresult ;
+  efk::GUIManager *arg1 = (efk::GUIManager *) 0 ;
+  float result;
+  
+  arg1 = (efk::GUIManager *)jarg1; 
+  result = (float)(arg1)->GetDeltaSecond();
   jresult = result; 
   return jresult;
 }
@@ -4306,6 +4344,22 @@ SWIGEXPORT unsigned int SWIGSTDCALL CSharp_Effekseerfswig_GUIManager_RadioButton
   arg2 = (char16_t *)jarg2; 
   arg3 = jarg3 ? true : false; 
   result = (bool)(arg1)->RadioButton((char16_t const *)arg2,arg3);
+  jresult = result; 
+  return jresult;
+}
+
+
+SWIGEXPORT unsigned int SWIGSTDCALL CSharp_Effekseerfswig_GUIManager_ToggleButton___(void * jarg1, void * jarg2, unsigned int * jarg3) {
+  unsigned int jresult ;
+  efk::GUIManager *arg1 = (efk::GUIManager *) 0 ;
+  char16_t *arg2 = (char16_t *) 0 ;
+  bool *arg3 = (bool *) 0 ;
+  bool result;
+  
+  arg1 = (efk::GUIManager *)jarg1; 
+  arg2 = (char16_t *)jarg2; 
+  arg3 = (bool *)jarg3; 
+  result = (bool)(arg1)->ToggleButton((char16_t const *)arg2,arg3);
   jresult = result; 
   return jresult;
 }
@@ -6825,6 +6879,56 @@ SWIGEXPORT unsigned int SWIGSTDCALL CSharp_Effekseerfswig_GUIManager_ColorEdit4_
 }
 
 
+SWIGEXPORT unsigned int SWIGSTDCALL CSharp_Effekseerfswig_GUIManager_CollapsingHeader__SWIG_0___(void * jarg1, void * jarg2, int jarg3) {
+  unsigned int jresult ;
+  efk::GUIManager *arg1 = (efk::GUIManager *) 0 ;
+  char16_t *arg2 = (char16_t *) 0 ;
+  efk::TreeNodeFlags arg3 ;
+  bool result;
+  
+  arg1 = (efk::GUIManager *)jarg1; 
+  arg2 = (char16_t *)jarg2; 
+  arg3 = (efk::TreeNodeFlags)jarg3; 
+  result = (bool)(arg1)->CollapsingHeader((char16_t const *)arg2,arg3);
+  jresult = result; 
+  return jresult;
+}
+
+
+SWIGEXPORT unsigned int SWIGSTDCALL CSharp_Effekseerfswig_GUIManager_CollapsingHeader__SWIG_1___(void * jarg1, void * jarg2) {
+  unsigned int jresult ;
+  efk::GUIManager *arg1 = (efk::GUIManager *) 0 ;
+  char16_t *arg2 = (char16_t *) 0 ;
+  bool result;
+  
+  arg1 = (efk::GUIManager *)jarg1; 
+  arg2 = (char16_t *)jarg2; 
+  result = (bool)(arg1)->CollapsingHeader((char16_t const *)arg2);
+  jresult = result; 
+  return jresult;
+}
+
+
+SWIGEXPORT unsigned int SWIGSTDCALL CSharp_Effekseerfswig_GUIManager_CollapsingHeaderWithToggle___(void * jarg1, void * jarg2, int jarg3, void * jarg4, unsigned int * jarg5) {
+  unsigned int jresult ;
+  efk::GUIManager *arg1 = (efk::GUIManager *) 0 ;
+  char16_t *arg2 = (char16_t *) 0 ;
+  efk::TreeNodeFlags arg3 ;
+  char16_t *arg4 = (char16_t *) 0 ;
+  bool *arg5 = (bool *) 0 ;
+  bool result;
+  
+  arg1 = (efk::GUIManager *)jarg1; 
+  arg2 = (char16_t *)jarg2; 
+  arg3 = (efk::TreeNodeFlags)jarg3; 
+  arg4 = (char16_t *)jarg4; 
+  arg5 = (bool *)jarg5; 
+  result = (bool)(arg1)->CollapsingHeaderWithToggle((char16_t const *)arg2,arg3,(char16_t const *)arg4,arg5);
+  jresult = result; 
+  return jresult;
+}
+
+
 SWIGEXPORT unsigned int SWIGSTDCALL CSharp_Effekseerfswig_GUIManager_TreeNode___(void * jarg1, void * jarg2) {
   unsigned int jresult ;
   efk::GUIManager *arg1 = (efk::GUIManager *) 0 ;
@@ -7393,15 +7497,19 @@ SWIGEXPORT void SWIGSTDCALL CSharp_Effekseerfswig_GUIManager_ClearAllFonts___(vo
 }
 
 
-SWIGEXPORT void SWIGSTDCALL CSharp_Effekseerfswig_GUIManager_AddFontFromFileTTF___(void * jarg1, void * jarg2, float jarg3) {
+SWIGEXPORT void SWIGSTDCALL CSharp_Effekseerfswig_GUIManager_AddFontFromFileTTF___(void * jarg1, void * jarg2, void * jarg3, void * jarg4, float jarg5) {
   efk::GUIManager *arg1 = (efk::GUIManager *) 0 ;
   char16_t *arg2 = (char16_t *) 0 ;
-  float arg3 ;
+  char16_t *arg3 = (char16_t *) 0 ;
+  char16_t *arg4 = (char16_t *) 0 ;
+  float arg5 ;
   
   arg1 = (efk::GUIManager *)jarg1; 
   arg2 = (char16_t *)jarg2; 
-  arg3 = (float)jarg3; 
-  (arg1)->AddFontFromFileTTF((char16_t const *)arg2,arg3);
+  arg3 = (char16_t *)jarg3; 
+  arg4 = (char16_t *)jarg4; 
+  arg5 = (float)jarg5; 
+  (arg1)->AddFontFromFileTTF((char16_t const *)arg2,(char16_t const *)arg3,(char16_t const *)arg4,arg5);
 }
 
 
@@ -8255,6 +8363,46 @@ SWIGEXPORT void SWIGSTDCALL CSharp_Effekseerfswig_GUIManager_Markdown___(void * 
 }
 
 
+SWIGEXPORT unsigned int SWIGSTDCALL CSharp_Effekseerfswig_GUIManager_BeginNodeFrameTimeline___(void * jarg1) {
+  unsigned int jresult ;
+  efk::GUIManager *arg1 = (efk::GUIManager *) 0 ;
+  bool result;
+  
+  arg1 = (efk::GUIManager *)jarg1; 
+  result = (bool)(arg1)->BeginNodeFrameTimeline();
+  jresult = result; 
+  return jresult;
+}
+
+
+SWIGEXPORT void SWIGSTDCALL CSharp_Effekseerfswig_GUIManager_TimelineNode___(void * jarg1, void * jarg2) {
+  efk::GUIManager *arg1 = (efk::GUIManager *) 0 ;
+  char16_t *arg2 = (char16_t *) 0 ;
+  
+  arg1 = (efk::GUIManager *)jarg1; 
+  arg2 = (char16_t *)jarg2; 
+  (arg1)->TimelineNode((char16_t const *)arg2);
+}
+
+
+SWIGEXPORT void SWIGSTDCALL CSharp_Effekseerfswig_GUIManager_EndNodeFrameTimeline___(void * jarg1, int * jarg2, int * jarg3, int * jarg4, int * jarg5, int * jarg6) {
+  efk::GUIManager *arg1 = (efk::GUIManager *) 0 ;
+  int *arg2 = (int *) 0 ;
+  int *arg3 = (int *) 0 ;
+  int *arg4 = (int *) 0 ;
+  int *arg5 = (int *) 0 ;
+  int *arg6 = (int *) 0 ;
+  
+  arg1 = (efk::GUIManager *)jarg1; 
+  arg2 = (int *)jarg2; 
+  arg3 = (int *)jarg3; 
+  arg4 = (int *)jarg4; 
+  arg5 = (int *)jarg5; 
+  arg6 = (int *)jarg6; 
+  (arg1)->EndNodeFrameTimeline(arg2,arg3,arg4,arg5,arg6);
+}
+
+
 SWIGEXPORT void * SWIGSTDCALL CSharp_Effekseerfswig_FileDialog_OpenDialog___(void * jarg1, void * jarg2) {
   void * jresult ;
   char16_t *arg1 = (char16_t *) 0 ;
@@ -8278,6 +8426,18 @@ SWIGEXPORT void * SWIGSTDCALL CSharp_Effekseerfswig_FileDialog_SaveDialog___(voi
   arg1 = (char16_t *)jarg1; 
   arg2 = (char16_t *)jarg2; 
   result = (char16_t *)efk::FileDialog::SaveDialog((char16_t const *)arg1,(char16_t const *)arg2);
+  jresult = (char16_t *)result; 
+  return jresult;
+}
+
+
+SWIGEXPORT void * SWIGSTDCALL CSharp_Effekseerfswig_FileDialog_PickFolder___(void * jarg1) {
+  void * jresult ;
+  char16_t *arg1 = (char16_t *) 0 ;
+  char16_t *result = 0 ;
+  
+  arg1 = (char16_t *)jarg1; 
+  result = (char16_t *)efk::FileDialog::PickFolder((char16_t const *)arg1);
   jresult = (char16_t *)result; 
   return jresult;
 }

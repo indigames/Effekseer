@@ -46,6 +46,16 @@ public:
 			\~Japanese 例えば、DeltaTimeが2でUpdateIntervalが1の場合、エフェクトは2回更新される。
 		*/
 		float UpdateInterval = 1.0f;
+
+		/**
+			@brief
+			\~English Perform synchronous update
+			\~Japanese 同期更新を行う
+			@note
+			\~English If true, update processing is performed synchronously. If false, update processing is performed asynchronously (after this, do not call anything other than Draw)
+			\~Japanese trueなら同期的に更新処理を行う。falseなら非同期的に更新処理を行う（次はDraw以外呼び出してはいけない）
+		*/
+		bool SyncUpdate = true;
 	};
 
 	/**
@@ -57,7 +67,16 @@ public:
 	struct DrawParameter
 	{
 		Vector3D CameraPosition;
-		Vector3D CameraDirection;
+
+		/**
+			@brief
+			\~English A direction of camera
+			\~Japanese カメラの方向
+			@note
+			\~English It means that the direction is normalize(focus - position)
+			\~Japanese normalize(focus-position)を意味する。
+		*/
+		Vector3D CameraFrontDirection;
 
 		/**
 			@brief
@@ -68,6 +87,13 @@ public:
 			\~Japanese 例えば、エフェクトのレイヤーが0でカリングマスクの最初のビットが1のときエフェクトは表示される。
 		*/
 		int32_t CameraCullingMask;
+
+		/**
+			@brief
+			\~English Whether effects should be sorted by camera position and direction
+			\~Japanese エフェクトをカメラの位置と方向でソートするかどうか
+		*/
+		bool IsSortingEffectsEnabled = false;
 
 		DrawParameter();
 	};
@@ -87,14 +113,7 @@ public:
 		@param	autoFlip		[in]	自動でスレッド間のデータを入れ替えるかどうか、を指定する。trueの場合、Update時に入れ替わる。
 		@return	マネージャー
 	*/
-	static Manager* Create(int instance_max, bool autoFlip = true);
-
-	/**
-		@brief マネージャーを破棄する。
-		@note
-		このマネージャーから生成されたエフェクトは全て強制的に破棄される。
-	*/
-	virtual void Destroy() = 0;
+	static ManagerRef Create(int instance_max, bool autoFlip = true);
 
 	/**
 		@brief
@@ -108,7 +127,7 @@ public:
 		\~English Get a thread handle (HANDLE(win32), pthread_t(posix) or etc.)
 		\~Japanese スレッドハンドルを取得する。(HANDLE(win32) や pthread_t(posix) など)
 	*/
-	virtual uintptr_t GetWorkerThreadHandle(uint32_t threadID) = 0;
+	virtual ThreadNativeHandleType GetWorkerThreadHandle(uint32_t threadID) = 0;
 
 	/**
 		@brief
@@ -174,113 +193,113 @@ public:
 	/**
 		@brief	スプライト描画機能を取得する。
 	*/
-	virtual SpriteRenderer* GetSpriteRenderer() = 0;
+	virtual SpriteRendererRef GetSpriteRenderer() = 0;
 
 	/**
 		@brief	スプライト描画機能を設定する。
 	*/
-	virtual void SetSpriteRenderer(SpriteRenderer* renderer) = 0;
+	virtual void SetSpriteRenderer(SpriteRendererRef renderer) = 0;
 
 	/**
 		@brief	ストライプ描画機能を取得する。
 	*/
-	virtual RibbonRenderer* GetRibbonRenderer() = 0;
+	virtual RibbonRendererRef GetRibbonRenderer() = 0;
 
 	/**
 		@brief	ストライプ描画機能を設定する。
 	*/
-	virtual void SetRibbonRenderer(RibbonRenderer* renderer) = 0;
+	virtual void SetRibbonRenderer(RibbonRendererRef renderer) = 0;
 
 	/**
 		@brief	リング描画機能を取得する。
 	*/
-	virtual RingRenderer* GetRingRenderer() = 0;
+	virtual RingRendererRef GetRingRenderer() = 0;
 
 	/**
 		@brief	リング描画機能を設定する。
 	*/
-	virtual void SetRingRenderer(RingRenderer* renderer) = 0;
+	virtual void SetRingRenderer(RingRendererRef renderer) = 0;
 
 	/**
 		@brief	モデル描画機能を取得する。
 	*/
-	virtual ModelRenderer* GetModelRenderer() = 0;
+	virtual ModelRendererRef GetModelRenderer() = 0;
 
 	/**
 		@brief	モデル描画機能を設定する。
 	*/
-	virtual void SetModelRenderer(ModelRenderer* renderer) = 0;
+	virtual void SetModelRenderer(ModelRendererRef renderer) = 0;
 
 	/**
 		@brief	軌跡描画機能を取得する。
 	*/
-	virtual TrackRenderer* GetTrackRenderer() = 0;
+	virtual TrackRendererRef GetTrackRenderer() = 0;
 
 	/**
 		@brief	軌跡描画機能を設定する。
 	*/
-	virtual void SetTrackRenderer(TrackRenderer* renderer) = 0;
+	virtual void SetTrackRenderer(TrackRendererRef renderer) = 0;
 
 	/**
 		@brief	設定クラスを取得する。
 	*/
-	virtual Setting* GetSetting() = 0;
+	virtual const SettingRef& GetSetting() const = 0;
 
 	/**
 		@brief	設定クラスを設定する。
 		@param	setting	[in]	設定
 	*/
-	virtual void SetSetting(Setting* setting) = 0;
+	virtual void SetSetting(const SettingRef& setting) = 0;
 
 	/**
 		@brief	エフェクト読込クラスを取得する。
 	*/
-	virtual EffectLoader* GetEffectLoader() = 0;
+	virtual EffectLoaderRef GetEffectLoader() = 0;
 
 	/**
 		@brief	エフェクト読込クラスを設定する。
 	*/
-	virtual void SetEffectLoader(EffectLoader* effectLoader) = 0;
+	virtual void SetEffectLoader(EffectLoaderRef effectLoader) = 0;
 
 	/**
 		@brief	テクスチャ読込クラスを取得する。
 	*/
-	virtual TextureLoader* GetTextureLoader() = 0;
+	virtual TextureLoaderRef GetTextureLoader() = 0;
 
 	/**
 		@brief	テクスチャ読込クラスを設定する。
 	*/
-	virtual void SetTextureLoader(TextureLoader* textureLoader) = 0;
+	virtual void SetTextureLoader(TextureLoaderRef textureLoader) = 0;
 
 	/**
 		@brief	サウンド再生機能を取得する。
 	*/
-	virtual SoundPlayer* GetSoundPlayer() = 0;
+	virtual SoundPlayerRef GetSoundPlayer() = 0;
 
 	/**
 		@brief	サウンド再生機能を設定する。
 	*/
-	virtual void SetSoundPlayer(SoundPlayer* soundPlayer) = 0;
+	virtual void SetSoundPlayer(SoundPlayerRef soundPlayer) = 0;
 
 	/**
 		@brief	サウンド読込クラスを取得する
 	*/
-	virtual SoundLoader* GetSoundLoader() = 0;
+	virtual SoundLoaderRef GetSoundLoader() = 0;
 
 	/**
 		@brief	サウンド読込クラスを設定する。
 	*/
-	virtual void SetSoundLoader(SoundLoader* soundLoader) = 0;
+	virtual void SetSoundLoader(SoundLoaderRef soundLoader) = 0;
 
 	/**
 		@brief	モデル読込クラスを取得する。
 	*/
-	virtual ModelLoader* GetModelLoader() = 0;
+	virtual ModelLoaderRef GetModelLoader() = 0;
 
 	/**
 		@brief	モデル読込クラスを設定する。
 	*/
-	virtual void SetModelLoader(ModelLoader* modelLoader) = 0;
+	virtual void SetModelLoader(ModelLoaderRef modelLoader) = 0;
 
 	/**
 		@brief
@@ -290,7 +309,7 @@ public:
 		\~English	loader
 		\~Japanese ローダー
 	*/
-	virtual MaterialLoader* GetMaterialLoader() = 0;
+	virtual MaterialLoaderRef GetMaterialLoader() = 0;
 
 	/**
 		@brief
@@ -300,7 +319,7 @@ public:
 		\~English	loader
 		\~Japanese ローダー
 	*/
-	virtual void SetMaterialLoader(MaterialLoader* loader) = 0;
+	virtual void SetMaterialLoader(MaterialLoaderRef loader) = 0;
 
 	/**
 		@brief
@@ -310,7 +329,7 @@ public:
 		\~English	loader
 		\~Japanese ローダー
 	*/
-	virtual CurveLoader* GetCurveLoader() = 0;
+	virtual CurveLoaderRef GetCurveLoader() = 0;
 
 	/**
 		@brief
@@ -320,7 +339,7 @@ public:
 		\~English	loader
 		\~Japanese ローダー
 	*/
-	virtual void SetCurveLoader(CurveLoader* loader) = 0;
+	virtual void SetCurveLoader(CurveLoaderRef loader) = 0;
 
 	/**
 		@brief	エフェクトを停止する。
@@ -343,7 +362,7 @@ public:
 		@brief	エフェクトのルートだけを停止する。
 		@param	effect	[in]	エフェクト
 	*/
-	virtual void StopRoot(Effect* effect) = 0;
+	virtual void StopRoot(const EffectRef& effect) = 0;
 
 	/**
 		@brief	エフェクトのインスタンスが存在しているか取得する。
@@ -617,6 +636,13 @@ public:
 	virtual void SetAutoDrawing(Handle handle, bool autoDraw) = 0;
 
 	/**
+		@brief
+		\~English	Specify a user pointer for custom renderer and custom sound player
+		\~Japanese	ハンドルごとにカスタムレンダラーやカスタムサウンド向けにユーザーポインタを設定する。
+	*/
+	virtual void SetUserData(Handle handle, void* userData) = 0;
+
+	/**
 		@brief	今までのPlay等の処理をUpdate実行時に適用するようにする。
 	*/
 	virtual void Flip() = 0;
@@ -744,7 +770,7 @@ public:
 		@param	z	[in]	Z座標
 		@return	エフェクトのインスタンスのハンドル
 	*/
-	virtual Handle Play(Effect* effect, float x, float y, float z) = 0;
+	virtual Handle Play(const EffectRef& effect, float x, float y, float z) = 0;
 
 	/**
 		@brief
@@ -760,7 +786,7 @@ public:
 		\~English	A time to play from middle
 		\~Japanese	途中から再生するための時間
 	*/
-	virtual Handle Play(Effect* effect, const Vector3D& position, int32_t startFrame = 0) = 0;
+	virtual Handle Play(const EffectRef& effect, const Vector3D& position, int32_t startFrame = 0) = 0;
 
 	/**
 		@brief
@@ -806,6 +832,28 @@ public:
 		@brief	現在存在するエフェクトのハンドルからカリングの空間を配置しなおす。
 	*/
 	virtual void RessignCulling() = 0;
+
+	/**
+		@brief
+		\~English	Lock rendering events
+		\~Japanese	レンダリングのイベントをロックする。
+		@note
+		\~English	I recommend to read internal codes.
+		\~Japanese	内部コードを読むことを勧めます。
+	*/
+	virtual void LockRendering() = 0;
+
+	/**
+		@brief
+		\~English	Unlock rendering events
+		\~Japanese	レンダリングのイベントをアンロックする。
+		@note
+		\~English	I recommend to read internal codes.
+		\~Japanese	内部コードを読むことを勧めます。
+	*/
+	virtual void UnlockRendering() = 0;
+
+	virtual ManagerImplemented* GetImplemented() = 0;
 };
 //----------------------------------------------------------------------------------
 //

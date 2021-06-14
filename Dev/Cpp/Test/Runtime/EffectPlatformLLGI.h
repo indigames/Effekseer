@@ -33,9 +33,15 @@ class LLGIWindow : public LLGI::Window
 	GLFWwindow* window_ = nullptr;
 
 public:
-	LLGIWindow(GLFWwindow* window) : window_(window) {}
+	LLGIWindow(GLFWwindow* window)
+		: window_(window)
+	{
+	}
 
-	bool OnNewFrame() override { return glfwWindowShouldClose(window_) == GL_FALSE; }
+	bool OnNewFrame() override
+	{
+		return glfwWindowShouldClose(window_) == GL_FALSE;
+	}
 
 	void* GetNativePtr(int32_t index) override
 	{
@@ -86,7 +92,9 @@ protected:
 		LLGI::Color8 Color;
 	};
 
-	virtual void CreateShaders() {}
+	virtual void CreateShaders()
+	{
+	}
 	void CreateResources();
 	void CreateCheckedTexture();
 
@@ -95,11 +103,11 @@ protected:
 	LLGI::Platform* platform_ = nullptr;
 	LLGI::Graphics* graphics_ = nullptr;
 	LLGI::SingleFrameMemoryPool* sfMemoryPool_ = nullptr;
-	LLGI::CommandList* commandList_ = nullptr;
+	std::shared_ptr<LLGI::CommandList> commandList_ = nullptr;
 	std::shared_ptr<LLGI::CommandListPool> commandListPool_ = nullptr;
 
-	EffekseerRenderer::CommandList* commandListEfk_ = nullptr;
-	EffekseerRenderer::SingleFrameMemoryPool* sfMemoryPoolEfk_ = nullptr;
+	Effekseer::RefPtr<EffekseerRenderer::CommandList> commandListEfk_ = nullptr;
+	Effekseer::RefPtr<EffekseerRenderer::SingleFrameMemoryPool> sfMemoryPoolEfk_ = nullptr;
 
 	LLGI::RenderPass* renderPass_ = nullptr;
 	LLGI::Texture* colorBuffer_ = nullptr;
@@ -109,11 +117,13 @@ protected:
 	LLGI::VertexBuffer* vb_ = nullptr;
 	LLGI::IndexBuffer* ib_ = nullptr;
 	LLGI::PipelineState* pip_ = nullptr;
-    LLGI::PipelineState* screenPip_ = nullptr;
+	LLGI::PipelineState* screenPip_ = nullptr;
 	LLGI::RenderPassPipelineState* rppip_ = nullptr;
 	LLGI::Texture* checkTexture_ = nullptr;
 	LLGI::TextureFormatType screenFormat_ = LLGI::TextureFormatType::R8G8B8A8_UNORM;
+	LLGI::DeviceType deviceType_;
 
+	void InitializeWindow() override;
 	void Present() override;
 	bool DoEvent() override;
 	void PreDestroyDevice() override;
@@ -128,5 +138,8 @@ public:
 
 	bool TakeScreenshot(const char* path) override;
 
-	LLGI::Graphics* GetGraphics() const { return graphics_; }
+	LLGI::Graphics* GetGraphics() const
+	{
+		return graphics_;
+	}
 };

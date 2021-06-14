@@ -3,6 +3,7 @@
 // Include
 //----------------------------------------------------------------------------------
 #include "EffekseerRendererGL.GLExtension.h"
+#include "Effekseer.h"
 
 #if defined(__ANDROID__) || defined(__EMSCRIPTEN__)
 #include <EGL/egl.h>
@@ -82,53 +83,101 @@ typedef void*(EFK_STDCALL* FP_glMapBuffer)(GLenum target, GLenum access);
 typedef void*(EFK_STDCALL* FP_glMapBufferRange)(GLenum target, GLintptr offset, GLsizeiptr length, GLbitfield access);
 typedef GLboolean(EFK_STDCALL* FP_glUnmapBuffer)(GLenum target);
 
+typedef void(EFK_STDCALL* FP_glDrawElementsInstanced)(GLenum mode,
+													  GLsizei count,
+													  GLenum type,
+													  const void* indices,
+													  GLsizei primcount);
+
 typedef void(EFK_STDCALL* FP_glCompressedTexImage2D)(
 	GLenum target, GLint level, GLenum internalformat, GLsizei width, GLsizei height, GLint border, GLsizei imageSize, const void* data);
 
-static FP_glDeleteBuffers g_glDeleteBuffers = NULL;
-static FP_glCreateShader g_glCreateShader = NULL;
-static FP_glBindBuffer g_glBindBuffer = NULL;
-static FP_glGenBuffers g_glGenBuffers = NULL;
-static FP_glBufferData g_glBufferData = NULL;
-static FP_glBlendEquationSeparate g_glBlendEquationSeparate = NULL;
-static FP_glBlendFuncSeparate g_glBlendFuncSeparate = NULL;
-static FP_glBlendEquation g_glBlendEquation = NULL;
-static FP_glActiveTexture g_glActiveTexture = NULL;
-static FP_glUniform1i g_glUniform1i = NULL;
-static FP_glShaderSource g_glShaderSource = NULL;
-static FP_glCompileShader g_glCompileShader = NULL;
-static FP_glGetShaderiv g_glGetShaderiv = NULL;
-static FP_glCreateProgram g_glCreateProgram = NULL;
-static FP_glAttachShader g_glAttachShader = NULL;
-static FP_glDeleteProgram g_glDeleteProgram = NULL;
-static FP_glDeleteShader g_glDeleteShader = NULL;
-static FP_glLinkProgram g_glLinkProgram = NULL;
-static FP_glGetProgramiv g_glGetProgramiv = NULL;
-static FP_glGetShaderInfoLog g_glGetShaderInfoLog = NULL;
-static FP_glGetProgramInfoLog g_glGetProgramInfoLog = NULL;
-static FP_glGetAttribLocation g_glGetAttribLocation = NULL;
-static FP_glGetUniformLocation g_glGetUniformLocation = NULL;
-static FP_glUseProgram g_glUseProgram = NULL;
-static FP_glEnableVertexAttribArray g_glEnableVertexAttribArray = NULL;
-static FP_glDisableVertexAttribArray g_glDisableVertexAttribArray = NULL;
-static FP_glVertexAttribPointer g_glVertexAttribPointer = NULL;
-static FP_glUniformMatrix4fv g_glUniformMatrix4fv = NULL;
-static FP_glUniform4fv g_glUniform4fv = NULL;
-static FP_glGenerateMipmap g_glGenerateMipmap = NULL;
-static FP_glBufferSubData g_glBufferSubData = NULL;
-static FP_glGenVertexArrays g_glGenVertexArrays = NULL;
-static FP_glDeleteVertexArrays g_glDeleteVertexArrays = NULL;
-static FP_glBindVertexArray g_glBindVertexArray = NULL;
+typedef void(EFK_STDCALL* FP_glGenFramebuffers)(GLsizei n, GLuint* ids);
+
+typedef void(EFK_STDCALL* FP_glBindFramebuffer)(GLenum target, GLuint framebuffer);
+
+typedef void(EFK_STDCALL* FP_glDeleteFramebuffers)(GLsizei n, GLuint* framebuffers);
+
+typedef void(EFK_STDCALL* FP_glFramebufferTexture2D)(GLenum target,
+													 GLenum attachment,
+													 GLenum textarget,
+													 GLuint texture,
+													 GLint level);
+
+typedef void(EFK_STDCALL* FP_glGenRenderbuffers)(GLsizei n, GLuint* renderbuffers);
+
+typedef void(EFK_STDCALL* FP_glBindRenderbuffer)(GLenum target, GLuint renderbuffer);
+
+typedef void(EFK_STDCALL* FP_glDeleteRenderbuffers)(GLsizei n, GLuint* renderbuffers);
+
+typedef void(EFK_STDCALL* FP_glRenderbufferStorageMultisample)(GLenum target, GLsizei samples, GLenum internalformat, GLsizei width, GLsizei height);
+
+typedef void(EFK_STDCALL* FP_glDrawBuffers)(GLsizei n, const GLenum* bufs);
+
+static FP_glDeleteBuffers g_glDeleteBuffers = nullptr;
+static FP_glCreateShader g_glCreateShader = nullptr;
+static FP_glBindBuffer g_glBindBuffer = nullptr;
+static FP_glGenBuffers g_glGenBuffers = nullptr;
+static FP_glBufferData g_glBufferData = nullptr;
+static FP_glBlendEquationSeparate g_glBlendEquationSeparate = nullptr;
+static FP_glBlendFuncSeparate g_glBlendFuncSeparate = nullptr;
+static FP_glBlendEquation g_glBlendEquation = nullptr;
+static FP_glActiveTexture g_glActiveTexture = nullptr;
+static FP_glUniform1i g_glUniform1i = nullptr;
+static FP_glShaderSource g_glShaderSource = nullptr;
+static FP_glCompileShader g_glCompileShader = nullptr;
+static FP_glGetShaderiv g_glGetShaderiv = nullptr;
+static FP_glCreateProgram g_glCreateProgram = nullptr;
+static FP_glAttachShader g_glAttachShader = nullptr;
+static FP_glDeleteProgram g_glDeleteProgram = nullptr;
+static FP_glDeleteShader g_glDeleteShader = nullptr;
+static FP_glLinkProgram g_glLinkProgram = nullptr;
+static FP_glGetProgramiv g_glGetProgramiv = nullptr;
+static FP_glGetShaderInfoLog g_glGetShaderInfoLog = nullptr;
+static FP_glGetProgramInfoLog g_glGetProgramInfoLog = nullptr;
+static FP_glGetAttribLocation g_glGetAttribLocation = nullptr;
+static FP_glGetUniformLocation g_glGetUniformLocation = nullptr;
+static FP_glUseProgram g_glUseProgram = nullptr;
+static FP_glEnableVertexAttribArray g_glEnableVertexAttribArray = nullptr;
+static FP_glDisableVertexAttribArray g_glDisableVertexAttribArray = nullptr;
+static FP_glVertexAttribPointer g_glVertexAttribPointer = nullptr;
+static FP_glUniformMatrix4fv g_glUniformMatrix4fv = nullptr;
+static FP_glUniform4fv g_glUniform4fv = nullptr;
+static FP_glGenerateMipmap g_glGenerateMipmap = nullptr;
+static FP_glBufferSubData g_glBufferSubData = nullptr;
+static FP_glGenVertexArrays g_glGenVertexArrays = nullptr;
+static FP_glDeleteVertexArrays g_glDeleteVertexArrays = nullptr;
+static FP_glBindVertexArray g_glBindVertexArray = nullptr;
 static FP_glGenSamplers g_glGenSamplers = nullptr;
 static FP_glDeleteSamplers g_glDeleteSamplers = nullptr;
 static FP_glSamplerParameteri g_glSamplerParameteri = nullptr;
 static FP_glBindSampler g_glBindSampler = nullptr;
 
-static FP_glMapBuffer g_glMapBuffer = NULL;
-static FP_glMapBufferRange g_glMapBufferRange = NULL;
-static FP_glUnmapBuffer g_glUnmapBuffer = NULL;
+static FP_glMapBuffer g_glMapBuffer = nullptr;
+static FP_glMapBufferRange g_glMapBufferRange = nullptr;
+static FP_glUnmapBuffer g_glUnmapBuffer = nullptr;
+
+static FP_glDrawElementsInstanced g_glDrawElementsInstanced = nullptr;
 
 static FP_glCompressedTexImage2D g_glCompressedTexImage2D = nullptr;
+
+static FP_glGenFramebuffers g_glGenFramebuffers = nullptr;
+
+static FP_glBindFramebuffer g_glBindFramebuffer = nullptr;
+
+static FP_glGenRenderbuffers g_glGenRenderbuffers = nullptr;
+
+static FP_glBindRenderbuffer g_glBindRenderbuffer = nullptr;
+
+static FP_glDeleteFramebuffers g_glDeleteFramebuffers = nullptr;
+
+static FP_glFramebufferTexture2D g_glFramebufferTexture2D = nullptr;
+
+static FP_glDeleteRenderbuffers g_glDeleteRenderbuffers = nullptr;
+
+static FP_glRenderbufferStorageMultisample g_glRenderbufferStorageMultisample = nullptr;
+
+static FP_glDrawBuffers g_glDrawBuffers = nullptr;
 
 #elif defined(__EFFEKSEER_RENDERER_GLES2__)
 
@@ -140,13 +189,26 @@ typedef void* (*FP_glMapBufferOES)(GLenum target, GLenum access);
 typedef void* (*FP_glMapBufferRangeEXT)(GLenum target, GLintptr offset, GLsizeiptr length, GLbitfield access);
 typedef GLboolean (*FP_glUnmapBufferOES)(GLenum target);
 
-static FP_glGenVertexArraysOES g_glGenVertexArraysOES = NULL;
-static FP_glDeleteVertexArraysOES g_glDeleteVertexArraysOES = NULL;
-static FP_glBindVertexArrayOES g_glBindVertexArrayOES = NULL;
+#ifdef EMSCRIPTEN
+typedef void(EFK_STDCALL* FP_glDrawElementsInstancedANGLE)(GLenum mode,
+														   GLsizei count,
+														   GLenum type,
+														   const void* indices,
+														   GLsizei primcount);
 
-static FP_glMapBufferOES g_glMapBufferOES = NULL;
-static FP_glMapBufferRangeEXT g_glMapBufferRangeEXT = NULL;
-static FP_glUnmapBufferOES g_glUnmapBufferOES = NULL;
+#endif
+
+static FP_glGenVertexArraysOES g_glGenVertexArraysOES = nullptr;
+static FP_glDeleteVertexArraysOES g_glDeleteVertexArraysOES = nullptr;
+static FP_glBindVertexArrayOES g_glBindVertexArrayOES = nullptr;
+
+static FP_glMapBufferOES g_glMapBufferOES = nullptr;
+static FP_glMapBufferRangeEXT g_glMapBufferRangeEXT = nullptr;
+static FP_glUnmapBufferOES g_glUnmapBufferOES = nullptr;
+
+#ifdef EMSCRIPTEN
+static FP_glDrawElementsInstancedANGLE g_glDrawElementsInstancedANGLE = nullptr;
+#endif
 
 #endif
 
@@ -157,15 +219,37 @@ static bool g_isSurrpotedMapBuffer = false;
 static OpenGLDeviceType g_deviceType = OpenGLDeviceType::OpenGL2;
 
 #if _WIN32
-#define GET_PROC(name)                              \
-	g_##name = (FP_##name)wglGetProcAddress(#name); \
-	if (g_##name == NULL)                           \
-		return false;
+#define GET_PROC_REQ(name)                                                                       \
+	g_##name = (FP_##name)wglGetProcAddress(#name);                                              \
+	if (g_##name == nullptr)                                                                     \
+	{                                                                                            \
+		Effekseer::Log(Effekseer::LogType::Error, "Failed to get proc : " + std::string(#name)); \
+		return false;                                                                            \
+	}
 #elif defined(__EFFEKSEER_RENDERER_GLES2__) || defined(__EFFEKSEER_RENDERER_GLES3__)
-#define GET_PROC(name)                              \
-	g_##name = (FP_##name)eglGetProcAddress(#name); \
-	if (g_##name == NULL)                           \
-		return false;
+#define GET_PROC_REQ(name)                                                                       \
+	g_##name = (FP_##name)eglGetProcAddress(#name);                                              \
+	if (g_##name == nullptr)                                                                     \
+	{                                                                                            \
+		Effekseer::Log(Effekseer::LogType::Error, "Failed to get proc : " + std::string(#name)); \
+		return false;                                                                            \
+	}
+#endif
+
+#if _WIN32
+#define GET_PROC(name)                                                                             \
+	g_##name = (FP_##name)wglGetProcAddress(#name);                                                \
+	if (g_##name == nullptr)                                                                       \
+	{                                                                                              \
+		Effekseer::Log(Effekseer::LogType::Warning, "Failed to get proc : " + std::string(#name)); \
+	}
+#elif defined(__EFFEKSEER_RENDERER_GLES2__) || defined(__EFFEKSEER_RENDERER_GLES3__)
+#define GET_PROC(name)                                                                             \
+	g_##name = (FP_##name)eglGetProcAddress(#name);                                                \
+	if (g_##name == nullptr)                                                                       \
+	{                                                                                              \
+		Effekseer::Log(Effekseer::LogType::Warning, "Failed to get proc : " + std::string(#name)); \
+	}
 #endif
 
 OpenGLDeviceType GetDeviceType()
@@ -173,66 +257,85 @@ OpenGLDeviceType GetDeviceType()
 	return g_deviceType;
 }
 
-bool Initialize(OpenGLDeviceType deviceType)
+bool Initialize(OpenGLDeviceType deviceType, bool isExtensionsEnabled)
 {
 	if (g_isInitialized)
 		return true;
 	g_deviceType = deviceType;
-
 #if _WIN32
-	GET_PROC(glDeleteBuffers);
-	GET_PROC(glCreateShader);
-	GET_PROC(glBindBuffer);
-	GET_PROC(glGenBuffers);
-	GET_PROC(glBufferData);
-	GET_PROC(glBlendEquationSeparate);
-	GET_PROC(glBlendFuncSeparate);
-	GET_PROC(glBlendEquation);
-	GET_PROC(glActiveTexture);
-	GET_PROC(glUniform1i);
-	GET_PROC(glShaderSource);
+	GET_PROC_REQ(glDeleteBuffers);
+	GET_PROC_REQ(glCreateShader);
+	GET_PROC_REQ(glBindBuffer);
+	GET_PROC_REQ(glGenBuffers);
+	GET_PROC_REQ(glBufferData);
+	GET_PROC_REQ(glBlendEquationSeparate);
+	GET_PROC_REQ(glBlendFuncSeparate);
+	GET_PROC_REQ(glBlendEquation);
+	GET_PROC_REQ(glActiveTexture);
+	GET_PROC_REQ(glUniform1i);
+	GET_PROC_REQ(glShaderSource);
 
-	GET_PROC(glCompileShader);
-	GET_PROC(glGetShaderiv);
-	GET_PROC(glCreateProgram);
+	GET_PROC_REQ(glCompileShader);
+	GET_PROC_REQ(glGetShaderiv);
+	GET_PROC_REQ(glCreateProgram);
 
-	GET_PROC(glAttachShader);
-	GET_PROC(glDeleteProgram);
-	GET_PROC(glDeleteShader);
+	GET_PROC_REQ(glAttachShader);
+	GET_PROC_REQ(glDeleteProgram);
+	GET_PROC_REQ(glDeleteShader);
 
-	GET_PROC(glLinkProgram);
-	GET_PROC(glGetProgramiv);
-	GET_PROC(glGetShaderInfoLog);
+	GET_PROC_REQ(glLinkProgram);
+	GET_PROC_REQ(glGetProgramiv);
+	GET_PROC_REQ(glGetShaderInfoLog);
 
-	GET_PROC(glGetProgramInfoLog);
-	GET_PROC(glGetAttribLocation);
-	GET_PROC(glGetUniformLocation);
+	GET_PROC_REQ(glGetProgramInfoLog);
+	GET_PROC_REQ(glGetAttribLocation);
+	GET_PROC_REQ(glGetUniformLocation);
 
-	GET_PROC(glUseProgram);
-	GET_PROC(glEnableVertexAttribArray);
-	GET_PROC(glDisableVertexAttribArray);
+	GET_PROC_REQ(glUseProgram);
+	GET_PROC_REQ(glEnableVertexAttribArray);
+	GET_PROC_REQ(glDisableVertexAttribArray);
 
-	GET_PROC(glVertexAttribPointer);
-	GET_PROC(glUniformMatrix4fv);
-	GET_PROC(glUniform4fv);
+	GET_PROC_REQ(glVertexAttribPointer);
+	GET_PROC_REQ(glUniformMatrix4fv);
+	GET_PROC_REQ(glUniform4fv);
 
-	GET_PROC(glGenerateMipmap);
-	GET_PROC(glBufferSubData);
+	GET_PROC_REQ(glGenerateMipmap);
+	GET_PROC_REQ(glBufferSubData);
 
-	GET_PROC(glGenVertexArrays);
-	GET_PROC(glDeleteVertexArrays);
-	GET_PROC(glBindVertexArray);
+	GET_PROC_REQ(glGenVertexArrays);
+	GET_PROC_REQ(glDeleteVertexArrays);
+	GET_PROC_REQ(glBindVertexArray);
 
-	GET_PROC(glGenSamplers);
-	GET_PROC(glDeleteSamplers);
-	GET_PROC(glSamplerParameteri);
-	GET_PROC(glBindSampler);
+	GET_PROC_REQ(glGenSamplers);
+	GET_PROC_REQ(glDeleteSamplers);
+	GET_PROC_REQ(glSamplerParameteri);
+	GET_PROC_REQ(glBindSampler);
 
-	GET_PROC(glMapBuffer);
-	GET_PROC(glMapBufferRange);
-	GET_PROC(glUnmapBuffer);
+	GET_PROC_REQ(glMapBuffer);
+	GET_PROC_REQ(glMapBufferRange);
+	GET_PROC_REQ(glUnmapBuffer);
 
-	GET_PROC(glCompressedTexImage2D);
+	GET_PROC_REQ(glDrawElementsInstanced);
+
+	GET_PROC_REQ(glCompressedTexImage2D);
+
+	GET_PROC_REQ(glGenFramebuffers);
+
+	GET_PROC_REQ(glBindFramebuffer);
+
+	GET_PROC_REQ(glDeleteFramebuffers);
+
+	GET_PROC(glFramebufferTexture2D);
+
+	GET_PROC(glGenRenderbuffers);
+
+	GET_PROC(glBindRenderbuffer);
+
+	GET_PROC(glDeleteRenderbuffers);
+
+	GET_PROC(glRenderbufferStorageMultisample);
+
+	GET_PROC_REQ(glDrawBuffers);
 
 	g_isSupportedVertexArray = (g_glGenVertexArrays && g_glDeleteVertexArrays && g_glBindVertexArray);
 	g_isSurrpotedBufferRange = (g_glMapBufferRange && g_glUnmapBuffer);
@@ -254,12 +357,21 @@ bool Initialize(OpenGLDeviceType deviceType)
 	g_isSurrpotedBufferRange = true;
 	g_isSurrpotedMapBuffer = true;
 #else
-	GET_PROC(glGenVertexArraysOES);
-	GET_PROC(glDeleteVertexArraysOES);
-	GET_PROC(glBindVertexArrayOES);
 	char* glExtensions = (char*)glGetString(GL_EXTENSIONS);
 
+	if (isExtensionsEnabled)
+	{
+		GET_PROC(glGenVertexArraysOES);
+		GET_PROC(glDeleteVertexArraysOES);
+		GET_PROC(glBindVertexArrayOES);
+	}
+
 #if defined(__EMSCRIPTEN__)
+	if (isExtensionsEnabled)
+	{
+		GET_PROC(glDrawElementsInstancedANGLE);
+	}
+
 	g_isSupportedVertexArray = (g_glGenVertexArraysOES && g_glDeleteVertexArraysOES && g_glBindVertexArrayOES &&
 								((glExtensions && strstr(glExtensions, "OES_vertex_array_object")) ? true : false));
 #else
@@ -274,8 +386,11 @@ bool Initialize(OpenGLDeviceType deviceType)
 	g_isSurrpotedBufferRange = false;
 	g_isSurrpotedMapBuffer = false;
 #else
-	GET_PROC(glMapBufferOES);
-	GET_PROC(glUnmapBufferOES);
+	if (isExtensionsEnabled)
+	{
+		GET_PROC(glMapBufferOES);
+		GET_PROC(glUnmapBufferOES);
+	}
 	g_isSurrpotedBufferRange = (g_glMapBufferRangeEXT && g_glUnmapBufferOES);
 	g_isSurrpotedMapBuffer =
 		(g_glMapBufferOES && g_glUnmapBufferOES && ((glExtensions && strstr(glExtensions, "GL_OES_mapbuffer")) ? true : false));
@@ -719,6 +834,25 @@ GLboolean glUnmapBuffer(GLenum target)
 #endif
 }
 
+void glDrawElementsInstanced(GLenum mode,
+							 GLsizei count,
+							 GLenum type,
+							 const void* indices,
+							 GLsizei primcount)
+{
+#if _WIN32
+	return g_glDrawElementsInstanced(mode, count, type, indices, primcount);
+#elif defined(__EFFEKSEER_RENDERER_GLES2__)
+
+#ifdef EMSCRIPTEN
+	return g_glDrawElementsInstancedANGLE(mode, count, type, indices, primcount);
+#endif
+	return;
+#else
+	return ::glDrawElementsInstanced(mode, count, type, indices, primcount);
+#endif
+}
+
 void glCompressedTexImage2D(
 	GLenum target, GLint level, GLenum internalformat, GLsizei width, GLsizei height, GLint border, GLsizei imageSize, const void* data)
 {
@@ -727,6 +861,104 @@ void glCompressedTexImage2D(
 #elif defined(__EFFEKSEER_RENDERER_GLES2__) || defined(__EFFEKSEER_RENDERER_GL2__)
 #else
 	::glCompressedTexImage2D(target, level, internalformat, width, height, border, imageSize, data);
+#endif
+}
+
+void glGenFramebuffers(GLsizei n, GLuint* ids)
+{
+#if _WIN32
+	g_glGenFramebuffers(n, ids);
+#else
+	::glGenFramebuffers(n, ids);
+#endif
+}
+
+void glBindFramebuffer(GLenum target, GLuint framebuffer)
+{
+#if _WIN32
+	g_glBindFramebuffer(target, framebuffer);
+#else
+	::glBindFramebuffer(target, framebuffer);
+#endif
+}
+
+void glDeleteFramebuffers(GLsizei n, GLuint* framebuffers)
+{
+#if _WIN32
+	g_glDeleteFramebuffers(n, framebuffers);
+#else
+	::glDeleteFramebuffers(n, framebuffers);
+#endif
+}
+
+void glFramebufferTexture2D(GLenum target,
+							GLenum attachment,
+							GLenum textarget,
+							GLuint texture,
+							GLint level)
+{
+#if _WIN32
+	g_glFramebufferTexture2D(target,
+							 attachment,
+							 textarget,
+							 texture,
+							 level);
+#else
+	::glFramebufferTexture2D(target,
+							 attachment,
+							 textarget,
+							 texture,
+							 level);
+#endif
+}
+
+void glGenRenderbuffers(GLsizei n, GLuint* renderbuffers)
+{
+#if _WIN32
+	g_glGenRenderbuffers(n, renderbuffers);
+#elif defined(__EFFEKSEER_RENDERER_GLES2__) || defined(__EFFEKSEER_RENDERER_GL2__)
+#else
+	::glGenRenderbuffers(n, renderbuffers);
+#endif
+}
+
+void glBindRenderbuffer(GLenum target, GLuint renderbuffer)
+{
+#if _WIN32
+	g_glBindRenderbuffer(target, renderbuffer);
+#elif defined(__EFFEKSEER_RENDERER_GLES2__) || defined(__EFFEKSEER_RENDERER_GL2__)
+#else
+	::glBindRenderbuffer(target, renderbuffer);
+#endif
+}
+
+void glDeleteRenderbuffers(GLsizei n, GLuint* renderbuffers)
+{
+#if _WIN32
+	g_glDeleteRenderbuffers(n, renderbuffers);
+#elif defined(__EFFEKSEER_RENDERER_GLES2__) || defined(__EFFEKSEER_RENDERER_GL2__)
+#else
+	::glDeleteRenderbuffers(n, renderbuffers);
+#endif
+}
+
+void glRenderbufferStorageMultisample(GLenum target, GLsizei samples, GLenum internalformat, GLsizei width, GLsizei height)
+{
+#if _WIN32
+	g_glRenderbufferStorageMultisample(target, samples, internalformat, width, height);
+#elif defined(__EFFEKSEER_RENDERER_GLES2__) || defined(__EFFEKSEER_RENDERER_GL2__)
+#else
+	::glRenderbufferStorageMultisample(target, samples, internalformat, width, height);
+#endif
+}
+
+void glDrawBuffers(GLsizei n, const GLenum* bufs)
+{
+#if _WIN32
+	g_glDrawBuffers(n, bufs);
+#elif defined(__EFFEKSEER_RENDERER_GLES2__) || defined(__EFFEKSEER_RENDERER_GL2__)
+#else
+	::glDrawBuffers(n, bufs);
 #endif
 }
 

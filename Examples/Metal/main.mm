@@ -29,11 +29,11 @@ int main(int argc, char** argv)
 
 	// Create a memory pool
 	// メモリプールの作成
-	EffekseerRenderer::SingleFrameMemoryPool* sfMemoryPoolEfk = EffekseerRendererMetal::CreateSingleFrameMemoryPool(renderer);
+	auto sfMemoryPoolEfk = EffekseerRenderer::CreateSingleFrameMemoryPool(renderer->GetGraphicsDevice());
 
 	// Create a command list
 	// コマンドリストの作成
-	EffekseerRenderer::CommandList* commandListEfk = EffekseerRendererMetal::CreateCommandList(renderer, sfMemoryPoolEfk);
+	auto commandListEfk = EffekseerRenderer::CreateCommandList(renderer->GetGraphicsDevice(), sfMemoryPoolEfk);
 
 	// Create a manager of effects
 	// エフェクトのマネージャーの作成
@@ -47,13 +47,14 @@ int main(int argc, char** argv)
 	manager->SetTrackRenderer(renderer->CreateTrackRenderer());
 	manager->SetModelRenderer(renderer->CreateModelRenderer());
 
-	// Specify a texture, model and material loader
+	// Specify a texture, model, curve and material loader
 	// It can be extended by yourself. It is loaded from a file on now.
-	// テクスチャ、モデル、マテリアルローダーの設定する。
+	// テクスチャ、モデル、カーブ、マテリアルローダーの設定する。
 	// ユーザーが独自で拡張できる。現在はファイルから読み込んでいる。
 	manager->SetTextureLoader(renderer->CreateTextureLoader());
 	manager->SetModelLoader(renderer->CreateModelLoader());
 	manager->SetMaterialLoader(renderer->CreateMaterialLoader());
+	manager->SetCurveLoader(Effekseer::MakeRefPtr<Effekseer::CurveLoader>());
 
 	// Specify a position of view
 	// 視点位置を確定
@@ -109,6 +110,10 @@ int main(int argc, char** argv)
 		// マネージャーの更新
 		manager->Update();
 
+		// Update a time
+		// 時間を更新する
+		renderer->SetTime(time / 60.0f);
+
 		// Begin to rendering effects
 		// エフェクトの描画開始処理を行う。
 		renderer->BeginRendering();
@@ -133,20 +138,13 @@ int main(int argc, char** argv)
 		time++;
 	}
 
-	// Release effects
-	// エフェクトの解放
-	ES_SAFE_RELEASE(effect);
-
 	// Dispose the manager
 	// マネージャーの破棄
-	manager->Destroy();
-
-	ES_SAFE_RELEASE(sfMemoryPoolEfk);
-	ES_SAFE_RELEASE(commandListEfk);
+	manager.Reset();
 
 	// Dispose the renderer
 	// レンダラーの破棄
-	renderer->Destroy();
+	renderer.Reset();
 
 	TerminateWindowAndDevice();
 
@@ -174,7 +172,7 @@ std::shared_ptr<ContextLLGI> context;
 
 id<MTLRenderCommandEncoder> GetEncoder()
 {
-    return static_cast<LLGI::CommandListMetal*>(context->commandList)->GetImpl()->renderEncoder;
+    return static_cast<LLGI::CommandListMetal*>(context->commandList)->GetRenderCommandEncorder();
 }
 
 int GetSwapBufferCount() { return 3; }

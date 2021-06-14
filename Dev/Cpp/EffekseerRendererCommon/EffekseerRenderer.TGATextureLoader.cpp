@@ -1,11 +1,10 @@
 ﻿
 #include "EffekseerRenderer.TGATextureLoader.h"
 
-
 namespace EffekseerRenderer
 {
 
-bool TGATextureLoader::Load(void* data, int32_t size)
+bool TGATextureLoader::Load(const void* data, int32_t size)
 {
 	uint8_t* data_texture = (uint8_t*)data;
 
@@ -21,7 +20,7 @@ bool TGATextureLoader::Load(void* data, int32_t size)
 	textureWidth = TgaHeader[12] + TgaHeader[13] * 256;
 	textureHeight = TgaHeader[14] + TgaHeader[15] * 256;
 
-	int ColorStep = 4;
+	int ColorStep{};
 
 	if (TgaHeader[16] == 16)
 	{
@@ -31,12 +30,20 @@ bool TGATextureLoader::Load(void* data, int32_t size)
 	{
 		ColorStep = 3;
 	}
+	else if (TgaHeader[16] == 32)
+	{
+		ColorStep = 4;
+	}
+	else
+	{
+		return false;
+	}
 
 	// カラーマップ取得
 	int MapSize = textureWidth * textureHeight * 4;
 	textureData.resize(MapSize);
 
-	uint8_t* SrcTextureData = &data_texture[TGA_HEADER_SIZE];
+	uint8_t* SrcTextureRef = &data_texture[TGA_HEADER_SIZE];
 
 	for (int h = 0; h < textureHeight; h++)
 	{
@@ -50,7 +57,7 @@ bool TGATextureLoader::Load(void* data, int32_t size)
 
 			for (int c = 0; c < ColorStep; c++)
 			{
-				textureData[LU_Index + c] = SrcTextureData[LD_Index + c];
+				textureData[LU_Index + c] = SrcTextureRef[LD_Index + c];
 			}
 
 			if (ColorStep == 2)

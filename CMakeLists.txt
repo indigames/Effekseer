@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.12)
+cmake_minimum_required(VERSION 3.15)
 include(ExternalProject)
 
 # Solution name
@@ -21,7 +21,7 @@ option(USE_LIBPNG_LOADER "use libpng in an internal loader (if it builds viewer 
 
 option(BUILD_VULKAN "Build vulkan modules" OFF)
 
-if (WIN32 AND NOT FROM_CI)
+if (WIN32)
     option(BUILD_DX12 "Build DirectX12 modules" ON)
     option(BUILD_DX11 "Build DirectX11 modules" ON)
     option(BUILD_DX9 "Build DirectX9 modules" ON)
@@ -64,14 +64,23 @@ if(BUILD_VULKAN)
     set(BUILD_VULKAN ON CACHE BOOL "For LLGI" FORCE)
     set(BUILD_VULKAN_COMPILER ON CACHE BOOL "For LLGI" FORCE)
     add_definitions(-D__EFFEKSEER_BUILD_VULKAN__)
+else()
+    set(BUILD_VULKAN OFF CACHE BOOL "For LLGI" FORCE)
+    set(BUILD_VULKAN_COMPILER OFF CACHE BOOL "For LLGI" FORCE)
 endif()
 
 if (BUILD_DX12)
     add_definitions(-D__EFFEKSEER_BUILD_DX12__)
 endif()
 
-if (BUILD_VERSION16)
+if (BUILD_VERSION17)
     add_definitions(-D__EFFEKSEER_BUILD_VERSION17__)
+endif()
+
+option(BUILD_WITH_EASY_PROFILER "Build with easy_profiler to profile" OFF)
+
+if ()
+    add_definitions(-D__EFFEKSEER_BUILD_DX12__)
 endif()
 
 # for linux
@@ -88,6 +97,44 @@ else()
     set(BUILD_WITH_POSTFIX OFF)
 endif()
 
+if(MSVC)
+    add_definitions(/MP)
+endif()
+
+if(SANITIZER_ENABLED AND MSVC)
+    STRING (REGEX REPLACE "/RTC(su|[1su])" "" CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG}")
+    STRING (REGEX REPLACE "/RTC(su|[1su])" "" CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE}")
+    STRING (REGEX REPLACE "/RTC(su|[1su])" "" CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO}")
+    STRING (REGEX REPLACE "/RTC(su|[1su])" "" CMAKE_CXX_FLAGS_MINSIZEREL "${CMAKE_CXX_FLAGS_MINSIZEREL}")
+endif()
+
+if(BUILD_WITH_EASY_PROFILER)
+    ExternalProject_Add(
+        ExternalProject_easy_profiler
+        SOURCE_DIR      ${CMAKE_CURRENT_SOURCE_DIR}/Dev/Cpp/3rdParty/easy_profiler
+        PREFIX          ${CMAKE_CURRENT_BINARY_DIR}/ThirdParty/Build/easy_profiler
+        INSTALL_DIR     ${CMAKE_CURRENT_BINARY_DIR}/ThirdParty/Install/easy_profiler
+        CMAKE_ARGS      -DCMAKE_INSTALL_PREFIX=${CMAKE_CURRENT_BINARY_DIR}/ThirdParty/Install/easy_profiler
+                        -DCMAKE_DEBUG_POSTFIX=d
+                        -DCMAKE_USER_MAKE_RULES_OVERRIDE=${CMAKE_CURRENT_SOURCE_DIR}/Dev/CFlagOverrides.cmake
+                        -DEFK_USE_MSVC_RUNTIME_LIBRARY_DLL=${USE_MSVC_RUNTIME_LIBRARY_DLL}
+                        -DBUILD_SHARED_LIBS=OFF
+                        -DCMAKE_POSITION_INDEPENDENT_CODE:BOOL=true
+    )
+
+    if(BUILD_WITH_POSTFIX)
+        set(EASY_PROFILER_LIB_DEBUG "easy_profilerd")
+        set(EASY_PROFILER_LIB_RELEASE "easy_profiler")
+    else()
+        set(EASY_PROFILER_LIB_DEBUG "easy_profiler")
+        set(EASY_PROFILER_LIB_RELEASE "easy_profiler")
+    endif()
+    
+    list(APPEND EFK_PROFILER_INCLUDES ${CMAKE_CURRENT_BINARY_DIR}/ThirdParty/Install/easy_profiler/include)
+    list(APPEND EFK_PROFILER_LIBRARY_DIRECTORIES ${CMAKE_CURRENT_BINARY_DIR}/ThirdParty/Install/easy_profiler/lib)
+
+endif()
+
 if(BUILD_VULKAN)
     # TODO : Improve it
 
@@ -99,22 +146,14 @@ if(BUILD_VULKAN)
 
         # Hack for GLSLANG
         if (MSVC)
-    	    if (NOT USE_MSVC_RUNTIME_LIBRARY_DLL)
-    		    foreach (flag CMAKE_C_FLAGS
-    			    CMAKE_C_FLAGS_DEBUG
-    			    CMAKE_C_FLAGS_RELEASE
-    			    CMAKE_CXX_FLAGS
-    			    CMAKE_CXX_FLAGS_DEBUG
-    			    CMAKE_CXX_FLAGS_RELEASE)
-    
-    			    if (${flag} MATCHES "/MD")
-    				    string(REGEX REPLACE "/MD" "/MT" ${flag} "${${flag}}")
-    			    endif()
-    			    if (${flag} MATCHES "/MDd")
-    				    string(REGEX REPLACE "/MDd" "/MTd" ${flag} "${${flag}}")
-        			endif()
-        		endforeach()
-    	    endif()
+            # CMAKE_MSVC_RUNTIME_LIBRARY can be only used if minimum required is larger than 3.17
+            if(USE_MSVC_RUNTIME_LIBRARY_DLL)
+                cmake_policy(SET CMP0091 NEW)
+                set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL")
+            else()
+                cmake_policy(SET CMP0091 NEW)
+                set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+            endif()
         endif()
 
         set(ENABLE_HLSL OFF CACHE BOOL "For glslang" FORCE)

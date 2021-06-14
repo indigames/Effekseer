@@ -11,6 +11,8 @@
 namespace EffekseerRendererLLGI
 {
 
+static const int LLGI_InstanceCount = 40;
+
 void MaterialLoader::Deserialize(uint8_t* data, uint32_t datasize, LLGI::CompilerResult& result)
 {
 	if (datasize < 4)
@@ -37,7 +39,7 @@ void MaterialLoader::Deserialize(uint8_t* data, uint32_t datasize, LLGI::Compile
 	}
 }
 
-MaterialLoader::MaterialLoader(GraphicsDevice* graphicsDevice,
+MaterialLoader::MaterialLoader(Backend::GraphicsDevice* graphicsDevice,
 							   ::Effekseer::FileInterface* fileInterface,
 							   ::Effekseer::CompiledMaterialPlatformType platformType,
 							   ::Effekseer::MaterialCompiler* materialCompiler)
@@ -61,7 +63,7 @@ MaterialLoader ::~MaterialLoader()
 	ES_SAFE_RELEASE(graphicsDevice_);
 }
 
-::Effekseer::MaterialData* MaterialLoader::Load(const EFK_CHAR* path)
+::Effekseer::MaterialRef MaterialLoader::Load(const char16_t* path)
 {
 	// code file
 	{
@@ -105,11 +107,11 @@ MaterialLoader ::~MaterialLoader()
 	return nullptr;
 }
 
-::Effekseer::MaterialData* MaterialLoader::LoadAcutually(::Effekseer::Material& material, ::Effekseer::CompiledMaterialBinary* binary)
+::Effekseer::MaterialRef MaterialLoader::LoadAcutually(::Effekseer::MaterialFile& materialFile, ::Effekseer::CompiledMaterialBinary* binary)
 {
-	auto materialData = new ::Effekseer::MaterialData();
-	materialData->IsSimpleVertex = material.GetIsSimpleVertex();
-	materialData->IsRefractionRequired = material.GetHasRefraction();
+	auto material = ::Effekseer::MakeRefPtr<::Effekseer::Material>();
+	material->IsSimpleVertex = materialFile.GetIsSimpleVertex();
+	material->IsRefractionRequired = materialFile.GetHasRefraction();
 
 	std::array<Effekseer::MaterialShaderType, 2> shaderTypes;
 	std::array<Effekseer::MaterialShaderType, 2> shaderTypesModel;
@@ -120,7 +122,7 @@ MaterialLoader ::~MaterialLoader()
 	shaderTypesModel[1] = Effekseer::MaterialShaderType::RefractionModel;
 	int32_t shaderTypeCount = 1;
 
-	if (material.GetHasRefraction())
+	if (materialFile.GetHasRefraction())
 	{
 		shaderTypeCount = 2;
 	}
@@ -128,9 +130,9 @@ MaterialLoader ::~MaterialLoader()
 	for (int32_t st = 0; st < shaderTypeCount; st++)
 	{
 		Shader* shader = nullptr;
-		auto parameterGenerator = EffekseerRenderer::MaterialShaderParameterGenerator(material, false, st, 1);
+		auto parameterGenerator = EffekseerRenderer::MaterialShaderParameterGenerator(materialFile, false, st, LLGI_InstanceCount);
 
-		if (materialData->IsSimpleVertex)
+		if (material->IsSimpleVertex)
 		{
 			LLGI::CompilerResult resultVS;
 			LLGI::CompilerResult resultPS;
@@ -161,9 +163,9 @@ MaterialLoader ::~MaterialLoader()
 
 			shader = Shader::Create(graphicsDevice_,
 									dataVS.data(),
-									resultVS.Binary.size(),
+									(int32_t)resultVS.Binary.size(),
 									dataPS.data(),
-									resultPS.Binary.size(),
+									(int32_t)resultPS.Binary.size(),
 									"MaterialStandardRenderer",
 									layouts,
 									true);
@@ -213,31 +215,33 @@ MaterialLoader ::~MaterialLoader()
 					return LLGI::VertexLayoutFormat::R32G32B32_FLOAT;
 				if (i == 4)
 					return LLGI::VertexLayoutFormat::R32G32B32A32_FLOAT;
+
+				return LLGI::VertexLayoutFormat::R32_FLOAT;
 			};
-			if (material.GetCustomData1Count() > 0)
+			if (materialFile.GetCustomData1Count() > 0)
 			{
-				layouts.push_back(VertexLayout{getFormat(material.GetCustomData1Count()), "TEXCOORD", index});
+				layouts.push_back(VertexLayout{getFormat(materialFile.GetCustomData1Count()), "TEXCOORD", index});
 
 				index++;
 				count++;
-				offset += sizeof(float) * material.GetCustomData1Count();
+				offset += sizeof(float) * materialFile.GetCustomData1Count();
 			}
 
-			if (material.GetCustomData2Count() > 0)
+			if (materialFile.GetCustomData2Count() > 0)
 			{
-				layouts.push_back(VertexLayout{getFormat(material.GetCustomData2Count()), "TEXCOORD", index});
+				layouts.push_back(VertexLayout{getFormat(materialFile.GetCustomData2Count()), "TEXCOORD", index});
 
 				index++;
 				count++;
 
-				offset += sizeof(float) * material.GetCustomData2Count();
+				offset += sizeof(float) * materialFile.GetCustomData2Count();
 			}
 
 			shader = Shader::Create(graphicsDevice_,
 									dataVS.data(),
-									resultVS.Binary.size(),
+									(int32_t)resultVS.Binary.size(),
 									dataPS.data(),
-									resultPS.Binary.size(),
+									(int32_t)resultPS.Binary.size(),
 									"MaterialStandardRenderer",
 									layouts,
 									true);
@@ -252,16 +256,16 @@ MaterialLoader ::~MaterialLoader()
 		shader->SetVertexConstantBufferSize(vertexUniformSize);
 		shader->SetPixelConstantBufferSize(pixelUniformSize);
 
-		materialData->TextureCount = material.GetTextureCount();
-		materialData->UniformCount = material.GetUniformCount();
+		material->TextureCount = materialFile.GetTextureCount();
+		material->UniformCount = materialFile.GetUniformCount();
 
 		if (st == 0)
 		{
-			materialData->UserPtr = shader;
+			material->UserPtr = shader;
 		}
 		else
 		{
-			materialData->RefractionUserPtr = shader;
+			material->RefractionUserPtr = shader;
 		}
 	}
 
@@ -289,7 +293,7 @@ MaterialLoader ::~MaterialLoader()
 			dataPS[i].Size = static_cast<int32_t>(resultPS.Binary[i].size());
 		}
 
-		auto parameterGenerator = EffekseerRenderer::MaterialShaderParameterGenerator(material, true, st, 1);
+		auto parameterGenerator = EffekseerRenderer::MaterialShaderParameterGenerator(materialFile, true, st, LLGI_InstanceCount);
 
 		std::vector<VertexLayout> layouts;
 		layouts.push_back(VertexLayout{LLGI::VertexLayoutFormat::R32G32B32_FLOAT, "POSITION", 0});
@@ -298,16 +302,15 @@ MaterialLoader ::~MaterialLoader()
 		layouts.push_back(VertexLayout{LLGI::VertexLayoutFormat::R32G32B32_FLOAT, "NORMAL", 2});
 		layouts.push_back(VertexLayout{LLGI::VertexLayoutFormat::R32G32_FLOAT, "TEXCOORD", 0});
 		layouts.push_back(VertexLayout{LLGI::VertexLayoutFormat::R8G8B8A8_UNORM, "NORMAL", 3});
-		layouts.push_back(VertexLayout{LLGI::VertexLayoutFormat::R8G8B8A8_UINT, "BLENDINDICES", 0});
 
 		// compile
 		std::string log;
 
 		auto shader = Shader::Create(graphicsDevice_,
 									 dataVS.data(),
-									 resultVS.Binary.size(),
+									 (int32_t)resultVS.Binary.size(),
 									 dataPS.data(),
-									 resultPS.Binary.size(),
+									 (int32_t)resultPS.Binary.size(),
 									 "MaterialStandardModelRenderer",
 									 layouts,
 									 true);
@@ -322,29 +325,29 @@ MaterialLoader ::~MaterialLoader()
 
 		if (st == 0)
 		{
-			materialData->ModelUserPtr = shader;
+			material->ModelUserPtr = shader;
 		}
 		else
 		{
-			materialData->RefractionModelUserPtr = shader;
+			material->RefractionModelUserPtr = shader;
 		}
 	}
 
-	materialData->CustomData1 = material.GetCustomData1Count();
-	materialData->CustomData2 = material.GetCustomData2Count();
-	materialData->TextureCount = std::min(material.GetTextureCount(), Effekseer::UserTextureSlotMax);
-	materialData->UniformCount = material.GetUniformCount();
-	materialData->ShadingModel = material.GetShadingModel();
+	material->CustomData1 = materialFile.GetCustomData1Count();
+	material->CustomData2 = materialFile.GetCustomData2Count();
+	material->TextureCount = std::min(materialFile.GetTextureCount(), Effekseer::UserTextureSlotMax);
+	material->UniformCount = materialFile.GetUniformCount();
+	material->ShadingModel = materialFile.GetShadingModel();
 
-	for (int32_t i = 0; i < materialData->TextureCount; i++)
+	for (int32_t i = 0; i < material->TextureCount; i++)
 	{
-		materialData->TextureWrapTypes.at(i) = material.GetTextureWrap(i);
+		material->TextureWrapTypes.at(i) = materialFile.GetTextureWrap(i);
 	}
 
-	return materialData;
+	return material;
 }
 
-::Effekseer::MaterialData* MaterialLoader::Load(const void* data, int32_t size, Effekseer::MaterialFileType fileType)
+::Effekseer::MaterialRef MaterialLoader::Load(const void* data, int32_t size, Effekseer::MaterialFileType fileType)
 {
 	if (fileType == Effekseer::MaterialFileType::Compiled)
 	{
@@ -360,11 +363,16 @@ MaterialLoader ::~MaterialLoader()
 		}
 
 		// compiled
-		Effekseer::Material material;
-		material.Load((const uint8_t*)compiled.GetOriginalData().data(), static_cast<int32_t>(compiled.GetOriginalData().size()));
+		Effekseer::MaterialFile materialFile;
+		if (!materialFile.Load((const uint8_t*)compiled.GetOriginalData().data(), static_cast<int32_t>(compiled.GetOriginalData().size())))
+		{
+			std::cout << "Error : Invalid material is loaded." << std::endl;
+			return nullptr;
+		}
+
 		auto binary = compiled.GetBinary(platformType_);
 
-		return LoadAcutually(material, binary);
+		return LoadAcutually(materialFile, binary);
 	}
 	else
 	{
@@ -373,15 +381,20 @@ MaterialLoader ::~MaterialLoader()
 			return nullptr;
 		}
 
-		Effekseer::Material material;
-		material.Load((const uint8_t*)data, size);
-		auto binary = ::Effekseer::CreateUniqueReference(materialCompiler_->Compile(&material));
+		Effekseer::MaterialFile materialFile;
+		if (!materialFile.Load((const uint8_t*)data, size))
+		{
+			std::cout << "Error : Invalid material is loaded." << std::endl;
+			return nullptr;
+		}
 
-		return LoadAcutually(material, binary.get());
+		auto binary = ::Effekseer::CreateUniqueReference(materialCompiler_->Compile(&materialFile));
+
+		return LoadAcutually(materialFile, binary.get());
 	}
 }
 
-void MaterialLoader::Unload(::Effekseer::MaterialData* data)
+void MaterialLoader::Unload(::Effekseer::MaterialRef data)
 {
 	if (data == nullptr)
 		return;
@@ -394,7 +407,11 @@ void MaterialLoader::Unload(::Effekseer::MaterialData* data)
 	ES_SAFE_DELETE(modelShader);
 	ES_SAFE_DELETE(refractionShader);
 	ES_SAFE_DELETE(refractionModelShader);
-	ES_SAFE_DELETE(data);
+
+	data->UserPtr = nullptr;
+	data->ModelUserPtr = nullptr;
+	data->RefractionUserPtr = nullptr;
+	data->RefractionModelUserPtr = nullptr;
 }
 
 } // namespace EffekseerRendererLLGI

@@ -5,20 +5,15 @@
 #include "../EffekseerRendererCommon/EffekseerRenderer.Renderer.h"
 #include "EffekseerRendererLLGI.Base.h"
 
+#include "GraphicsDevice.h"
 #include <LLGI.CommandList.h>
-#include <LLGI.Constantbuffer.h>
+#include <LLGI.ConstantBuffer.h>
 #include <LLGI.Graphics.h>
 #include <LLGI.IndexBuffer.h>
 #include <LLGI.VertexBuffer.h>
 
 namespace EffekseerRendererLLGI
 {
-
-class GraphicsDevice;
-
-::Effekseer::TextureLoader* CreateTextureLoader(GraphicsDevice* graphicsDevice, ::Effekseer::FileInterface* fileInterface = NULL);
-
-::Effekseer::ModelLoader* CreateModelLoader(GraphicsDevice* graphicsDevice, ::Effekseer::FileInterface* fileInterface = NULL);
 
 struct FixedShader
 {
@@ -29,9 +24,6 @@ struct FixedShader
 	std::vector<LLGI::DataStructure> ModelLit_VS;
 	std::vector<LLGI::DataStructure> ModelDistortion_VS;
 
-	std::vector<LLGI::DataStructure> SpriteUnlit_PS;
-	std::vector<LLGI::DataStructure> SpriteLit_PS;
-	std::vector<LLGI::DataStructure> SpriteDistortion_PS;
 	std::vector<LLGI::DataStructure> ModelUnlit_PS;
 	std::vector<LLGI::DataStructure> ModelLit_PS;
 	std::vector<LLGI::DataStructure> ModelDistortion_PS;
@@ -43,13 +35,9 @@ struct FixedShader
 	std::vector<LLGI::DataStructure> AdvancedModelLit_VS;
 	std::vector<LLGI::DataStructure> AdvancedModelDistortion_VS;
 
-	std::vector<LLGI::DataStructure> AdvancedSpriteUnlit_PS;
-	std::vector<LLGI::DataStructure> AdvancedSpriteLit_PS;
-	std::vector<LLGI::DataStructure> AdvancedSpriteDistortion_PS;
 	std::vector<LLGI::DataStructure> AdvancedModelUnlit_PS;
 	std::vector<LLGI::DataStructure> AdvancedModelLit_PS;
 	std::vector<LLGI::DataStructure> AdvancedModelDistortion_PS;
-
 };
 
 /**
@@ -67,18 +55,6 @@ protected:
 
 public:
 	virtual LLGI::Graphics* GetGraphics() const = 0;
-
-	/**
-		@brief	\~English	Get background
-				\~Japanese	背景を取得する
-	*/
-	virtual Effekseer::TextureData* GetBackground() = 0;
-
-	/**
-		@brief	\~English	Set background
-				\~Japanese	背景を設定する
-	*/
-	virtual void SetBackground(LLGI::Texture* background) = 0;
 };
 
 class SingleFrameMemoryPool : public ::EffekseerRenderer::SingleFrameMemoryPool, public ::Effekseer::ReferenceObject
@@ -121,12 +97,20 @@ public:
 	}
 };
 
+enum class CommandListState
+{
+	Wait,
+	Running,
+	RunningWithPlatformCommandList,
+};
+
 class CommandList : public ::EffekseerRenderer::CommandList, public ::Effekseer::ReferenceObject
 {
 private:
 	LLGI::Graphics* graphics_ = nullptr;
 	LLGI::CommandList* commandList_ = nullptr;
 	LLGI::SingleFrameMemoryPool* memoryPool_ = nullptr;
+	CommandListState state_ = CommandListState::Wait;
 
 public:
 	CommandList(LLGI::Graphics* graphics, LLGI::CommandList* commandList, LLGI::SingleFrameMemoryPool* memoryPool)
@@ -156,75 +140,19 @@ public:
 		return commandList_;
 	}
 
-	LLGI::SingleFrameMemoryPool* GetMemoryPooll()
+	LLGI::SingleFrameMemoryPool* GetMemoryPool()
 	{
 		return memoryPool_;
 	}
 
-	virtual int GetRef() override
+	CommandListState GetState() const
 	{
-		return ::Effekseer::ReferenceObject::GetRef();
-	}
-	virtual int AddRef() override
-	{
-		return ::Effekseer::ReferenceObject::AddRef();
-	}
-	virtual int Release() override
-	{
-		return ::Effekseer::ReferenceObject::Release();
-	}
-};
-
-class DeviceObject;
-
-class GraphicsDevice : public ::EffekseerRenderer::GraphicsDevice, public ::Effekseer::ReferenceObject
-{
-	friend class DeviceObject;
-
-private:
-	std::set<DeviceObject*> deviceObjects_;
-
-	LLGI::Graphics* graphics_ = nullptr;
-
-	/**
-		@brief	register an object
-	*/
-	void Register(DeviceObject* device);
-
-	/**
-		@brief	unregister an object
-	*/
-	void Unregister(DeviceObject* device);
-
-public:
-	GraphicsDevice(LLGI::Graphics* graphics)
-		: graphics_(graphics)
-	{
-		ES_SAFE_ADDREF(graphics_);
+		return state_;
 	}
 
-	virtual ~GraphicsDevice()
+	void SetState(CommandListState state)
 	{
-		ES_SAFE_RELEASE(graphics_);
-	}
-
-	/**
-		@brief
-		\~english Call when device lost causes
-		\~japanese デバイスロストが発生した時に実行する。
-	*/
-	void OnLostDevice();
-
-	/**
-		@brief
-		\~english Call when device reset causes
-		\~japanese デバイスがリセットされた時に実行する。
-	*/
-	void OnResetDevice();
-
-	LLGI::Graphics* GetGraphics() const
-	{
-		return graphics_;
+		state_ = state;
 	}
 
 	virtual int GetRef() override
@@ -239,60 +167,6 @@ public:
 	{
 		return ::Effekseer::ReferenceObject::Release();
 	}
-};
-
-/**
-@brief	\~English	Model
-		\~Japanese	モデル
-*/
-class Model : public Effekseer::Model
-{
-private:
-	GraphicsDevice* graphicsDevice_ = nullptr;
-
-public:
-	struct InternalModel
-	{
-		LLGI::VertexBuffer* VertexBuffer;
-		LLGI::IndexBuffer* IndexBuffer;
-		int32_t VertexCount;
-		int32_t IndexCount;
-		int32_t FaceCount;
-
-		InternalModel()
-		{
-			VertexBuffer = nullptr;
-			IndexBuffer = nullptr;
-			VertexCount = 0;
-			IndexCount = 0;
-			FaceCount = 0;
-		}
-
-		virtual ~InternalModel()
-		{
-			ES_SAFE_RELEASE(VertexBuffer);
-			ES_SAFE_RELEASE(IndexBuffer);
-		}
-	};
-
-	InternalModel* InternalModels = nullptr;
-	int32_t ModelCount;
-	bool IsLoadedOnGPU = false;
-
-	Model(uint8_t* data, int32_t size, GraphicsDevice* graphicsDevice)
-		: Effekseer::Model(data, size), InternalModels(nullptr), graphicsDevice_(graphicsDevice), ModelCount(0)
-	{
-		this->m_vertexSize = sizeof(VertexWithIndex);
-		ES_SAFE_ADDREF(graphicsDevice_);
-	}
-
-	virtual ~Model()
-	{
-		ES_SAFE_DELETE_ARRAY(InternalModels);
-		ES_SAFE_RELEASE(graphicsDevice_);
-	}
-
-	bool LoadToGPU();
 };
 
 } // namespace EffekseerRendererLLGI

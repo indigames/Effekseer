@@ -9,7 +9,7 @@
 namespace EffekseerRendererDX12
 {
 
-::EffekseerRenderer::GraphicsDevice* CreateDevice(ID3D12Device* device, ID3D12CommandQueue* commandQueue, int32_t swapBufferCount);
+::Effekseer::Backend::GraphicsDeviceRef CreateGraphicsDevice(ID3D12Device* device, ID3D12CommandQueue* commandQueue, int32_t swapBufferCount);
 
 /**
 	@brief	Create an instance
@@ -21,12 +21,12 @@ namespace EffekseerRendererDX12
 	@param	squareMaxCount	The number of maximum sprites
 	@return	instance
 */
-::EffekseerRenderer::Renderer* Create(::EffekseerRenderer::GraphicsDevice* graphicsDevice,
-									  DXGI_FORMAT* renderTargetFormats,
-									  int32_t renderTargetCount,
-									  DXGI_FORMAT depthFormat,
-									  bool isReversedDepth,
-									  int32_t squareMaxCount);
+::EffekseerRenderer::RendererRef Create(::Effekseer::Backend::GraphicsDeviceRef graphicsDevice,
+										DXGI_FORMAT* renderTargetFormats,
+										int32_t renderTargetCount,
+										DXGI_FORMAT depthFormat,
+										bool isReversedDepth,
+										int32_t squareMaxCount);
 
 /**
 	@brief	Create an instance
@@ -40,40 +40,57 @@ namespace EffekseerRendererDX12
 	@param	squareMaxCount	The number of maximum sprites
 	@return	instance
 */
-::EffekseerRenderer::Renderer* Create(ID3D12Device* device,
-									  ID3D12CommandQueue* commandQueue,
-									  int32_t swapBufferCount,
-									  DXGI_FORMAT* renderTargetFormats,
-									  int32_t renderTargetCount,
-									  DXGI_FORMAT depthFormat,
-									  bool isReversedDepth,
-									  int32_t squareMaxCount);
+::EffekseerRenderer::RendererRef Create(ID3D12Device* device,
+										ID3D12CommandQueue* commandQueue,
+										int32_t swapBufferCount,
+										DXGI_FORMAT* renderTargetFormats,
+										int32_t renderTargetCount,
+										DXGI_FORMAT depthFormat,
+										bool isReversedDepth,
+										int32_t squareMaxCount);
 
-Effekseer::TextureData* CreateTextureData(::EffekseerRenderer::Renderer* renderer, ID3D12Resource* texture);
+Effekseer::Backend::TextureRef CreateTexture(::Effekseer::Backend::GraphicsDeviceRef graphicsDevice, ID3D12Resource* texture);
 
-Effekseer::TextureData* CreateTextureData(::EffekseerRenderer::GraphicsDevice* graphicsDevice, ID3D12Resource* texture);
+/**
+		@brief	\~English	Properties in a texture
+				\~Japanese	テクスチャ内のプロパティ
 
-void DeleteTextureData(::EffekseerRenderer::Renderer* renderer, Effekseer::TextureData* textureData);
+		@note	\~English	You need not to release pointers
+				\~Japanese	ポインタの解放する必要はない
+*/
+struct TextureProperty
+{
+	ID3D12Resource* TexturePtr = nullptr;
+};
 
-void DeleteTextureData(::EffekseerRenderer::GraphicsDevice* graphicsDevice, Effekseer::TextureData* textureData);
+TextureProperty GetTextureProperty(::Effekseer::Backend::TextureRef texture);
 
-void FlushAndWait(::EffekseerRenderer::Renderer* renderer);
+/**
+		@brief	\~English	Properties in a commandlist
+				\~Japanese	コマンドリスト内のプロパティ
 
-void FlushAndWait(::EffekseerRenderer::GraphicsDevice* graphicsDevice);
+		@note	\~English	You need not to release pointers
+				\~Japanese	ポインタの解放する必要はない
+*/
+struct CommandListProperty
+{
+	ID3D12CommandList* CommandListPtr = nullptr;
+};
 
-EffekseerRenderer::CommandList* CreateCommandList(::EffekseerRenderer::Renderer* renderer,
-												  ::EffekseerRenderer::SingleFrameMemoryPool* memoryPool);
+CommandListProperty GetCommandListProperty(Effekseer::RefPtr<EffekseerRenderer::CommandList> commandList);
 
-EffekseerRenderer::CommandList* CreateCommandList(::EffekseerRenderer::GraphicsDevice* graphicsDevice,
-												  ::EffekseerRenderer::SingleFrameMemoryPool* memoryPool);
+/**
+	@brief	\~English	Start to record commands
+	\~Japanese	コマンドの記録を開始する。
+	@note
+	\~English	dx12CommandList can be null. In this case, it need to call ExecuteCommandList
+	\~Japanese	dx12CommandList はnullにできる。その場合、ExecuteCommandListを呼ぶ必要がある。
+*/
+void BeginCommandList(Effekseer::RefPtr<EffekseerRenderer::CommandList> commandList, ID3D12GraphicsCommandList* dx12CommandList);
 
-EffekseerRenderer::SingleFrameMemoryPool* CreateSingleFrameMemoryPool(::EffekseerRenderer::Renderer* renderer);
+void EndCommandList(Effekseer::RefPtr<EffekseerRenderer::CommandList> commandList);
 
-EffekseerRenderer::SingleFrameMemoryPool* CreateSingleFrameMemoryPool(::EffekseerRenderer::GraphicsDevice* renderer);
-
-void BeginCommandList(EffekseerRenderer::CommandList* commandList, ID3D12GraphicsCommandList* dx12CommandList);
-
-void EndCommandList(EffekseerRenderer::CommandList* commandList);
+void ExecuteCommandList(Effekseer::RefPtr<EffekseerRenderer::CommandList> commandList);
 
 } // namespace EffekseerRendererDX12
 

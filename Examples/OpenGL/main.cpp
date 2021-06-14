@@ -33,13 +33,14 @@ int main(int argc, char** argv)
 	manager->SetTrackRenderer(renderer->CreateTrackRenderer());
 	manager->SetModelRenderer(renderer->CreateModelRenderer());
 
-	// Specify a texture, model and material loader
+	// Specify a texture, model, curve and material loader
 	// It can be extended by yourself. It is loaded from a file on now.
-	// テクスチャ、モデル、マテリアルローダーの設定する。
+	// テクスチャ、モデル、カーブ、マテリアルローダーの設定する。
 	// ユーザーが独自で拡張できる。現在はファイルから読み込んでいる。
 	manager->SetTextureLoader(renderer->CreateTextureLoader());
 	manager->SetModelLoader(renderer->CreateModelLoader());
 	manager->SetMaterialLoader(renderer->CreateMaterialLoader());
+	manager->SetCurveLoader(Effekseer::MakeRefPtr<Effekseer::CurveLoader>());
 
 	// Specify a position of view
 	// 視点位置を確定
@@ -47,8 +48,8 @@ int main(int argc, char** argv)
 
 	// Specify a projection matrix
 	// 投影行列を設定
-	renderer->SetProjectionMatrix(::Effekseer::Matrix44().PerspectiveFovRH(
-		90.0f / 180.0f * 3.14f, (float)windowWidth / (float)windowHeight, 1.0f, 500.0f));
+	renderer->SetProjectionMatrix(
+		::Effekseer::Matrix44().PerspectiveFovRH_OpenGL(90.0f / 180.0f * 3.14f, (float)windowWidth / (float)windowHeight, 1.0f, 500.0f));
 
 	// Specify a camera matrix
 	// カメラ行列を設定
@@ -109,17 +110,13 @@ int main(int argc, char** argv)
 		time++;
 	}
 
-	// Release effects
-	// エフェクトの解放
-	ES_SAFE_RELEASE(effect);
-
 	// Dispose the manager
 	// マネージャーの破棄
-	manager->Destroy();
+	manager.Reset();
 
 	// Dispose the renderer
 	// レンダラーの破棄
-	renderer->Destroy();
+	renderer.Reset();
 
 	TerminateWindowAndDevice();
 
@@ -132,7 +129,6 @@ int main(int argc, char** argv)
 #include <GLFW/glfw3.h>
 static GLFWwindow* glfwWindow = nullptr;
 
-
 bool InitializeWindowAndDevice(int32_t windowWidth, int32_t windowHeight)
 {
 	// Initialize Window
@@ -141,12 +137,12 @@ bool InitializeWindowAndDevice(int32_t windowWidth, int32_t windowHeight)
 	{
 		throw "Failed to initialize glfw";
 	}
-	
+
 #if !_WIN32
-		glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-		glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
-		glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
-		glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
+	glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
+	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 #endif
 
 	glfwWindow = glfwCreateWindow(windowWidth, windowHeight, "OpenGL", nullptr, nullptr);

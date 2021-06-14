@@ -18,17 +18,33 @@
 namespace EffekseerRendererGL
 {
 
-class GraphicsDevice;
+::Effekseer::Backend::GraphicsDeviceRef CreateGraphicsDevice(OpenGLDeviceType deviceType, bool isExtensionsEnabled = true);
 
-::EffekseerRenderer::GraphicsDevice* CreateDevice(OpenGLDeviceType deviceType = OpenGLDeviceType::OpenGL2);
+[[deprecated("please use EffekseerRenderer::CreateTextureLoader")]] ::Effekseer::TextureLoaderRef CreateTextureLoader(
+	Effekseer::Backend::GraphicsDeviceRef graphicsDevice,
+	::Effekseer::FileInterface* fileInterface = nullptr,
+	::Effekseer::ColorSpaceType colorSpaceType = ::Effekseer::ColorSpaceType::Gamma);
 
-::Effekseer::TextureLoader* CreateTextureLoader(::Effekseer::FileInterface* fileInterface = nullptr,
-												::Effekseer::ColorSpaceType colorSpaceType = ::Effekseer::ColorSpaceType::Gamma);
+[[deprecated("please use EffekseerRenderer::CreateModelLoader")]] ::Effekseer::ModelLoaderRef CreateModelLoader(::Effekseer::FileInterface* fileInterface = nullptr, OpenGLDeviceType deviceType = OpenGLDeviceType::OpenGL2);
 
-::Effekseer::ModelLoader* CreateModelLoader(::Effekseer::FileInterface* fileInterface = NULL);
+::Effekseer::MaterialLoaderRef CreateMaterialLoader(Effekseer::Backend::GraphicsDeviceRef graphicsDevice,
+													::Effekseer::FileInterface* fileInterface = nullptr);
 
-::Effekseer::MaterialLoader* CreateMaterialLoader(::EffekseerRenderer::GraphicsDevice* graphicsDevice,
-												  ::Effekseer::FileInterface* fileInterface = nullptr);
+Effekseer::Backend::TextureRef CreateTexture(Effekseer::Backend::GraphicsDeviceRef graphicsDevice, GLuint buffer, bool hasMipmap, const std::function<void()>& onDisposed);
+
+/**
+		@brief	\~English	Properties in a texture
+				\~Japanese	テクスチャ内のプロパティ
+*/
+struct TextureProperty
+{
+	GLuint Buffer = 0;
+};
+
+TextureProperty GetTextureProperty(::Effekseer::Backend::TextureRef texture);
+
+class Renderer;
+using RendererRef = ::Effekseer::RefPtr<Renderer>;
 
 class Renderer : public ::EffekseerRenderer::Renderer
 {
@@ -51,16 +67,16 @@ public:
 	@param	deviceType
 	\~english	device type of opengl
 	\~japanese	デバイスの種類
-	@param	graphicDevice
-	\~english	for a middleware. it should be nullptr.
-	\~japanese	ミドルウェア向け。 nullptrにすべきである。
+	@param	isExtensionsEnabled
+	\~english	whether does make extensions enabled.
+	\~japanese	拡張を有効にするかどうか
 	@return
 	\~english	instance
 	\~japanese	インスタンス
 	*/
-	static Renderer* Create(int32_t squareMaxCount, OpenGLDeviceType deviceType = OpenGLDeviceType::OpenGL2);
+	static RendererRef Create(int32_t squareMaxCount, OpenGLDeviceType deviceType = OpenGLDeviceType::OpenGL2, bool isExtensionsEnabled = true);
 
-	static Renderer* Create(int32_t squareMaxCount, ::EffekseerRenderer::GraphicsDevice* graphicDevice);
+	static RendererRef Create(Effekseer::Backend::GraphicsDeviceRef graphicsDevice, int32_t squareMaxCount);
 
 	/**
 		@brief	最大描画スプライト数を取得する。
@@ -73,13 +89,6 @@ public:
 		描画している時は使用できない。
 	*/
 	virtual void SetSquareMaxCount(int32_t count) = 0;
-
-	/**
-	@brief
-	\~english	Get a background.
-	\~japanese	背景を取得する。
-	*/
-	virtual Effekseer::TextureData* GetBackground() = 0;
 
 	/**
 	@brief
@@ -103,47 +112,6 @@ public:
 	virtual bool IsVertexArrayObjectSupported() const = 0;
 };
 
-//----------------------------------------------------------------------------------
-//
-//----------------------------------------------------------------------------------
-/**
-	@brief	モデル
-*/
-class Model : public Effekseer::Model
-{
-private:
-public:
-	struct InternalModel
-	{
-		GLuint VertexBuffer;
-		GLuint IndexBuffer;
-		int32_t VertexCount;
-		int32_t IndexCount;
-
-		std::vector<uint8_t> delayVertexBuffer;
-		std::vector<uint8_t> delayIndexBuffer;
-
-		InternalModel();
-
-		virtual ~InternalModel();
-
-		bool TryDelayLoad();
-	};
-
-	InternalModel* InternalModels = nullptr;
-	int32_t ModelCount;
-
-	bool IsLoadedOnGPU = false;
-
-	Model(void* data, int32_t size);
-	~Model();
-
-	bool LoadToGPU();
-};
-
-//----------------------------------------------------------------------------------
-//
-//----------------------------------------------------------------------------------
 } // namespace EffekseerRendererGL
 //----------------------------------------------------------------------------------
 //

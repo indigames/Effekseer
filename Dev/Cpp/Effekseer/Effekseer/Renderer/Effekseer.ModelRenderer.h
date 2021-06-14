@@ -10,9 +10,10 @@
 #include "../Effekseer.Matrix43.h"
 #include "../Effekseer.Vector2D.h"
 #include "../Effekseer.Vector3D.h"
-#include "../SIMD/Effekseer.Mat43f.h"
-#include "../SIMD/Effekseer.Vec2f.h"
-#include "../SIMD/Effekseer.Vec3f.h"
+#include "../Parameter/Effekseer.Parameters.h"
+#include "../SIMD/Mat43f.h"
+#include "../SIMD/Vec2f.h"
+#include "../SIMD/Vec3f.h"
 
 //----------------------------------------------------------------------------------
 //
@@ -23,36 +24,12 @@ namespace Effekseer
 //
 //----------------------------------------------------------------------------------
 
-class ModelRenderer
+class ModelRenderer : public ReferenceObject
 {
 public:
-	struct FalloffParameter
-	{
-		enum BlendType
-		{
-			Add = 0,
-			Sub = 1,
-			Mul = 2,
-		} ColorBlendType;
-		Color BeginColor;
-		Color EndColor;
-		float Pow;
-
-		FalloffParameter()
-		{
-			ColorBlendType = BlendType::Add;
-			BeginColor = Color(255, 255, 255, 255);
-			EndColor = Color(255, 255, 255, 255);
-			Pow = 1.0f;
-		}
-	};
-
 	struct NodeParameter
 	{
 		Effect* EffectPointer;
-		// AlphaBlendType		AlphaBlend;
-		// TextureFilterType	TextureFilter;
-		// TextureWrapType	TextureWrap;
 		bool ZTest;
 		bool ZWrite;
 		BillboardType Billboard;
@@ -60,13 +37,9 @@ public:
 		// bool				Lighting;
 		CullingType Culling;
 		int32_t ModelIndex;
-		// int32_t				ColorTextureIndex;
-		// int32_t				NormalTextureIndex;
 		float Magnification;
 		bool IsRightHand;
-
-		// bool				Distortion;
-		// float				DistortionIntensity;
+		float Maginification = 1.0f;
 
 		NodeRendererDepthParameter* DepthParameterPtr = nullptr;
 		NodeRendererBasicParameter* BasicParameterPtr = nullptr;
@@ -76,17 +49,14 @@ public:
 
 		bool EnableViewOffset = false;
 
-		// RendererMaterialType MaterialType = RendererMaterialType::Default;
-		// MaterialParameter* MaterialParameterPtr = nullptr;
+		bool IsProceduralMode = false;
 
-		// float				DepthOffset;
-		// bool				IsDepthOffsetScaledWithCamera;
-		// bool				IsDepthOffsetScaledWithParticleScale;
+		RefPtr<RenderingUserData> UserData;
 	};
 
 	struct InstanceParameter
 	{
-		Mat43f SRTMatrix43;
+		SIMD::Mat43f SRTMatrix43;
 		RectF UV;
 
 		RectF AlphaUV;

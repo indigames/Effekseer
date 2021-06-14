@@ -64,11 +64,11 @@ public:
 };
 } // namespace SupportXAudio2
 
-SoundLoader::SoundLoader(SoundImplemented* sound, ::Effekseer::FileInterface* fileInterface)
+SoundLoader::SoundLoader(const SoundImplementedRef& sound, ::Effekseer::FileInterface* fileInterface)
 	: m_sound(sound)
 	, m_fileInterface(fileInterface)
 {
-	if (m_fileInterface == NULL)
+	if (m_fileInterface == nullptr)
 	{
 		m_fileInterface = &m_defaultFileInterface;
 	}
@@ -81,7 +81,7 @@ SoundLoader::~SoundLoader()
 {
 }
 
-void* SoundLoader::Load(::Effekseer::FileReader* reader)
+::Effekseer::SoundDataRef SoundLoader::Load(::Effekseer::FileReader* reader)
 {
 	uint32_t chunkIdent, chunkSize;
 	// check RIFF chunk
@@ -89,14 +89,14 @@ void* SoundLoader::Load(::Effekseer::FileReader* reader)
 	reader->Read(&chunkSize, 4);
 	if (memcmp(&chunkIdent, "RIFF", 4) != 0)
 	{
-		return NULL;
+		return nullptr;
 	}
 
 	// check WAVE symbol
 	reader->Read(&chunkIdent, 4);
 	if (memcmp(&chunkIdent, "WAVE", 4) != 0)
 	{
-		return NULL;
+		return nullptr;
 	}
 
 	WAVEFORMATEX wavefmt = {0};
@@ -130,7 +130,7 @@ void* SoundLoader::Load(::Effekseer::FileReader* reader)
 	// check a format
 	if (wavefmt.wFormatTag != WAVE_FORMAT_PCM || wavefmt.nChannels > 2)
 	{
-		return NULL;
+		return nullptr;
 	}
 
 	uint8_t* buffer;
@@ -175,11 +175,10 @@ void* SoundLoader::Load(::Effekseer::FileReader* reader)
 		}
 		break;
 	default:
-		return NULL;
+		return nullptr;
 	}
 
-	SoundData* soundData = new SoundData;
-	memset(soundData, 0, sizeof(SoundData));
+	SoundDataRef soundData = ::Effekseer::MakeRefPtr<SoundData>();
 	soundData->channels = wavefmt.nChannels;
 	soundData->sampleRate = wavefmt.nSamplesPerSec;
 	soundData->buffer.Flags = XAUDIO2_END_OF_STREAM;
@@ -189,35 +188,32 @@ void* SoundLoader::Load(::Effekseer::FileReader* reader)
 	return soundData;
 }
 
-void* SoundLoader::Load(const EFK_CHAR* path)
+::Effekseer::SoundDataRef SoundLoader::Load(const char16_t* path)
 {
-	assert(path != NULL);
+	assert(path != nullptr);
 
 	std::unique_ptr<::Effekseer::FileReader> reader(m_fileInterface->OpenRead(path));
-	if (reader.get() == NULL)
+	if (reader.get() == nullptr)
 		return false;
 
 	return Load(reader.get());
 }
 
-void* SoundLoader::Load(const void* data, int32_t size)
+::Effekseer::SoundDataRef SoundLoader::Load(const void* data, int32_t size)
 {
 	auto reader = SupportXAudio2::BinaryFileReader(data, size);
 	return Load(&reader);
 }
 
-void SoundLoader::Unload(void* data)
+void SoundLoader::Unload(::Effekseer::SoundDataRef soundData)
 {
-	SoundData* soundData = (SoundData*)data;
-	if (soundData == NULL)
+	if (soundData != nullptr)
 	{
-		return;
+		// stop a voice which plays this data
+		m_sound->StopData(soundData);
+		SoundData* soundDataImpl = (SoundData*)soundData.Get();
+		ES_SAFE_DELETE_ARRAY(soundDataImpl->buffer.pAudioData);
 	}
-	// stop a voice which plays this data
-	m_sound->StopData(soundData);
-
-	delete[] soundData->buffer.pAudioData;
-	delete soundData;
 }
 
 //----------------------------------------------------------------------------------

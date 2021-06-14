@@ -4,18 +4,26 @@ cmake_minimum_required(VERSION 3.10)
 project(Test)
 
 set(effekseer_test_src
-    graphics_gl.cpp
     main.cpp
     TestHelper.h
     TestHelper.cpp
+    Window/RenderingWindow.h
+    Window/RenderingWindow.cpp
+    Window/RenderingWindowGL.h
+    Window/RenderingWindowGL.cpp
     Runtime/EffectPlatform.h
     Runtime/EffectPlatform.cpp
     Runtime/EffectPlatformGLFW.h
     Runtime/EffectPlatformGLFW.cpp
     Runtime/EffectPlatformGL.h
     Runtime/EffectPlatformGL.cpp
-    Runtime/RuntimeTest.h
     Runtime/RuntimeTest.cpp
+    Runtime/Performance.cpp
+    Runtime/TextureFormats.cpp
+    Runtime/Vertex.cpp
+    Runtime/ResourceManager.cpp
+    Backend/Mesh.cpp
+    Backend/RenderPassTest.cpp
 )
 
 if(BUILD_DX12 OR BUILD_METAL OR BUILD_VULKAN)
@@ -52,6 +60,8 @@ if(WIN32)
         Runtime/EffectPlatformDX9.cpp
         Runtime/EffectPlatformDX11.h
         Runtime/EffectPlatformDX11.cpp
+        Window/RenderingWindowDX11.h
+        Window/RenderingWindowDX11.cpp
     )
 endif()
 
@@ -62,25 +72,21 @@ include_directories(
     ../EffekseerSoundAL/
     )
 
+if(WIN32)
+include_directories(
+    ${EFK_THIRDPARTY_INCLUDES}
+    ../EffekseerRendererDX11/
+    )
+endif()
+
 set(common_lib)
 set(common_inc)
 
-list(APPEND common_lib Effekseer)
 list(APPEND common_lib EffekseerRendererGL)
 
 if(WIN32)
     list(APPEND common_lib EffekseerRendererDX11)
     list(APPEND common_lib EffekseerRendererDX9)
-endif()
-
-if (USE_XAUDIO2)
-    list(APPEND effekseer_test_src sound_xaudio2.cpp)
-    list(APPEND common_lib EffekseerSoundXAudio2)
-endif()
-
-if (USE_OPENAL)
-    list(APPEND effekseer_test_src sound_al.cpp)
-    list(APPEND common_lib EffekseerSoundAL)
 endif()
 
 if(BUILD_DX12 OR BUILD_METAL OR BUILD_VULKAN)
@@ -99,6 +105,8 @@ endif()
 if(BUILD_VULKAN)
     list(APPEND common_lib EffekseerRendererVulkan)
 endif()
+
+list(APPEND common_lib Effekseer)
 
 if (MSVC)
 else()
@@ -132,11 +140,6 @@ else()
             ${IOKIT_FRAMEWORK}
             ${CORE_FOUNDATION_FRAMEWORK}
             ${CORE_VIDEO_FRAMEWORK})
-    else()
-        list(APPEND common_lib GLEW )
-        find_package(X11 REQUIRED)
-        list(APPEND common_inc ${X11_INCLUDE_DIR})
-        list(APPEND common_lib ${X11_LIBRARIES})
     endif()
 
 endif()
@@ -155,12 +158,14 @@ if(BUILD_VULKAN)
     
     target_link_libraries(
         Test
+        PRIVATE 
         ${Vulkan_LIBRARIES}
     )
 
     # TODO Improve it
     target_link_libraries(
         Test
+        PRIVATE 
         glslang
         SPIRV
         OGLCompiler
@@ -176,9 +181,14 @@ endif()
 
 add_dependencies(Test ExternalProject_glfw)
 
+if(BUILD_WITH_EASY_PROFILER)
+    add_dependencies(Test ExternalProject_easy_profiler)
+endif()
+
 if (BUILD_WITH_POSTFIX)
 target_link_libraries(
     Test
+    PRIVATE 
     ${common_lib}
     debug glfw3d
     optimized glfw3
@@ -186,9 +196,22 @@ target_link_libraries(
 else()
 target_link_libraries(
     Test
+    PRIVATE 
     ${common_lib}
     glfw3
+    dl
 )
+endif()
+
+if(UNIX AND NOT APPLE)
+    find_package(X11 REQUIRED)
+    target_link_libraries(Test PRIVATE ${X11_LIBRARIES})
+    find_package(Threads REQUIRED)
+    target_link_libraries(Test PRIVATE ${CMAKE_THREAD_LIBS_INIT})
+endif()
+
+if(FROM_CI)
+    target_compile_definitions(Test PRIVATE __FROM_CI__)
 endif()
 
 add_definitions(-D__EFFEKSEER_RENDERER_INTERNAL_LOADER__)
@@ -225,10 +248,12 @@ if(USE_LIBPNG_LOADER)
 
     target_link_libraries(
         ${PROJECT_NAME}
+        PRIVATE 
+        debug "${LIBPNG_LIB_DEBUG}"
+        optimized "${LIBPNG_LIB_RELEASE}"
         debug "${ZLIB_LIB_DEBUG}"
         optimized "${ZLIB_LIB_RELEASE}"
-        debug "${LIBPNG_LIB_DEBUG}"
-	    optimized "${LIBPNG_LIB_RELEASE}"
+
 	)
 endif()
 

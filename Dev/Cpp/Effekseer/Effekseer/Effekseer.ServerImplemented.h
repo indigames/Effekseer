@@ -2,6 +2,7 @@
 #ifndef __EFFEKSEER_SERVER_IMPLEMENTED_H__
 #define __EFFEKSEER_SERVER_IMPLEMENTED_H__
 
+#if !(defined(__EFFEKSEER_NETWORK_DISABLED__))
 #if !(defined(_PSVITA) || defined(_SWITCH) || defined(_XBOXONE))
 
 //----------------------------------------------------------------------------------
@@ -51,22 +52,28 @@ private:
 	};
 
 private:
-	EfkSocket m_socket;
-	uint16_t m_port;
+	struct EffectParameter
+	{
+		EffectRef EffectPtr;
+		bool IsRegistered;
+	};
+
+	EfkSocket m_socket = InvalidSocket;
+	uint16_t m_port = 0;
 
 	std::thread m_thread;
 	std::mutex m_ctrlClients;
 
-	bool m_running;
+	bool m_running = false;
 
 	std::set<InternalClient*> m_clients;
 	std::set<InternalClient*> m_removedClients;
 
-	std::map<std::u16string, Effect*> m_effects;
+	std::map<std::u16string, EffectParameter> m_effects;
 
 	std::map<std::u16string, std::vector<uint8_t>> m_data;
 
-	std::vector<EFK_CHAR> m_materialPath;
+	std::vector<char16_t> m_materialPath;
 
 	void AddClient(InternalClient* client);
 	void RemoveClient(InternalClient* client);
@@ -80,17 +87,13 @@ public:
 
 	void Stop() override;
 
-	void Register(const EFK_CHAR* key, Effect* effect) override;
+	void Register(const char16_t* key, const EffectRef& effect) override;
 
-	void Unregister(Effect* effect) override;
+	void Unregister(const EffectRef& effect) override;
 
-	void Update(Manager** managers, int32_t managerCount, ReloadingThreadType reloadingThreadType) override;
+	void Update(ManagerRef* managers, int32_t managerCount, ReloadingThreadType reloadingThreadType) override;
 
-	void SetMaterialPath(const EFK_CHAR* materialPath) override;
-
-	void Regist(const EFK_CHAR* key, Effect* effect) override;
-
-	void Unregist(Effect* effect) override;
+	void SetMaterialPath(const char16_t* materialPath) override;
 };
 
 //----------------------------------------------------------------------------------
@@ -102,5 +105,6 @@ public:
 //----------------------------------------------------------------------------------
 
 #endif // #if !( defined(_PSVITA) || defined(_SWITCH) || defined(_XBOXONE) )
+#endif
 
 #endif // __EFFEKSEER_SERVER_IMPLEMENTED_H__

@@ -132,32 +132,27 @@ fragment main0_out main0(main0_in in [[stage_in]], texture2d<float> txt [[textur
 class DistortingCallbackMetal : public EffekseerRenderer::DistortingCallback
 {
 	EffectPlatformMetal* platform_ = nullptr;
-	::EffekseerRenderer::Renderer* renderer_ = nullptr;
-	Effekseer::TextureData* textureData_ = nullptr;
-
+    Effekseer::Backend::TextureRef texture_ = nullptr;
+    
 public:
-	DistortingCallbackMetal(EffectPlatformMetal* platform, ::EffekseerRenderer::Renderer* renderer) : platform_(platform), renderer_(renderer)
+	DistortingCallbackMetal(EffectPlatformMetal* platform) : platform_(platform)
 	{
 	}
 
 	virtual ~DistortingCallbackMetal()
 	{
-
-		if (textureData_ != nullptr)
-		{
-			EffekseerRendererMetal::DeleteTextureData(renderer_, textureData_);
-		}
+        texture_.Reset();
 	}
 
-	virtual bool OnDistorting() override
+	bool OnDistorting(EffekseerRenderer::Renderer* renderer) override
 	{
-		if (textureData_ == nullptr)
+        if (texture_ == nullptr)
 		{
 			auto tex = (LLGI::TextureMetal*)(platform_->GetCheckedTexture());
-			textureData_ = EffekseerRendererMetal::CreateTextureData(renderer_, tex->GetImpl()->texture);
+			texture_ = EffekseerRendererMetal::CreateTexture(renderer->GetGraphicsDevice(), tex->GetTexture());
 		}
 
-		renderer_->SetBackgroundTexture(textureData_);
+        renderer->SetBackground(texture_);
 
 		return true;
 	}
@@ -200,14 +195,14 @@ void EffectPlatformMetal::CreateShaders()
 	shader_ps_ = graphics_->CreateShader(data_ps.data(), data_ps.size());
 }
 
-EffekseerRenderer::Renderer* EffectPlatformMetal::CreateRenderer()
+EffekseerRenderer::RendererRef EffectPlatformMetal::CreateRenderer()
 {
 	auto renderer = EffekseerRendererMetal::Create(10000, MTLPixelFormatRGBA8Unorm,  MTLPixelFormatDepth32Float, false);
 
-	renderer->SetDistortingCallback(new DistortingCallbackMetal(this, renderer));
+	renderer->SetDistortingCallback(new DistortingCallbackMetal(this));
 
-	sfMemoryPoolEfk_ = EffekseerRendererMetal::CreateSingleFrameMemoryPool(renderer);
-	commandListEfk_ = EffekseerRendererMetal::CreateCommandList(renderer, sfMemoryPoolEfk_);
+	sfMemoryPoolEfk_ = EffekseerRenderer::CreateSingleFrameMemoryPool(renderer->GetGraphicsDevice());
+	commandListEfk_ = EffekseerRenderer::CreateCommandList(renderer->GetGraphicsDevice(), sfMemoryPoolEfk_);
 
 	CreateResources();
 
@@ -224,8 +219,8 @@ void EffectPlatformMetal::BeginRendering()
 {
 	EffectPlatformLLGI::BeginRendering();
 
-	auto cl = static_cast<LLGI::CommandListMetal*>(commandList_);
-	EffekseerRendererMetal::BeginCommandList(commandListEfk_, cl->GetImpl()->renderEncoder);
+	auto cl = static_cast<LLGI::CommandListMetal*>(commandList_.get());
+	EffekseerRendererMetal::BeginCommandList(commandListEfk_, cl->GetRenderCommandEncorder());
 	GetRenderer()->SetCommandList(commandListEfk_);
 }
 

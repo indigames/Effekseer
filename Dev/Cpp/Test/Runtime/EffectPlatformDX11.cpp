@@ -7,17 +7,15 @@ class DistortingCallbackDX11 : public EffekseerRenderer::DistortingCallback
 	ID3D11Device* g_D3d11Device = NULL;
 	ID3D11DeviceContext* g_D3d11Context = NULL;
 
-	::EffekseerRendererDX11::Renderer* renderer = nullptr;
 	ID3D11Texture2D* backGroundTexture = nullptr;
 	ID3D11ShaderResourceView* backGroundTextureSRV = nullptr;
 	D3D11_TEXTURE2D_DESC backGroundTextureDesc;
 
 public:
-	DistortingCallbackDX11(::EffekseerRendererDX11::Renderer* renderer)
-		: renderer(renderer)
+	DistortingCallbackDX11(ID3D11Device* device, ID3D11DeviceContext* context)
 	{
-		g_D3d11Device = renderer->GetDevice();
-		g_D3d11Context = renderer->GetContext();
+		g_D3d11Device = device;
+		g_D3d11Context = context;
 	}
 
 	virtual ~DistortingCallbackDX11()
@@ -77,7 +75,7 @@ public:
 		}
 	}
 
-	virtual bool OnDistorting() override
+	virtual bool OnDistorting(EffekseerRenderer::Renderer* renderer) override
 	{
 		HRESULT hr = S_OK;
 
@@ -100,7 +98,7 @@ public:
 		ES_SAFE_RELEASE(renderTexture);
 		ES_SAFE_RELEASE(renderTargetView);
 
-		renderer->SetBackground(backGroundTextureSRV);
+		reinterpret_cast<EffekseerRendererDX11::Renderer*>(renderer)->SetBackground(backGroundTextureSRV);
 
 		return true;
 	}
@@ -113,8 +111,8 @@ void EffectPlatformDX11::CreateCheckedTexture()
 	desc.BindFlags = 0;
 	desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ | D3D11_CPU_ACCESS_WRITE;
 	desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-	desc.Width = WindowWidth;
-	desc.Height = WindowHeight;
+	desc.Width = initParam_.WindowSize[0];
+	desc.Height = initParam_.WindowSize[1];
 	desc.MipLevels = 1;
 	desc.MiscFlags = 0;
 	desc.SampleDesc.Count = 1;
@@ -133,23 +131,34 @@ void EffectPlatformDX11::CreateCheckedTexture()
 
 	std::vector<uint8_t> data;
 
-	data.resize(WindowWidth * WindowHeight * 4);
+	data.resize(initParam_.WindowSize[0] * initParam_.WindowSize[1] * 4);
 
-	for (int32_t h = 0; h < WindowHeight; h++)
+	for (int32_t h = 0; h < initParam_.WindowSize[1]; h++)
 	{
-		auto src_ = &(checkeredPattern_[h * WindowWidth]);
+		auto src_ = &(checkeredPattern_[h * initParam_.WindowSize[0]]);
 		auto dst_ = &(((uint8_t*)mr.pData)[h * mr.RowPitch]);
-		memcpy(dst_, src_, WindowWidth * 4);
+		memcpy(dst_, src_, initParam_.WindowSize[0] * 4);
 	}
 
 	context_->Unmap(checkedTexture_, sr);
 }
 
-EffekseerRenderer::Renderer* EffectPlatformDX11::CreateRenderer()
+EffekseerRenderer::RendererRef EffectPlatformDX11::CreateRenderer()
 {
-	auto ret = EffekseerRendererDX11::Renderer::Create(device_, context_, 2000);
+	ID3D11DeviceContext* context = nullptr;
 
-	ret->SetDistortingCallback(new DistortingCallbackDX11((EffekseerRendererDX11::Renderer*)ret));
+	if (isDefferedContextMode_)
+	{
+		context = defferedContext_;
+	}
+	else
+	{
+		context = context_;
+	}
+
+	auto ret = EffekseerRendererDX11::Renderer::Create(device_, context, 2000);
+
+	ret->SetDistortingCallback(new DistortingCallbackDX11(device_, context));
 
 	return ret;
 }
@@ -166,6 +175,7 @@ EffectPlatformDX11::~EffectPlatformDX11()
 	ES_SAFE_RELEASE(adapter_);
 	ES_SAFE_RELEASE(dxgiDevice_);
 	ES_SAFE_RELEASE(context_);
+	ES_SAFE_RELEASE(defferedContext_);
 	ES_SAFE_RELEASE(device_);
 }
 
@@ -200,8 +210,8 @@ void EffectPlatformDX11::InitializeDevice(const EffectPlatformInitializingParame
 	}
 
 	DXGI_SWAP_CHAIN_DESC hDXGISwapChainDesc;
-	hDXGISwapChainDesc.BufferDesc.Width = WindowWidth;
-	hDXGISwapChainDesc.BufferDesc.Height = WindowHeight;
+	hDXGISwapChainDesc.BufferDesc.Width = initParam_.WindowSize[0];
+	hDXGISwapChainDesc.BufferDesc.Height = initParam_.WindowSize[1];
 	hDXGISwapChainDesc.BufferDesc.RefreshRate.Numerator = 60;
 	hDXGISwapChainDesc.BufferDesc.RefreshRate.Denominator = 1;
 	hDXGISwapChainDesc.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
@@ -261,26 +271,62 @@ void EffectPlatformDX11::InitializeDevice(const EffectPlatformInitializingParame
 	D3D11_VIEWPORT vp;
 	vp.TopLeftX = 0;
 	vp.TopLeftY = 0;
-	vp.Width = (float)WindowWidth;
-	vp.Height = (float)WindowHeight;
+	vp.Width = (float)initParam_.WindowSize[0];
+	vp.Height = (float)initParam_.WindowSize[1];
 	vp.MinDepth = 0.0f;
 	vp.MaxDepth = 1.0f;
 	context_->RSSetViewports(1, &vp);
 
 	CreateCheckedTexture();
+
+	if (FAILED(device_->CreateDeferredContext(0, &defferedContext_)))
+	{
+		throw "Failed : CreateDeferredContext";
+	}
 }
 
 void EffectPlatformDX11::BeginRendering()
 {
-	float ClearColor[] = {0.0f, 0.0f, 0.0f, 1.0f};
-	context_->ClearRenderTargetView(renderTargetView_, ClearColor);
-	context_->ClearDepthStencilView(depthStencilView_, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
+	ID3D11DeviceContext* context = nullptr;
 
-	context_->CopyResource(backBuffer_, checkedTexture_);
+	if (isDefferedContextMode_)
+	{
+		GetRenderer().DownCast<EffekseerRendererDX11::Renderer>()->ResetStateForDefferedContext();
+
+		context = defferedContext_;
+
+		context->OMSetRenderTargets(1, &renderTargetView_, depthStencilView_);
+
+		D3D11_VIEWPORT vp;
+		vp.TopLeftX = 0;
+		vp.TopLeftY = 0;
+		vp.Width = (float)initParam_.WindowSize[0];
+		vp.Height = (float)initParam_.WindowSize[1];
+		vp.MinDepth = 0.0f;
+		vp.MaxDepth = 1.0f;
+		context->RSSetViewports(1, &vp);
+	}
+	else
+	{
+		context = context_;
+	}
+
+	float ClearColor[] = {0.0f, 0.0f, 0.0f, 1.0f};
+	context->ClearRenderTargetView(renderTargetView_, ClearColor);
+	context->ClearDepthStencilView(depthStencilView_, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
+
+	context->CopyResource(backBuffer_, checkedTexture_);
 }
 
 void EffectPlatformDX11::EndRendering()
 {
+	if (isDefferedContextMode_)
+	{
+		ID3D11CommandList* cl = nullptr;
+		defferedContext_->FinishCommandList(false, &cl);
+		context_->ExecuteCommandList(cl, false);
+		cl->Release();
+	}
 }
 
 void EffectPlatformDX11::Present()
@@ -300,8 +346,8 @@ bool EffectPlatformDX11::TakeScreenshot(const char* path)
 	desc.BindFlags = 0;
 	desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ | D3D11_CPU_ACCESS_WRITE;
 	desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-	desc.Width = WindowWidth;
-	desc.Height = WindowHeight;
+	desc.Width = initParam_.WindowSize[0];
+	desc.Height = initParam_.WindowSize[1];
 	desc.MipLevels = 1;
 	desc.MiscFlags = 0;
 	desc.SampleDesc.Count = 1;
@@ -322,13 +368,13 @@ bool EffectPlatformDX11::TakeScreenshot(const char* path)
 
 	std::vector<uint8_t> data;
 
-	data.resize(WindowWidth * WindowHeight * 4);
+	data.resize(initParam_.WindowSize[0] * initParam_.WindowSize[1] * 4);
 
-	for (int32_t h = 0; h < WindowHeight; h++)
+	for (int32_t h = 0; h < initParam_.WindowSize[1]; h++)
 	{
-		auto dst_ = &(data[h * WindowWidth * 4]);
+		auto dst_ = &(data[h * initParam_.WindowSize[0] * 4]);
 		auto src_ = &(((uint8_t*)mr.pData)[h * mr.RowPitch]);
-		memcpy(dst_, src_, WindowWidth * 4);
+		memcpy(dst_, src_, initParam_.WindowSize[0] * 4);
 	}
 
 	context_->Unmap(cpuTexture, sr);
@@ -336,12 +382,12 @@ bool EffectPlatformDX11::TakeScreenshot(const char* path)
 	cpuTexture->Release();
 
 	// HACK for intel
-	for (int32_t i = 0; i < WindowWidth * WindowHeight; i++)
+	for (int32_t i = 0; i < initParam_.WindowSize[0] * initParam_.WindowSize[1]; i++)
 	{
 		data[i * 4 + 3] = 255;
 	}
 
-	stbi_write_png(path, WindowWidth, WindowHeight, 4, data.data(), WindowWidth * 4);
+	stbi_write_png(path, initParam_.WindowSize[0], initParam_.WindowSize[1], 4, data.data(), initParam_.WindowSize[0] * 4);
 
 	return true;
 }

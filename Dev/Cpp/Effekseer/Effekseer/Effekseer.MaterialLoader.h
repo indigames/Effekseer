@@ -2,6 +2,7 @@
 #ifndef __EFFEKSEER_MATERIALLOADER_H__
 #define __EFFEKSEER_MATERIALLOADER_H__
 
+#include "Effekseer.Base.Pre.h"
 #include "Effekseer.Base.h"
 
 namespace Effekseer
@@ -12,7 +13,7 @@ namespace Effekseer
 	\~English	Material loader
 	\~Japanese	マテリアル読み込み破棄関数指定クラス
 */
-class MaterialLoader
+class MaterialLoader : public ReferenceObject
 {
 public:
 	/**
@@ -40,7 +41,7 @@ public:
 		\~English	a pointer of loaded a material
 		\~Japanese	読み込まれたマテリアルのポインタ
 	*/
-	virtual MaterialData* Load(const EFK_CHAR* path)
+	virtual MaterialRef Load(const char16_t* path)
 	{
 		return nullptr;
 	}
@@ -62,7 +63,7 @@ public:
 		\~English	a pointer of loaded a material
 		\~Japanese	読み込まれたマテリアルのポインタ
 	*/
-	virtual MaterialData* Load(const void* data, int32_t size, MaterialFileType fileType)
+	virtual MaterialRef Load(const void* data, int32_t size, MaterialFileType fileType)
 	{
 		return nullptr;
 	}
@@ -75,7 +76,7 @@ public:
 		\~English	a pointer of loaded a material
 		\~Japanese	読み込まれたマテリアルのポインタ
 	*/
-	virtual void Unload(MaterialData* data)
+	virtual void Unload(MaterialRef data)
 	{
 	}
 };

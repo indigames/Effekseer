@@ -1,13 +1,19 @@
-cmake_minimum_required(VERSION 2.8)
+cmake_minimum_required(VERSION 3.15)
+
 project(Viewer CXX)
 
-# For Mac
-if(APPLE)
-	set(CMAKE_OSX_DEPLOYMENT_TARGET 10.10)
+if (MSVC)
+    if(USE_MSVC_RUNTIME_LIBRARY_DLL)
+        cmake_policy(SET CMP0091 NEW)
+        set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL")
+    else()
+        cmake_policy(SET CMP0091 NEW)
+        set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+    endif()
 endif()
 
+
 FILE(GLOB hs
-	3rdParty/imgui/*.h
 	EffekseerTool/*.h
 	Graphics/*.h
 	GUI/*.h
@@ -15,10 +21,10 @@ FILE(GLOB hs
 )
 
 FILE(GLOB cpps
-	3rdParty/imgui/*.cpp
 	3rdParty/imgui_addon/imguidock/*.cpp
 	3rdParty/imgui_addon/imguihelper/*.cpp
 	3rdParty/imgui_addon/fcurve/*.cpp
+	3rdParty/imgui_addon/ImGuizmo/*.cpp
 	EffekseerTool/*.cpp
 	Graphics/*.cpp
 	GUI/*.cpp
@@ -30,6 +36,8 @@ list(APPEND cpps
     RenderedEffectGenerator.cpp
 	Graphics/CommandList.cpp
     Graphics/RenderPass.cpp
+    Graphics/StaticMeshRenderer.cpp
+    Graphics/PostProcess.cpp
     Recorder/Recorder.cpp
 )
 
@@ -37,21 +45,15 @@ list(APPEND hs
     RenderedEffectGenerator.h
 	Graphics/CommandList.h
     Graphics/RenderPass.h
+    Graphics/StaticMeshRenderer.h
+    Graphics/PostProcess.h
     Recorder/Recorder.h
 )
 
 # OS Dependency
 if (WIN32)
-list(APPEND hs
-	3rdParty/nfd/nfd.h
-	3rdParty/nfd/nfd_common.h
-	3rdParty/Boxer/boxer.h
-)
 
 list(APPEND cpps
-	3rdParty/nfd/nfd_common.c
-	3rdParty/nfd/nfd_win.cpp
-	3rdParty/Boxer/boxer_win.cpp
 	3rdParty/imgui_platform/imgui_impl_glfw.cpp
 	3rdParty/imgui_platform/imgui_impl_opengl3.cpp
 	3rdParty/imgui_platform/imgui_impl_dx11.cpp
@@ -59,32 +61,15 @@ list(APPEND cpps
 
 elseif(APPLE)
 
-list(APPEND hs
-	3rdParty/nfd/nfd.h
-	3rdParty/nfd/nfd_common.h
-	3rdParty/Boxer/boxer.h
-)
-
 list(APPEND cpps
-	3rdParty/nfd/nfd_common.c
-	3rdParty/nfd/nfd_cocoa.m
-	3rdParty/Boxer/boxer_osx.mm
 	3rdParty/imgui_platform/imgui_impl_glfw.cpp
 	3rdParty/imgui_platform/imgui_impl_opengl3.cpp
 )
 
 else()
 
-list(APPEND hs
-	3rdParty/nfd/nfd.h
-	3rdParty/nfd/nfd_common.h
-	3rdParty/Boxer/boxer.h
-)
 
 list(APPEND cpps
-	3rdParty/nfd/nfd_common.c
-	3rdParty/nfd/nfd_gtk.c
-	3rdParty/Boxer/boxer_linux.cpp
 	3rdParty/imgui_platform/imgui_impl_glfw.cpp
 	3rdParty/imgui_platform/imgui_impl_opengl3.cpp
 )
@@ -119,29 +104,8 @@ list(APPEND cpps ${cpps_g})
 FilterFolder("${hs}")
 FilterFolder("${cpps}")
 
-# MSVC Flag
-if (MSVC)
-	if (NOT USE_MSVC_RUNTIME_LIBRARY_DLL)
-		foreach (flag CMAKE_C_FLAGS
-			CMAKE_C_FLAGS_DEBUG
-			CMAKE_C_FLAGS_RELEASE
-			CMAKE_CXX_FLAGS
-			CMAKE_CXX_FLAGS_DEBUG
-			CMAKE_CXX_FLAGS_RELEASE)
-
-			if (${flag} MATCHES "/MD")
-				string(REGEX REPLACE "/MD" "/MT" ${flag} "${${flag}}")
-			endif()
-			if (${flag} MATCHES "/MDd")
-				string(REGEX REPLACE "/MDd" "/MTd" ${flag} "${${flag}}")
-			endif()
-		endforeach()
-	endif()
-endif()
-
 include_directories(
 	${EFK_THIRDPARTY_INCLUDES}
-	3rdParty/imgui/
 	../include/
 	../EffekseerRendererDX9/
 	../EffekseerRendererGL/
@@ -159,6 +123,8 @@ target_link_libraries(
     Viewer
     PRIVATE
     EditorCommon
+    Boxer
+    imgui
     debug "${GLFW3_LIB_DEBUG}"
     optimized "${GLFW3_LIB_RELEASE}"
     debug "${GD_LIB_DEBUG}"
@@ -189,17 +155,24 @@ if(CLANG_FORMAT_ENABLED)
     clang_format(Viewer)
 endif()
 
+target_link_libraries(
+    Viewer
+    PRIVATE
+    Effekseer
+    EffekseerSoundOSMixer
+    IPC
+    nfd)
+
+
 if (WIN32)
 
     target_link_libraries(
         Viewer
         PRIVATE
-        Effekseer
         EffekseerRendererDX9
         EffekseerRendererDX11
         EffekseerRendererGL
         EffekseerSoundOSMixer
-        IPC
         debug libglew32d
         debug OpenSoundMixerd
         optimized libglew32
@@ -222,9 +195,6 @@ elseif(APPLE)
         Viewer
         PRIVATE
         EffekseerRendererGL
-        EffekseerSoundOSMixer
-        Effekseer
-        IPC
         OpenSoundMixer
         ${OpenAL_LIBRARY}
         "-framework OpenAL"
@@ -235,6 +205,8 @@ elseif(APPLE)
         ${CORE_FOUNDATION_FRAMEWORK}
         ${CORE_VIDEO_FRAMEWORK})
 
+    set_target_properties(Viewer PROPERTIES XCODE_ATTRIBUTE_ENABLE_HARDENED_RUNTIME YES)
+
 else()
 
 FIND_PACKAGE(PulseAudio REQUIRED)
@@ -244,32 +216,20 @@ FIND_PACKAGE(OpenGL REQUIRED)
 find_package(X11 REQUIRED)
 find_package(Threads REQUIRED)
 
-find_package(PkgConfig REQUIRED)
-pkg_check_modules(GTK3 REQUIRED gtk+-3.0)
-
 include_directories(
 	${OPENGL_INCLUDE_DIR}
-	${GTK3_INCLUDE_DIRS}
 	${X11_INCLUDE_DIR})
-
-link_directories(${GTK3_LIBRARY_DIRS})
-
-add_definitions(${GTK3_CFLAGS_OTHER})
 
 target_link_libraries(
 	Viewer
 	PRIVATE
 	EffekseerRendererGL
-	EffekseerSoundOSMixer
-	Effekseer
-	IPC
 	dl
 	OpenSoundMixer
 	stdc++fs
 	${OPENGL_LIBRARY}
 	${CMAKE_THREAD_LIBS_INIT}
 	${PulseAudio_LIBRARY}
-	${GTK3_LIBRARIES}
 	${X11_LIBRARIES})
 
 endif()

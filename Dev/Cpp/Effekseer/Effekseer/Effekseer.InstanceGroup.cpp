@@ -1,14 +1,10 @@
-﻿
+﻿#include "Effekseer.InstanceGroup.h"
 
-//----------------------------------------------------------------------------------
-//
-//----------------------------------------------------------------------------------
 #include "Effekseer.ManagerImplemented.h"
 
 #include "Effekseer.Instance.h"
 #include "Effekseer.InstanceContainer.h"
 #include "Effekseer.InstanceGlobal.h"
-#include "Effekseer.InstanceGroup.h"
 #include "Utils/Effekseer.CustomAllocator.h"
 #include <assert.h>
 
@@ -21,17 +17,13 @@ namespace Effekseer
 //----------------------------------------------------------------------------------
 //
 //----------------------------------------------------------------------------------
-InstanceGroup::InstanceGroup(Manager* manager, EffectNode* effectNode, InstanceContainer* container, InstanceGlobal* global)
-	: m_manager((ManagerImplemented*)manager)
-	, m_effectNode((EffectNodeImplemented*)effectNode)
+InstanceGroup::InstanceGroup(ManagerImplemented* manager, EffectNodeImplemented* effectNode, InstanceContainer* container, InstanceGlobal* global)
+	: m_manager(manager)
+	, m_effectNode(effectNode)
 	, m_container(container)
 	, m_global(global)
-	, m_time(0)
-	, IsReferencedFromInstance(true)
-	, NextUsedByInstance(NULL)
-	, NextUsedByContainer(NULL)
 {
-	parentMatrix_ = Mat43f::Identity;
+	parentMatrix_ = SIMD::Mat43f::Identity;
 }
 
 //----------------------------------------------------------------------------------
@@ -50,18 +42,70 @@ void InstanceGroup::NotfyEraseInstance()
 //----------------------------------------------------------------------------------
 //
 //----------------------------------------------------------------------------------
-Instance* InstanceGroup::CreateInstance()
+void InstanceGroup::Initialize(RandObject& rand, Instance* parent)
 {
-	Instance* instance = NULL;
+	m_generatedCount = 0;
 
-	instance = m_manager->CreateInstance(m_effectNode, m_container, this);
+	auto gt = ApplyEq(m_effectNode->GetEffect(), m_global, parent, &rand, 
+		m_effectNode->CommonValues.RefEqGenerationTimeOffset, m_effectNode->CommonValues.GenerationTimeOffset);
 
-	if (instance)
+	m_nextGenerationTime = gt.getValue(rand);
+
+	if (m_effectNode->CommonValues.RefEqMaxGeneration >= 0)
+	{
+		auto maxGene = static_cast<float>(m_effectNode->CommonValues.MaxGeneration);
+		ApplyEq(maxGene, m_effectNode->GetEffect(), m_global, parent, &rand, m_effectNode->CommonValues.RefEqMaxGeneration, maxGene);
+		m_maxGenerationCount = static_cast<int32_t>(maxGene);
+	}
+	else
+	{
+		m_maxGenerationCount = m_effectNode->CommonValues.MaxGeneration;
+	}
+}
+
+Instance* InstanceGroup::CreateRootInstance()
+{
+	auto instance = m_manager->CreateInstance(m_effectNode, m_container, this);
+	if (instance != nullptr)
 	{
 		m_instances.push_back(instance);
 		m_global->IncInstanceCount();
+		return instance;
 	}
-	return instance;
+	return nullptr;
+}
+
+//----------------------------------------------------------------------------------
+//
+//----------------------------------------------------------------------------------
+void InstanceGroup::GenerateInstancesInRequirred(float localTime, RandObject& rand, Instance* parent)
+{
+	while (true)
+	{
+		// GenerationTimeOffset can be minus value.
+		// Minus frame particles is generated simultaniously at frame 0.
+		if (m_maxGenerationCount > m_generatedCount && localTime >= m_nextGenerationTime)
+		{
+			// Create a particle
+			auto instance = m_manager->CreateInstance(m_effectNode, m_container, this);
+			if (instance != nullptr)
+			{
+				m_instances.push_back(instance);
+				m_global->IncInstanceCount();
+
+				instance->Initialize(parent, m_generatedCount, SIMD::Mat43f::Identity);
+			}
+
+			m_generatedCount++;
+
+			auto gt = ApplyEq(m_effectNode->GetEffect(), m_global, parent, &rand, m_effectNode->CommonValues.RefEqGenerationTime, m_effectNode->CommonValues.GenerationTime);
+			m_nextGenerationTime += Max(0.0f, gt.getValue(rand));
+		}
+		else
+		{
+			break;
+		}
+	}
 }
 
 //----------------------------------------------------------------------------------
@@ -73,7 +117,7 @@ Instance* InstanceGroup::GetFirst()
 	{
 		return m_instances.front();
 	}
-	return NULL;
+	return nullptr;
 }
 
 //----------------------------------------------------------------------------------
@@ -104,13 +148,13 @@ void InstanceGroup::Update(bool shown)
 		}
 	}
 
-	m_time++;
+	//m_time++;
 }
 
 //----------------------------------------------------------------------------------
 //
 //----------------------------------------------------------------------------------
-void InstanceGroup::SetBaseMatrix(const Mat43f& mat)
+void InstanceGroup::SetBaseMatrix(const SIMD::Mat43f& mat)
 {
 	for (auto instance : m_instances)
 	{
@@ -122,7 +166,7 @@ void InstanceGroup::SetBaseMatrix(const Mat43f& mat)
 	}
 }
 
-void InstanceGroup::SetParentMatrix(const Mat43f& mat)
+void InstanceGroup::SetParentMatrix(const SIMD::Mat43f& mat)
 {
 	TranslationParentBindType tType = m_effectNode->CommonValues.TranslationBindType;
 	BindType rType = m_effectNode->CommonValues.RotationBindType;
@@ -138,16 +182,14 @@ void InstanceGroup::SetParentMatrix(const Mat43f& mat)
 	{
 		parentMatrix_ = rootGroup->GetParentMatrix();
 	}
-	else if (tType == BindType::WhenCreating 
-			 || tType == TranslationParentBindType::WhenCreating_FollowParent
-			 && rType == BindType::WhenCreating && sType == BindType::WhenCreating)
+	else if ((tType == BindType::WhenCreating || tType == TranslationParentBindType::WhenCreating_FollowParent) && rType == BindType::WhenCreating && sType == BindType::WhenCreating)
 	{
 		// don't do anything
 	}
 	else
 	{
-		Vec3f s, t;
-		Mat43f r;
+		SIMD::Vec3f s, t;
+		SIMD::Mat43f r;
 		mat.GetSRT(s, r, t);
 
 		if (tType == BindType::Always)
@@ -160,11 +202,11 @@ void InstanceGroup::SetParentMatrix(const Mat43f& mat)
 		}
 		else if (tType == BindType::NotBind)
 		{
-			parentTranslation_ = Vec3f(0.0f, 0.0f, 0.0f);
+			parentTranslation_ = SIMD::Vec3f(0.0f, 0.0f, 0.0f);
 		}
 		else if (tType == TranslationParentBindType::NotBind_FollowParent)
 		{
-			parentTranslation_ = Vec3f(0.0f, 0.0f, 0.0f);
+			parentTranslation_ = SIMD::Vec3f(0.0f, 0.0f, 0.0f);
 		}
 
 		if (rType == BindType::Always)
@@ -177,7 +219,7 @@ void InstanceGroup::SetParentMatrix(const Mat43f& mat)
 		}
 		else if (rType == BindType::NotBind)
 		{
-			parentRotation_ = Mat43f::Identity;
+			parentRotation_ = SIMD::Mat43f::Identity;
 		}
 
 		if (sType == BindType::Always)
@@ -190,7 +232,7 @@ void InstanceGroup::SetParentMatrix(const Mat43f& mat)
 		}
 		else if (sType == BindType::NotBind)
 		{
-			parentScale_ = Vec3f(1.0f, 1.0f, 1.0f);
+			parentScale_ = SIMD::Vec3f(1.0f, 1.0f, 1.0f);
 		}
 	}
 }
@@ -219,6 +261,11 @@ void InstanceGroup::KillAllInstances()
 			instance->Kill();
 		}
 	}
+}
+
+bool InstanceGroup::IsActive() const
+{
+	return GetInstanceCount() > 0 || m_generatedCount < m_maxGenerationCount;
 }
 
 //----------------------------------------------------------------------------------

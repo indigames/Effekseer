@@ -1,9 +1,9 @@
 #include "efk.Window.h"
 #include "../Effekseer/Effekseer/Effekseer.DefaultFile.h"
 #include "../EffekseerRendererCommon/EffekseerRenderer.PngTextureLoader.h"
-#include <memory>
 #include <imgui.h>
 #include <imgui_internal.h>
+#include <memory>
 
 #ifdef __APPLE__
 #define GL_SILENCE_DEPRECATION
@@ -17,7 +17,7 @@ static constexpr std::codecvt_mode mode = std::codecvt_mode::little_endian;
 
 static std::string utf16_to_utf8(const std::u16string& s)
 {
-#if defined(_MSC_VER)
+#if defined(_WIN32)
 	std::wstring_convert<std::codecvt_utf8_utf16<std::uint16_t, 0x10ffff, mode>, std::uint16_t> conv;
 	auto p = reinterpret_cast<const std::uint16_t*>(s.c_str());
 	return conv.to_bytes(p, p + s.length());
@@ -58,14 +58,27 @@ void GLFW_CloseCallback(GLFWwindow* w)
 	}
 }
 
-void GLFW_WindowFocusCallback(GLFWwindow* w, int f)
+void GLFW_WindowFocusCallback(GLFWwindow* gltfWindow, int focused)
 {
+	auto window = (Window*)glfwGetWindowUserPointer(gltfWindow);
 
-	auto w_ = (Window*)glfwGetWindowUserPointer(w);
-
-	if (f > 0 && w_->Focused != nullptr)
+	if (focused)
 	{
-		w_->Focused();
+		if (window->Focused != nullptr)
+		{
+			window->Focused();
+		}
+
+		// If there is modal window, it will be focused.
+		ImGuiContext& g = *GImGui;
+		for (size_t i = 0; i < g.Viewports.size(); i++)
+		{
+			const auto viewport = g.Viewports[i];
+			if (viewport->Window != nullptr && (viewport->Window->Flags & ImGuiWindowFlags_Modal) != 0)
+			{
+				glfwFocusWindow((GLFWwindow*)viewport->PlatformHandle);
+			}
+		}
 	}
 }
 
@@ -120,6 +133,7 @@ bool Window::Initialize(std::shared_ptr<Effekseer::MainWindow> mainWindow, Devic
 	glfwSetWindowIconifyCallback(window, GLFW_IconifyCallback);
 	glfwSetWindowMaximizeCallback(window, GLFW_MaximizeCallback);
 	// glfwSetWindowContentScaleCallback(window, GLFW_ContentScaleCallback);
+	glfwSetWindowSizeLimits(window, 320, 240, GLFW_DONT_CARE, GLFW_DONT_CARE);
 	glfwMakeContextCurrent(window);
 	glfwSwapInterval(1);
 
@@ -187,16 +201,14 @@ void Window::SetWindowIcon(const char16_t* iconPath)
 {
 	Effekseer::DefaultFileInterface file;
 	std::unique_ptr<Effekseer::FileReader> reader(file.OpenRead(iconPath));
-	if (reader.get() != NULL)
+	if (reader.get() != nullptr)
 	{
 		size_t size = reader->GetLength();
 		std::vector<uint8_t> data(size);
 		reader->Read(&data[0], size);
 
 		auto pngLoader = EffekseerRenderer::PngTextureLoader();
-		pngLoader.Initialize();
 		pngLoader.Load(&data[0], size, false);
-		pngLoader.Finalize();
 
 		GLFWimage image;
 		image.pixels = pngLoader.GetData().data();
@@ -211,8 +223,8 @@ Vec2 Window::GetSize() const
 	int32_t w, h;
 	glfwGetWindowSize(window, &w, &h);
 	Vec2 s;
-	s.X = w;
-	s.Y = h;
+	s.X = (float)w;
+	s.Y = (float)h;
 	return s;
 }
 
@@ -272,8 +284,8 @@ Vec2 Window::GetMousePosition()
 	glfwGetCursorPos(window, &xpos, &ypos);
 
 	Vec2 ret;
-	ret.X = xpos;
-	ret.Y = ypos;
+	ret.X = (float)xpos;
+	ret.Y = (float)ypos;
 
 	return ret;
 }
@@ -329,15 +341,16 @@ LRESULT CALLBACK Window::WndProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lpar
 	{
 		WINDOWPLACEMENT placement;
 		GetWindowPlacement(hwnd, &placement);
-		if (placement.showCmd == SW_NORMAL) {
+		if (placement.showCmd == SW_NORMAL)
+		{
 			NCCALCSIZE_PARAMS* pncsp = (NCCALCSIZE_PARAMS*)lparam;
-			pncsp->rgrc[0].top    += 0;
+			pncsp->rgrc[0].top += 0;
 			pncsp->rgrc[0].bottom -= 8;
-			pncsp->rgrc[0].left   += 8;
-			pncsp->rgrc[0].right  -= 8;
+			pncsp->rgrc[0].left += 8;
+			pncsp->rgrc[0].right -= 8;
 		}
 	}
-	return 0;
+		return 0;
 	case WM_NCHITTEST:
 	{
 		long x = LOWORD(lparam);
@@ -348,17 +361,15 @@ LRESULT CALLBACK Window::WndProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lpar
 
 		RECT rect;
 		GetClientRect(hwnd, &rect);
-		if (point.x >= rect.left && point.x < rect.right) {
+		if (point.x >= rect.left && point.x < rect.right)
+		{
 
-			if (point.y >= rect.top  && point.y < rect.top + 6
-				&& !window->maximized)
+			if (point.y >= rect.top && point.y < rect.top + 6 && !window->maximized)
 			{
 				glfwSetCursor(window->window, window->vertResize);
 				return HTTOP;
 			}
-			else if (point.y >= rect.top
-				&& point.y < rect.top + 32 * window->mainWindow_->GetDPIScale()
-				&& ImGui::GetHoveredID() == 0 && GImGui->HoveredWindow == ImGui::FindWindowByName("##MainMenuBar"))
+			else if (point.y >= rect.top && point.y < rect.top + 32 * window->mainWindow_->GetDPIScale() && ImGui::GetHoveredID() == 0 && GImGui->HoveredWindow == ImGui::FindWindowByName("##MainMenuBar"))
 			{
 				return HTCAPTION;
 			}
@@ -369,7 +380,8 @@ LRESULT CALLBACK Window::WndProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lpar
 		if (wparam == HTCAPTION)
 		{
 			WPARAM cmd = TrackPopupMenu(GetSystemMenu(hwnd, 0), TPM_RETURNCMD, LOWORD(lparam), HIWORD(lparam), 0, hwnd, nullptr);
-			if (cmd) PostMessage(hwnd, WM_SYSCOMMAND, cmd, 0);
+			if (cmd)
+				PostMessage(hwnd, WM_SYSCOMMAND, cmd, 0);
 			return 0;
 		}
 		break;

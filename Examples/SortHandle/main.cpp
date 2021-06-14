@@ -28,10 +28,10 @@
 static HWND g_window_handle = NULL;
 static int g_window_width = 800;
 static int g_window_height = 600;
-static ::Effekseer::Manager* g_manager = NULL;
-static ::EffekseerRenderer::Renderer* g_renderer = NULL;
-static ::EffekseerSound::Sound* g_sound = NULL;
-static ::Effekseer::Effect* g_effects[3];
+static ::Effekseer::ManagerRef g_manager;
+static ::EffekseerRenderer::RendererRef g_renderer = NULL;
+static ::EffekseerSound::SoundRef g_sound = NULL;
+static ::Effekseer::EffectRef g_effects[3];
 static ::Effekseer::Vector3D g_position;
 
 static LPDIRECT3D9 g_d3d = NULL;
@@ -240,7 +240,7 @@ void MainLoop()
 }
 
 #if _WIN32
-#include <Windows.h>
+#include <windows.h>
 std::wstring ToWide(const char* pText);
 void GetDirectoryName(char* dst, char* src);
 #endif
@@ -255,11 +255,6 @@ int main(int argc, char** argv)
 	GetDirectoryName(current_path, argv[0]);
 	SetCurrentDirectoryA(current_path);
 #endif
-
-	for (int i = 0; i < 3; i++)
-	{
-		g_effects[i] = NULL;
-	}
 
 	InitWindow();
 
@@ -311,17 +306,17 @@ int main(int argc, char** argv)
 	// エフェクトの破棄
 	for (int i = 0; i < 3; i++)
 	{
-		ES_SAFE_RELEASE(g_effects[i]);
+		g_effects[i].Reset();
 	}
 
 	// 先にエフェクト管理用インスタンスを破棄
-	g_manager->Destroy();
+	g_manager.Reset();
 
 	// 次に音再生用インスタンスを破棄
-	g_sound->Destroy();
+	g_sound.Reset();
 
 	// 次に描画用インスタンスを破棄
-	g_renderer->Destroy();
+	g_renderer.Reset();
 
 	// XAudio2の解放
 	if (g_xa2_master != NULL)

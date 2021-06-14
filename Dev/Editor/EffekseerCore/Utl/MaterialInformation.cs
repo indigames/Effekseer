@@ -21,6 +21,7 @@ namespace Effekseer.Utl
 		PS4 = 40,
 		Switch = 50,
 		XBoxOne = 60,
+		PS5 = 70,
 	}
 
 	public enum TextureType : int
@@ -33,9 +34,24 @@ namespace Effekseer.Utl
 	{
 		OK,
 		TooOldFormat,
+		TooNewFormat,
 		NotFound,
 		FailedToOpen,
 		InvalidFormat,
+	}
+
+	public enum MaterialVersion : int
+	{
+		Version0 = 0,
+		Version15 = 3,
+		Version16 = 1610,
+	}
+
+	public enum CompiledMaterialVersion : int
+	{
+		Version0 = 0,
+		Version15 = 1,
+		Version16 = 1610,
 	}
 
 	/// <summary>
@@ -43,7 +59,11 @@ namespace Effekseer.Utl
 	/// </summary>
 	public class CompiledMaterialInformation
 	{
+		const CompiledMaterialVersion LatestSupportVersion = CompiledMaterialVersion.Version16;
+		const CompiledMaterialVersion OldestSupportVersion = CompiledMaterialVersion.Version16;
+
 		public UInt64 GUID;
+		public int Version;
 		public HashSet<CompiledMaterialPlatformType> Platforms = new HashSet<CompiledMaterialPlatformType>();
 
 		public CompiledMaterialInformationErrorCode Load(string path)
@@ -86,14 +106,21 @@ namespace Effekseer.Utl
 				return CompiledMaterialInformationErrorCode.InvalidFormat;
 			}
 
-			int version = BitConverter.ToInt32(buf, 4);
+			Version = BitConverter.ToInt32(buf, 4);
 
 			// bacause of camera position node, structure of uniform is changed
-			if (version == 0)
+			if (Version < (int)OldestSupportVersion)
 			{
 				fs.Dispose();
 				br.Close();
 				return CompiledMaterialInformationErrorCode.TooOldFormat;
+			}
+
+			if (Version > (int)LatestSupportVersion)
+			{
+				fs.Dispose();
+				br.Close();
+				return CompiledMaterialInformationErrorCode.TooNewFormat;
 			}
 
 			int fversion = BitConverter.ToInt32(buf, 4);
@@ -123,7 +150,9 @@ namespace Effekseer.Utl
 
 	public class MaterialInformation
 	{
-		public int Version = 3;
+		const MaterialVersion LatestSupportVersion = MaterialVersion.Version16;
+
+		public MaterialVersion Version = MaterialVersion.Version16;
 
 		public TextureInformation[] Textures = new TextureInformation[0];
 
@@ -200,6 +229,12 @@ namespace Effekseer.Utl
 			}
 
 			int version = BitConverter.ToInt32(buf, 4);
+
+			if(version > (int)LatestSupportVersion)
+			{
+				return false;
+			}
+
 			GUID = BitConverter.ToUInt64(buf, 8);
 
 			while (true)
@@ -467,7 +502,7 @@ namespace Effekseer.Utl
 			var writer = new System.IO.BinaryWriter(ms);
 
 			writer.Write(Encoding.ASCII.GetBytes("EFKM"));
-			writer.Write(Version);
+			writer.Write((int)Version);
 			writer.Write(GUID);
 
 			{

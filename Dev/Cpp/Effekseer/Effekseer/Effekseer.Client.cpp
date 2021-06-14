@@ -1,6 +1,8 @@
 ﻿
+#if !(defined(__EFFEKSEER_NETWORK_DISABLED__))
 #if !(defined(_PSVITA) || defined(_PS4) || defined(_SWITCH) || defined(_XBOXONE))
 
+#include "Effekseer.Client.h"
 #include "Effekseer.ClientImplemented.h"
 
 #include "Effekseer.EffectLoader.h"
@@ -48,7 +50,6 @@ void ClientImplemented::StopInternal()
 }
 
 ClientImplemented::ClientImplemented()
-	: m_running(false)
 {
 	Socket::Initialize();
 }
@@ -215,7 +216,7 @@ bool ClientImplemented::Send(void* data, int32_t datasize)
 	return true;
 }
 
-void ClientImplemented::Reload(const EFK_CHAR* key, void* data, int32_t size)
+void ClientImplemented::Reload(const char16_t* key, void* data, int32_t size)
 {
 	int32_t keylen = 0;
 	for (;; keylen++)
@@ -247,11 +248,11 @@ void ClientImplemented::Reload(const EFK_CHAR* key, void* data, int32_t size)
 //----------------------------------------------------------------------------------
 //
 //----------------------------------------------------------------------------------
-void ClientImplemented::Reload(Manager* manager, const EFK_CHAR* path, const EFK_CHAR* key)
+void ClientImplemented::Reload(ManagerRef manager, const char16_t* path, const char16_t* key)
 {
-	EffectLoader* loader = manager->GetEffectLoader();
+	EffectLoaderRef loader = manager->GetEffectLoader();
 
-	void* data = NULL;
+	void* data = nullptr;
 	int32_t size = 0;
 
 	if (!loader->Load(path, data, size))
@@ -279,3 +280,4 @@ bool ClientImplemented::IsConnected()
 //----------------------------------------------------------------------------------
 
 #endif // #if !( defined(_PSVITA) || defined(_PS4) || defined(_SWITCH) || defined(_XBOXONE) )
+#endif

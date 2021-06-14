@@ -20,18 +20,22 @@ typedef ::Effekseer::ModelRenderer::NodeParameter efkModelNodeParam;
 typedef ::Effekseer::ModelRenderer::InstanceParameter efkModelInstanceParam;
 typedef ::Effekseer::Vector3D efkVector3D;
 
+class ModelRenderer;
+typedef ::Effekseer::RefPtr<ModelRenderer> ModelRendererRef;
+
 class ModelRenderer : public ::EffekseerRenderer::ModelRendererBase
 {
 private:
-	RendererImplemented* m_renderer;
+	RendererImplementedRef m_renderer;
 	Shader* shader_advanced_lit_ = nullptr;
 	Shader* shader_advanced_unlit_ = nullptr;
 	Shader* shader_advanced_distortion_ = nullptr;
 	Shader* shader_lit_ = nullptr;
 	Shader* shader_unlit_ = nullptr;
 	Shader* shader_distortion_ = nullptr;
+	Backend::GraphicsDeviceRef graphicsDevice_ = nullptr;
 
-	ModelRenderer(RendererImplemented* renderer,
+	ModelRenderer(const RendererImplementedRef& renderer,
 				  Shader* shader_advanced_lit,
 				  Shader* shader_advanced_unlit,
 				  Shader* shader_advanced_distortion,
@@ -42,7 +46,7 @@ private:
 public:
 	virtual ~ModelRenderer();
 
-	static ModelRenderer* Create(RendererImplemented* renderer);
+	static ModelRendererRef Create(const RendererImplementedRef& renderer);
 
 public:
 	void BeginRendering(const efkModelNodeParam& parameter, int32_t count, void* userData);

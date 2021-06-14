@@ -1,9 +1,8 @@
 ﻿
+#if !(defined(__EFFEKSEER_NETWORK_DISABLED__))
 #if !(defined(_PSVITA) || defined(_XBOXONE))
 
-//----------------------------------------------------------------------------------
-// Include
-//----------------------------------------------------------------------------------
+#include "Effekseer.Server.h"
 #include "Effekseer.Effect.h"
 #include "Effekseer.ServerImplemented.h"
 #include <thread>
@@ -115,7 +114,6 @@ void ServerImplemented::InternalClient::ShutDown()
 //
 //----------------------------------------------------------------------------------
 ServerImplemented::ServerImplemented()
-	: m_running(false)
 {
 	Socket::Initialize();
 }
@@ -292,40 +290,21 @@ void ServerImplemented::Stop()
 //----------------------------------------------------------------------------------
 //
 //----------------------------------------------------------------------------------
-void ServerImplemented::Register(const EFK_CHAR* key, Effect* effect)
+void ServerImplemented::Register(const char16_t* key, const EffectRef& effect)
 {
-	if (effect == NULL)
+	if (effect == nullptr)
 		return;
 
 	std::u16string key_((const char16_t*)key);
-
-	if (m_effects.count(key_) > 0)
-	{
-		m_effects[key_]->Release();
-	}
-
-	m_effects[key_] = effect;
-	m_effects[key_]->AddRef();
-
-	if (m_data.count(key_) > 0)
-	{
-		if (m_materialPath.size() > 1)
-		{
-			m_effects[key_]->Reload(&(m_data[key_][0]), (int32_t)m_data.size(), &(m_materialPath[0]));
-		}
-		else
-		{
-			m_effects[key_]->Reload(&(m_data[key_][0]), (int32_t)m_data.size());
-		}
-	}
+	m_effects[key_] = {effect, false};
 }
 
 //----------------------------------------------------------------------------------
 //
 //----------------------------------------------------------------------------------
-void ServerImplemented::Unregister(Effect* effect)
+void ServerImplemented::Unregister(const EffectRef& effect)
 {
-	if (effect == NULL)
+	if (effect == nullptr)
 		return;
 
 	auto it = m_effects.begin();
@@ -333,9 +312,8 @@ void ServerImplemented::Unregister(Effect* effect)
 
 	while (it != it_end)
 	{
-		if ((*it).second == effect)
+		if ((*it).second.EffectPtr == effect)
 		{
-			(*it).second->Release();
 			m_effects.erase(it);
 			return;
 		}
@@ -347,7 +325,7 @@ void ServerImplemented::Unregister(Effect* effect)
 //----------------------------------------------------------------------------------
 //
 //----------------------------------------------------------------------------------
-void ServerImplemented::Update(Manager** managers, int32_t managerCount, ReloadingThreadType reloadingThreadType)
+void ServerImplemented::Update(ManagerRef* managers, int32_t managerCount, ReloadingThreadType reloadingThreadType)
 {
 	m_ctrlClients.lock();
 
@@ -360,6 +338,33 @@ void ServerImplemented::Update(Manager** managers, int32_t managerCount, Reloadi
 		delete (*it);
 	}
 	m_removedClients.clear();
+
+	for (auto& kv : m_effects)
+	{
+		if (kv.second.IsRegistered)
+		{
+			continue;
+		}
+
+		kv.second.IsRegistered = true;
+
+		auto key_ = kv.first;
+
+		auto found = m_data.find(kv.first);
+		if (found != m_data.end())
+		{
+			const auto& data = found->second;
+
+			if (m_materialPath.size() > 1)
+			{
+				m_effects[key_].EffectPtr->Reload(managers, managerCount, data.data(), (int32_t)data.size(), m_materialPath.data());
+			}
+			else
+			{
+				m_effects[key_].EffectPtr->Reload(managers, managerCount, data.data(), (int32_t)data.size());
+			}
+		}
+	}
 
 	for (std::set<InternalClient*>::iterator it = m_clients.begin(); it != m_clients.end(); ++it)
 	{
@@ -397,33 +402,17 @@ void ServerImplemented::Update(Manager** managers, int32_t managerCount, Reloadi
 
 			if (m_effects.count(key) > 0)
 			{
-				if (managers != nullptr)
-				{
-					auto& data_ = m_data[key];
+				const auto& data_ = m_data[key];
 
-					if (m_materialPath.size() > 1)
-					{
-						m_effects[key]->Reload(
-							managers, managerCount, data_.data(), (int32_t)data_.size(), &(m_materialPath[0]), reloadingThreadType);
-					}
-					else
-					{
-						m_effects[key]->Reload(managers, managerCount, data_.data(), (int32_t)data_.size(), nullptr, reloadingThreadType);
-					}
+				if (m_materialPath.size() > 1)
+				{
+					m_effects[key].EffectPtr->Reload(
+						managers, managerCount, data_.data(), (int32_t)data_.size(), m_materialPath.data(), reloadingThreadType);
 				}
 				else
 				{
-					auto& data_ = m_data[key];
-
-					if (m_materialPath.size() > 1)
-					{
-						m_effects[key]->Reload(data_.data(), (int32_t)data_.size(), &(m_materialPath[0]), reloadingThreadType);
-					}
-					else
-					{
-						m_effects[key]->Reload(data_.data(), (int32_t)data_.size(), nullptr, reloadingThreadType);
-					}
-				}
+					m_effects[key].EffectPtr->Reload(managers, managerCount, data_.data(), (int32_t)data_.size(), nullptr, reloadingThreadType);
+				}	
 			}
 		}
 
@@ -436,7 +425,7 @@ void ServerImplemented::Update(Manager** managers, int32_t managerCount, Reloadi
 //----------------------------------------------------------------------------------
 //
 //----------------------------------------------------------------------------------
-void ServerImplemented::SetMaterialPath(const EFK_CHAR* materialPath)
+void ServerImplemented::SetMaterialPath(const char16_t* materialPath)
 {
 	m_materialPath.clear();
 
@@ -449,16 +438,6 @@ void ServerImplemented::SetMaterialPath(const EFK_CHAR* materialPath)
 	m_materialPath.push_back(0);
 }
 
-void ServerImplemented::Regist(const EFK_CHAR* key, Effect* effect)
-{
-	Register(key, effect);
-}
-
-void ServerImplemented::Unregist(Effect* effect)
-{
-	Unregister(effect);
-}
-
 //----------------------------------------------------------------------------------
 //
 //----------------------------------------------------------------------------------
@@ -468,3 +447,4 @@ void ServerImplemented::Unregist(Effect* effect)
 //----------------------------------------------------------------------------------
 
 #endif // #if !( defined(_PSVITA) || defined(_XBOXONE) )
+#endif

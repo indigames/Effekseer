@@ -45,14 +45,40 @@ class Renderer;
 //-----------------------------------------------------------------------------------
 //
 //-----------------------------------------------------------------------------------
+
+namespace Effekseer
+{
+namespace Backend
+{
+class VertexBuffer;
+class IndexBuffer;
+class GraphicsDevice;
+} // namespace Backend
+} // namespace Effekseer
+
 namespace EffekseerRenderer
 {
-//-----------------------------------------------------------------------------------
-//
-//-----------------------------------------------------------------------------------
+
+class Renderer;
+using RendererRef = ::Effekseer::RefPtr<Renderer>;
 
 /**
-	@brief	背景を歪ませるエフェクトを描画する前に実行されるコールバック
+	@brief	Specify a shader for renderer from external class
+	@note
+	For Effekseer tools
+*/
+struct ExternalShaderSettings
+{
+	Effekseer::Backend::ShaderRef StandardShader;
+	Effekseer::Backend::ShaderRef ModelShader;
+	Effekseer::AlphaBlendType Blend;
+};
+
+/**
+	@brief	
+	\~english A callback to distort a background before drawing
+	\~japanese 背景を歪ませるエフェクトを描画する前に実行されるコールバック
+	
 */
 class DistortingCallback
 {
@@ -64,7 +90,15 @@ public:
 	{
 	}
 
-	virtual bool OnDistorting()
+	/**
+	@brief	
+	\~english A callback
+	\~japanese コールバック
+	@note
+	\~english Don't hold renderer in the instance
+	\~japanese インスタンス内にrendererを保持してはいけない
+	*/
+	virtual bool OnDistorting(Renderer* renderer)
 	{
 		return false;
 	}
@@ -92,18 +126,6 @@ enum class ProxyTextureType
 	Normal,
 };
 
-/**
-	@brief
-	\~english A class which contains a graphics device
-	\~japanese グラフィックデバイスを格納しているクラス
-*/
-class GraphicsDevice : public ::Effekseer::IReference
-{
-public:
-	GraphicsDevice() = default;
-	virtual ~GraphicsDevice() = default;
-};
-
 class CommandList : public ::Effekseer::IReference
 {
 public:
@@ -127,6 +149,22 @@ public:
 	}
 };
 
+struct DepthReconstructionParameter
+{
+	float DepthBufferScale = 1.0f;
+	float DepthBufferOffset = 0.0f;
+	float ProjectionMatrix33 = 0.0f;
+	float ProjectionMatrix34 = 0.0f;
+	float ProjectionMatrix43 = 0.0f;
+	float ProjectionMatrix44 = 0.0f;
+};
+
+::Effekseer::TextureLoaderRef CreateTextureLoader(::Effekseer::Backend::GraphicsDeviceRef gprahicsDevice,
+												  ::Effekseer::FileInterface* fileInterface = nullptr,
+												  ::Effekseer::ColorSpaceType colorSpaceType = ::Effekseer::ColorSpaceType::Gamma);
+
+::Effekseer::ModelLoaderRef CreateModelLoader(::Effekseer::Backend::GraphicsDeviceRef gprahicsDevice, ::Effekseer::FileInterface* fileInterface = nullptr);
+
 class Renderer : public ::Effekseer::IReference
 {
 protected:
@@ -134,7 +172,7 @@ protected:
 	virtual ~Renderer();
 
 	class Impl;
-	Impl* impl = nullptr;
+	std::unique_ptr<Impl> impl;
 
 public:
 	/**
@@ -151,11 +189,6 @@ public:
 		@brief	デバイスがリセットされた時に実行する。
 	*/
 	virtual void OnResetDevice() = 0;
-
-	/**
-		@brief	このインスタンスを破棄する。
-	*/
-	virtual void Destroy() = 0;
 
 	/**
 		@brief	ステートを復帰するかどうかのフラグを設定する。
@@ -258,37 +291,37 @@ public:
 	/**
 		@brief	スプライトレンダラーを生成する。
 	*/
-	virtual ::Effekseer::SpriteRenderer* CreateSpriteRenderer() = 0;
+	virtual ::Effekseer::SpriteRendererRef CreateSpriteRenderer() = 0;
 
 	/**
 		@brief	リボンレンダラーを生成する。
 	*/
-	virtual ::Effekseer::RibbonRenderer* CreateRibbonRenderer() = 0;
+	virtual ::Effekseer::RibbonRendererRef CreateRibbonRenderer() = 0;
 
 	/**
 		@brief	リングレンダラーを生成する。
 	*/
-	virtual ::Effekseer::RingRenderer* CreateRingRenderer() = 0;
+	virtual ::Effekseer::RingRendererRef CreateRingRenderer() = 0;
 
 	/**
 		@brief	モデルレンダラーを生成する。
 	*/
-	virtual ::Effekseer::ModelRenderer* CreateModelRenderer() = 0;
+	virtual ::Effekseer::ModelRendererRef CreateModelRenderer() = 0;
 
 	/**
 		@brief	軌跡レンダラーを生成する。
 	*/
-	virtual ::Effekseer::TrackRenderer* CreateTrackRenderer() = 0;
+	virtual ::Effekseer::TrackRendererRef CreateTrackRenderer() = 0;
 
 	/**
 		@brief	標準のテクスチャ読込クラスを生成する。
 	*/
-	virtual ::Effekseer::TextureLoader* CreateTextureLoader(::Effekseer::FileInterface* fileInterface = NULL) = 0;
+	virtual ::Effekseer::TextureLoaderRef CreateTextureLoader(::Effekseer::FileInterface* fileInterface = nullptr) = 0;
 
 	/**
 		@brief	標準のモデル読込クラスを生成する。
 	*/
-	virtual ::Effekseer::ModelLoader* CreateModelLoader(::Effekseer::FileInterface* fileInterface = NULL) = 0;
+	virtual ::Effekseer::ModelLoaderRef CreateModelLoader(::Effekseer::FileInterface* fileInterface = nullptr) = 0;
 
 	/**
 	@brief
@@ -296,7 +329,7 @@ public:
 	\~japanese 標準のマテリアル読込クラスを生成する。
 
 	*/
-	virtual ::Effekseer::MaterialLoader* CreateMaterialLoader(::Effekseer::FileInterface* fileInterface = nullptr) = 0;
+	virtual ::Effekseer::MaterialLoaderRef CreateMaterialLoader(::Effekseer::FileInterface* fileInterface = nullptr) = 0;
 
 	/**
 		@brief	レンダーステートを強制的にリセットする。
@@ -402,38 +435,74 @@ public:
 	\~English	specify a command list to render.  This function is available except DirectX9, DirectX11 and OpenGL.
 	\~Japanese	描画に使用するコマンドリストを設定する。この関数はDirectX9、DirectX11、OpenGL以外で使用できる。
 	*/
-	virtual void SetCommandList(CommandList* commandList)
+	virtual void SetCommandList(Effekseer::RefPtr<CommandList> commandList)
 	{
 	}
+
+	/**
+		@brief	\~English	Get a background texture.
+		\~Japanese	背景を取得する。
+		@note
+		\~English	Textures are generated by a function specific to each backend or SetBackground.
+		\~Japanese	テクスチャは各バックエンド固有の関数かSetBackgroundで生成される。
+	*/
+	virtual const ::Effekseer::Backend::TextureRef& GetBackground();
 
 	/**
 	@brief
 	\~English	Specify a background texture.
 	\~Japanese	背景のテクスチャを設定する。
-	@note
-	\~English	Specified texture is not deleted by the renderer. This function is available except DirectX9, DirectX11.
-	\~Japanese	設定されたテクスチャはレンダラーによって削除されない。この関数はDirectX9、DirectX11以外で使用できる。
 	*/
-	virtual void SetBackgroundTexture(::Effekseer::TextureData* textureData);
+	virtual void SetBackground(::Effekseer::Backend::TextureRef texture);
 
 	/**
 	@brief
 	\~English	Create a proxy texture
 	\~Japanese	代替のテクスチャを生成する
 	*/
-	virtual Effekseer::TextureData* CreateProxyTexture(ProxyTextureType type)
-	{
-		return nullptr;
-	}
+	virtual ::Effekseer::Backend::TextureRef CreateProxyTexture(ProxyTextureType type);
 
 	/**
 	@brief
 	\~English	Delete a proxy texture
 	\~Japanese	代替のテクスチャを削除する
 	*/
-	virtual void DeleteProxyTexture(Effekseer::TextureData* data)
-	{
-	}
+	virtual void DeleteProxyTexture(Effekseer::Backend::TextureRef& texture);
+
+	/**
+		@brief	
+		\~English	Get a depth texture and parameters to reconstruct from z to depth
+		\~Japanese	深度画像とZから深度を復元するためのパラメーターを取得する。
+	*/
+	virtual void GetDepth(::Effekseer::Backend::TextureRef& texture, DepthReconstructionParameter& reconstructionParam);
+
+	/**
+		@brief	
+		\~English	Specify a depth texture and parameters to reconstruct from z to depth
+		\~Japanese	深度画像とZから深度を復元するためのパラメーターを設定する。
+	*/
+	virtual void SetDepth(::Effekseer::Backend::TextureRef texture, const DepthReconstructionParameter& reconstructionParam);
+
+	/**
+		@brief	
+		\~English	Get the graphics device
+		\~Japanese	グラフィクスデバイスを取得する。
+	*/
+	virtual Effekseer::Backend::GraphicsDeviceRef GetGraphicsDevice() const;
+
+	/**
+		@brief	Get external shader settings
+		@note
+		For	Effekseer tools
+	*/
+	virtual std::shared_ptr<ExternalShaderSettings> GetExternalShaderSettings() const;
+
+	/**
+		@brief	Specify external shader settings
+		@note
+		For	Effekseer tools
+	*/
+	virtual void SetExternalShaderSettings(const std::shared_ptr<ExternalShaderSettings>& settings);
 };
 
 //----------------------------------------------------------------------------------
@@ -458,15 +527,14 @@ public:
 namespace EffekseerRendererDX9
 {
 
-/**
-@brief	テクスチャ読込クラスを生成する。
-*/
-::Effekseer::TextureLoader* CreateTextureLoader(LPDIRECT3DDEVICE9 device, ::Effekseer::FileInterface* fileInterface = NULL);
+::Effekseer::Backend::GraphicsDeviceRef CreateGraphicsDevice(LPDIRECT3DDEVICE9 device);
 
-/**
-@brief	モデル読込クラスを生成する。
-*/
-::Effekseer::ModelLoader* CreateModelLoader(LPDIRECT3DDEVICE9 device, ::Effekseer::FileInterface* fileInterface = NULL);
+[[deprecated("please use EffekseerRenderer::CreateTextureLoader")]] ::Effekseer::TextureLoaderRef CreateTextureLoader(
+	Effekseer::Backend::GraphicsDeviceRef graphicsDevice,
+	::Effekseer::FileInterface* fileInterface = nullptr,
+	::Effekseer::ColorSpaceType colorSpaceType = ::Effekseer::ColorSpaceType::Gamma);
+
+[[deprecated("please use EffekseerRenderer::CreateTextureLoader")]] ::Effekseer::ModelLoaderRef CreateModelLoader(Effekseer::Backend::GraphicsDeviceRef graphicsDevice, ::Effekseer::FileInterface* fileInterface = nullptr);
 
 //----------------------------------------------------------------------------------
 //
@@ -474,6 +542,9 @@ namespace EffekseerRendererDX9
 /**
 	@brief	描画クラス
 */
+class Renderer;
+using RendererRef = ::Effekseer::RefPtr<Renderer>;
+
 class Renderer : public ::EffekseerRenderer::Renderer
 {
 protected:
@@ -486,12 +557,20 @@ protected:
 
 public:
 	/**
+	@brief	Create an instance
+	@param	graphicsDevice	Effekseer graphics device
+	@param	squareMaxCount	The number of maximum sprites
+	@return	instance
+*/
+	static RendererRef Create(Effekseer::Backend::GraphicsDeviceRef graphicsDevice, int32_t squareMaxCount);
+
+	/**
 		@brief	インスタンスを生成する。
 		@param	device	[in]	DirectXのデバイス
 		@param	squareMaxCount	[in]	最大描画スプライト数
 		@return	インスタンス
 	*/
-	static Renderer* Create(LPDIRECT3DDEVICE9 device, int32_t squareMaxCount);
+	static RendererRef Create(LPDIRECT3DDEVICE9 device, int32_t squareMaxCount);
 
 	/**
 		@brief	デバイスを取得する。
@@ -504,78 +583,11 @@ public:
 	virtual void ChangeDevice(LPDIRECT3DDEVICE9 device) = 0;
 
 	/**
-	@brief	背景を取得する。
-	*/
-	virtual Effekseer::TextureData* GetBackground() = 0;
-
-	/**
 	@brief	背景を設定する。
 	*/
 	virtual void SetBackground(IDirect3DTexture9* background) = 0;
 };
 
-//----------------------------------------------------------------------------------
-//
-//----------------------------------------------------------------------------------
-/**
-	@brief	モデル
-*/
-class Model : public Effekseer::Model
-{
-private:
-	LPDIRECT3DDEVICE9 device_ = nullptr;
-
-public:
-	struct InternalModel
-	{
-		IDirect3DVertexBuffer9* VertexBuffer;
-		IDirect3DIndexBuffer9* IndexBuffer;
-		int32_t VertexCount;
-		int32_t IndexCount;
-		int32_t FaceCount;
-
-		InternalModel()
-		{
-			VertexBuffer = nullptr;
-			IndexBuffer = nullptr;
-			VertexCount = 0;
-			IndexCount = 0;
-			FaceCount = 0;
-		}
-
-		virtual ~InternalModel()
-		{
-			ES_SAFE_RELEASE(VertexBuffer);
-			ES_SAFE_RELEASE(IndexBuffer);
-		}
-	};
-
-	InternalModel* InternalModels = nullptr;
-	int32_t ModelCount;
-	bool IsLoadedOnGPU = false;
-
-	Model(uint8_t* data, int32_t size, LPDIRECT3DDEVICE9 device)
-		: Effekseer::Model(data, size)
-		, device_(device)
-		, InternalModels(nullptr)
-		, ModelCount(0)
-	{
-		this->m_vertexSize = sizeof(VertexWithIndex);
-		ES_SAFE_ADDREF(device_);
-	}
-
-	virtual ~Model()
-	{
-		ES_SAFE_DELETE_ARRAY(InternalModels);
-		ES_SAFE_RELEASE(device_);
-	}
-
-	bool LoadToGPU();
-};
-
-//----------------------------------------------------------------------------------
-//
-//----------------------------------------------------------------------------------
 } // namespace EffekseerRendererDX9
 //----------------------------------------------------------------------------------
 //

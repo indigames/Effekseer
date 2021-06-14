@@ -9,9 +9,9 @@
 #include "../Effekseer.Color.h"
 #include "../Effekseer.Matrix43.h"
 #include "../Effekseer.Vector2D.h"
-#include "../SIMD/Effekseer.Mat43f.h"
-#include "../SIMD/Effekseer.Vec2f.h"
-#include "../SIMD/Effekseer.Vec3f.h"
+#include "../SIMD/Mat43f.h"
+#include "../SIMD/Vec2f.h"
+#include "../SIMD/Vec3f.h"
 
 //----------------------------------------------------------------------------------
 //
@@ -22,48 +22,37 @@ namespace Effekseer
 //
 //----------------------------------------------------------------------------------
 
-class SpriteRenderer
+class SpriteRenderer : public ReferenceObject
 {
 public:
 	struct NodeParameter
 	{
 		Effect* EffectPointer;
-		// int32_t				ColorTextureIndex;
-		// AlphaBlendType			AlphaBlend;
-		// TextureFilterType	TextureFilter;
-		// TextureWrapType	TextureWrap;
 		bool ZTest;
 		bool ZWrite;
 		BillboardType Billboard;
 		bool IsRightHand;
-
-		// bool				Distortion;
-		// float				DistortionIntensity;
-
-		// float				DepthOffset;
-		// bool				IsDepthOffsetScaledWithCamera;
-		// bool				IsDepthOffsetScaledWithParticleScale;
+		float Maginification = 1.0f;
 
 		ZSortType ZSort;
 
 		NodeRendererDepthParameter* DepthParameterPtr = nullptr;
 		NodeRendererBasicParameter* BasicParameterPtr = nullptr;
 
-		// RendererMaterialType MaterialType = RendererMaterialType::Default;
-		// MaterialParameter* MaterialParameterPtr = nullptr;
-
 		bool EnableViewOffset = false;
+
+		RefPtr<RenderingUserData> UserData;
 	};
 
 	struct InstanceParameter
 	{
-		Mat43f SRTMatrix43;
+		SIMD::Mat43f SRTMatrix43;
 		Color AllColor;
 
 		// Lower left, Lower right, Upper left, Upper right
 		Color Colors[4];
 
-		Vec2f Positions[4];
+		SIMD::Vec2f Positions[4];
 
 		RectF UV;
 

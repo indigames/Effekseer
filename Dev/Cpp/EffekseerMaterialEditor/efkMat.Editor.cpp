@@ -3,8 +3,12 @@
 #include "efkMat.CommandManager.h"
 #include "efkMat.Models.h"
 
-#include "ThirdParty/imgui_main/imgui_internal.h"
-#include "ThirdParty/nfd/nfd.h"
+#include <imgui_node_editor.h>
+
+#include <imgui_node_editor_internal.h>
+
+#include <imgui_internal.h>
+#include <nfd.h>
 
 #include <GUI/MainWindow.h>
 #include <fstream>
@@ -14,12 +18,37 @@
 #include <efkMat.StringContainer.h>
 #include <efkMat.TextExporter.h>
 
-#include "../Effekseer/Effekseer/Material/Effekseer.Material.h"
+#include "../Effekseer/Effekseer/Material/Effekseer.MaterialFile.h"
 #include "../EffekseerMaterialCompiler/OpenGL/EffekseerMaterialCompilerGL.h"
 #include "../EffekseerRendererGL/EffekseerRenderer/EffekseerRendererGL.MaterialLoader.h"
 
+#include <boxer.h>
+
 namespace EffekseerMaterial
 {
+static Vector2DF GetNodeGroupSize(uint64_t guid)
+{
+	auto editor = reinterpret_cast<ax::NodeEditor::Detail::EditorContext*>(ed::GetCurrentEditor());
+	if (editor == nullptr)
+	{
+		return Vector2DF{0.0f, 0.0f};
+	}
+	auto nodeContext = editor->GetNode(guid);
+
+	if (nodeContext->m_Type == ax::NodeEditor::Detail::NodeType::Node)
+	{
+		return Vector2DF{0.0f, 0.0f};
+	}
+
+	ImVec2 size{0, 0};
+
+	if (nodeContext != nullptr)
+	{
+		size = nodeContext->m_GroupBounds.GetSize();
+	}
+
+	return {size.x, size.y};
+}
 
 void Compile(std::shared_ptr<Graphics> graphics,
 			 std::shared_ptr<Material> material,
@@ -32,7 +61,7 @@ void Compile(std::shared_ptr<Graphics> graphics,
 	EffekseerMaterial::TextExporter exporter;
 	auto result = (&exporter)->Export(material, node);
 
-	auto efkMaterial = Effekseer::Material();
+	auto efkMaterial = Effekseer::MaterialFile();
 	efkMaterial.SetGenericCode(result.Code.c_str());
 	efkMaterial.SetIsSimpleVertex(false);
 	efkMaterial.SetHasRefraction(result.HasRefraction);
@@ -133,11 +162,16 @@ void ExtractUniforms(std::shared_ptr<Graphics> graphics,
 	outputUniforms = result.Uniforms;
 }
 
-NodeUserDataObject::NodeUserDataObject() {}
+NodeUserDataObject::NodeUserDataObject()
+{
+}
 
-NodeUserDataObject::~NodeUserDataObject() {}
+NodeUserDataObject::~NodeUserDataObject()
+{
+}
 
-EditorContent::EditorContent(Editor* editor) : editor_(editor)
+EditorContent::EditorContent(Editor* editor)
+	: editor_(editor)
 {
 	material_ = std::make_shared<EffekseerMaterial::Material>();
 	material_->Initialize();
@@ -159,7 +193,7 @@ bool EditorContent::Save()
 {
 	if (GetPath() == "")
 	{
-		nfdchar_t* outPath = NULL;
+		nfdchar_t* outPath = nullptr;
 		nfdresult_t result = NFD_SaveDialog("efkmat", "", &outPath);
 
 		if (result == NFD_OKAY)
@@ -183,7 +217,7 @@ void EditorContent::SaveAs(const char* path)
 	material_->Save(data, path);
 
 	char16_t path16[260];
-	Effekseer::ConvertUtf8ToUtf16((int16_t*)path16, 260, (const int8_t*)path);
+	Effekseer::ConvertUtf8ToUtf16(path16, 260, path);
 
 	std::string pathstr = path;
 	int ext_i = pathstr.find_last_of(".");
@@ -207,7 +241,7 @@ void EditorContent::SaveAs(const char* path)
 	else
 	{
 		char16_t path16[260];
-		Effekseer::ConvertUtf8ToUtf16((int16_t*)path16, 260, (const int8_t*)(std::string(path) + ".efkmat").c_str());
+		Effekseer::ConvertUtf8ToUtf16(path16, 260, (std::string(path) + ".efkmat").c_str());
 
 		FILE* fp = nullptr;
 #ifdef _WIN32
@@ -229,19 +263,19 @@ void EditorContent::SaveAs(const char* path)
 	previousChangedID_ = material_->GetCommandManager()->GetHistoryID();
 }
 
-bool EditorContent::Load(const char* path, std::shared_ptr<Library> library)
+ErrorCode EditorContent::Load(const char* path, std::shared_ptr<Library> library)
 {
 	FILE* fp = nullptr;
 #ifdef _WIN32
 	char16_t path16[260];
-	Effekseer::ConvertUtf8ToUtf16((int16_t*)path16, 260, (const int8_t*)path);
+	Effekseer::ConvertUtf8ToUtf16(path16, 260, path);
 	_wfopen_s(&fp, (const wchar_t*)path16, L"rb");
 #else
 	fp = fopen(path, "rb");
 #endif
 	if (fp == nullptr)
 	{
-		return false;
+		return ErrorCode::NotFound;
 	}
 
 	std::vector<uint8_t> data;
@@ -255,12 +289,24 @@ bool EditorContent::Load(const char* path, std::shared_ptr<Library> library)
 	fread(data.data(), 1, data.size(), fp);
 	fclose(fp);
 
-	material_->Load(data, library, path);
+	auto err = material_->Load(data, library, path);
+	if(err != ErrorCode::OK)
+	{
+		if(err == ErrorCode::NewVersion)
+		{
+			boxer::show(
+				StringContainer::GetValue("Error_NewVersion").c_str(),
+				"Error",
+				(boxer::Style::Error),
+				(boxer::Buttons::OK));
+		}
+		return err;
+	}
 
 	UpdatePath(path);
 
 	ClearIsChanged();
-	return true;
+	return ErrorCode::OK;
 }
 
 void EditorContent::UpdateBinary()
@@ -324,7 +370,10 @@ void EditorContent::UpdatePath(const char* path)
 	}
 }
 
-std::shared_ptr<Material> EditorContent::GetMaterial() { return material_; }
+std::shared_ptr<Material> EditorContent::GetMaterial()
+{
+	return material_;
+}
 
 std::string EditorContent::GetName()
 {
@@ -350,11 +399,20 @@ std::string EditorContent::GetName()
 	}
 }
 
-std::string EditorContent::GetPath() { return path_; }
+std::string EditorContent::GetPath()
+{
+	return path_;
+}
 
-bool EditorContent::GetIsChanged() { return previousChangedID_ != material_->GetCommandManager()->GetHistoryID(); }
+bool EditorContent::GetIsChanged()
+{
+	return previousChangedID_ != material_->GetCommandManager()->GetHistoryID();
+}
 
-void EditorContent::ClearIsChanged() { previousChangedID_ = material_->GetCommandManager()->GetHistoryID(); }
+void EditorContent::ClearIsChanged()
+{
+	previousChangedID_ = material_->GetCommandManager()->GetHistoryID();
+}
 
 static const char* label_new_node = "##NEW_NODE";
 static const char* label_edit_link = "##EDIT_LINK";
@@ -430,7 +488,7 @@ void Editor::SaveAs()
 	if (selectedContentInd_ < 0 || selectedContentInd_ >= contents_.size())
 		return;
 
-	nfdchar_t* outPath = NULL;
+	nfdchar_t* outPath = nullptr;
 	nfdresult_t result = NFD_SaveDialog("efkmat", "", &outPath);
 
 	if (result == NFD_OKAY)
@@ -439,13 +497,13 @@ void Editor::SaveAs()
 	}
 }
 
-bool Editor::Load(const char* path)
+ErrorCode Editor::Load(const char* path)
 {
 	auto content = std::make_shared<EditorContent>(this);
-
-	if (!content->Load(path, library))
+	auto err = content->Load(path, library);
+	if (err != ErrorCode::OK)
 	{
-		return false;
+		return err;
 	}
 
 	contents_.push_back(content);
@@ -455,12 +513,12 @@ bool Editor::Load(const char* path)
 	isSelectedDirty_ = true;
 	content->IsLoading = true;
 
-	return true;
+	return ErrorCode::OK;
 }
 
 bool Editor::Load()
 {
-	nfdchar_t* outPath = NULL;
+	nfdchar_t* outPath = nullptr;
 	nfdresult_t result = NFD_OpenDialog("efkmat", "", &outPath);
 
 	if (result == NFD_OKAY)
@@ -471,7 +529,7 @@ bool Editor::Load()
 	return false;
 }
 
-bool Editor::LoadOrSelect(const char* path)
+ErrorCode Editor::LoadOrSelect(const char* path)
 {
 	auto p = ResolvePath(path);
 
@@ -480,7 +538,7 @@ bool Editor::LoadOrSelect(const char* path)
 		if (contents_[i]->GetPath() == p)
 		{
 			selectedContentInd_ = i;
-			return true;
+			return ErrorCode::OK;
 		}
 	}
 
@@ -689,6 +747,7 @@ void Editor::UpdateNodes()
 
 			preview_->CompileShader(vs, ps, textures, uniforms);
 			previewTextureCount_ = textures.size();
+			previewUniformCount_ = uniforms.size();
 		}
 
 		for (auto node : material->GetNodes())
@@ -705,6 +764,7 @@ void Editor::UpdateNodes()
 
 			preview_->UpdateUniforms(textures, uniforms);
 			previewTextureCount_ = textures.size();
+			previewUniformCount_ = uniforms.size();
 		}
 	}
 
@@ -844,9 +904,10 @@ void Editor::UpdatePopup()
 		auto create_node = [&, this](std::shared_ptr<LibraryContentBase> content) -> void {
 			auto nodeParam = content->Create();
 			auto node = material->CreateNode(nodeParam, false);
-			ed::SetNodePosition(node->GUID, popupPosition);
-			node->Pos.X = popupPosition.x;
-			node->Pos.Y = popupPosition.y;
+			ImVec2 nodePos{floorf(popupPosition.x), floorf(popupPosition.y)};
+			ed::SetNodePosition(node->GUID, nodePos);
+			node->Pos.X = nodePos.x;
+			node->Pos.Y = nodePos.y;
 
 			// link automatically
 			if (currentPin != nullptr)
@@ -916,7 +977,7 @@ void Editor::UpdatePopup()
 		// keyword box
 
 		// focus into a searching textbox
-		if (ImGui::IsRootWindowOrAnyChildFocused() && !ImGui::IsAnyItemActive() && !ImGui::IsAnyItemFocused())
+		if (ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) && !ImGui::IsAnyItemActive() && !ImGui::IsAnyItemFocused())
 			ImGui::SetKeyboardFocusHere(0);
 
 		ImGui::InputText(StringContainer::GetValue("Search").c_str(), searchingKeywords.data(), searchingKeywords.size());
@@ -1263,7 +1324,7 @@ void Editor::UpdateParameterEditor(std::shared_ptr<Node> node)
 
 			if (ImGui::Button(nameStr.c_str()))
 			{
-				nfdchar_t* outPath = NULL;
+				nfdchar_t* outPath = nullptr;
 				nfdresult_t result = NFD_OpenDialog("png", "", &outPath);
 
 				if (result == NFD_OKAY)
@@ -1506,6 +1567,22 @@ void Editor::UpdatePreview()
 	{
 		ImGui::Text((textureNumHeader + " %d / %d").c_str(), previewTextureCount_, Effekseer::UserTextureSlotMax);
 	}
+
+	// uniform
+	
+	// TODO : refactor
+	auto uniformNumHeader = StringContainer::GetValue("UniformCount", "Uniform");
+	const int uniformMax = 16;
+
+	if (previewUniformCount_ > uniformMax)
+	{
+		ImGui::TextColored(
+			ImColor(255, 0, 0, 255), (uniformNumHeader + " %d / %d").c_str(), previewUniformCount_, uniformMax);
+	}
+	else
+	{
+		ImGui::Text((uniformNumHeader + " %d / %d").c_str(), previewUniformCount_, uniformMax);
+	}
 }
 
 void Editor::UpdateToRecordMovingCommand()
@@ -1518,6 +1595,7 @@ void Editor::UpdateToRecordMovingCommand()
 
 	std::vector<std::shared_ptr<Node>> nodes;
 	std::vector<Vector2DF> poses;
+	std::vector<Vector2DF> sizes;
 
 	for (auto node : material->GetNodes())
 	{
@@ -1525,16 +1603,18 @@ void Editor::UpdateToRecordMovingCommand()
 			continue;
 
 		auto nodePos = ed::GetNodePosition(node->GUID);
-		if (nodePos.x != node->Pos.X || nodePos.y != node->Pos.Y)
+		auto nodeSize = GetNodeGroupSize(node->GUID);
+		if (nodePos.x != node->Pos.X || nodePos.y != node->Pos.Y || node->CommentSize.X != nodeSize.X || node->CommentSize.Y != nodeSize.Y)
 		{
 			nodes.push_back(node);
 			poses.push_back(Vector2DF(nodePos.x, nodePos.y));
+			sizes.push_back(nodeSize);
 		}
 	}
 
 	if (nodes.size() == 1)
 	{
-		nodes[0]->UpdatePos(Vector2DF(poses[0].X, poses[0].Y));
+		nodes[0]->UpdateRegion(Vector2DF(poses[0].X, poses[0].Y), sizes[0]);
 	}
 	else if (nodes.size() > 0)
 	{
@@ -1563,19 +1643,28 @@ void Editor::UpdateNode(std::shared_ptr<Node> node)
 		ImGui::BeginHorizontal("horizontal");
 		ImGui::Text(node->Properties[0]->Str.c_str());
 		ImGui::EndHorizontal();
-		auto size = ed::GetNodeSize(node->GUID);
+		
+		auto editor = reinterpret_cast<ax::NodeEditor::Detail::EditorContext*>(ed::GetCurrentEditor());
+		auto nodeContext = editor->GetNode(node->GUID);
+
+		ImVec2 size{0, 0};
+		if (nodeContext != nullptr)
+		{
+			size = nodeContext->m_GroupBounds.GetSize();
+		}
+		size.x = size.x < 64 ? 64 : size.x;
+		size.y = size.y < 64 ? 64 : size.y;
+
+		//auto size = ed::GetNodeSize(node->GUID);
 
 		// initialize
 		if (contents_[GetSelectedContentIndex()]->IsLoading || node->GetIsPosDirtied())
 		{
 			size.x = node->CommentSize.X;
 			size.y = node->CommentSize.Y;
+			nodeContext->m_GroupBounds.Max = nodeContext->m_GroupBounds.Min + size;
 		}
 
-		size.x = size.x < 64 ? 64 : size.x;
-		size.y = size.y < 64 ? 64 : size.y;
-		node->CommentSize.X = size.x;
-		node->CommentSize.Y = size.y;
 		ed::Group(size);
 		ImGui::EndVertical();
 		ed::EndNode();
@@ -1789,6 +1878,10 @@ void Editor::UpdateNode(std::shared_ptr<Node> node)
 		{
 			ImGui::TextColored(ImColor(1.0f, 0.0f, 0.0f, 1.0f), StringContainer::GetValue("Warning_InvalidName").c_str());
 		}
+		else if (node->CurrentWarning == WarningType::PixelNodeAndNormal)
+		{
+			ImGui::TextColored(ImColor(1.0f, 0.0f, 0.0f, 1.0f), StringContainer::GetValue("Warning_PixelNodeAndNormal").c_str());
+		}
 		else
 		{
 			assert(0);
@@ -1816,7 +1909,10 @@ void Editor::UpdateNode(std::shared_ptr<Node> node)
 	node->ClearPosDirtied();
 }
 
-void Editor::UpdateLink(std::shared_ptr<Link> link) { ed::Link(link->GUID, link->InputPin->GUID, link->OutputPin->GUID); }
+void Editor::UpdateLink(std::shared_ptr<Link> link)
+{
+	ed::Link(link->GUID, link->InputPin->GUID, link->OutputPin->GUID);
+}
 
 bool Editor::GetIsSelectedDirty()
 {
@@ -1825,6 +1921,9 @@ bool Editor::GetIsSelectedDirty()
 	return ret;
 }
 
-void Editor::ClearDirtiedSelectedFlags() { isSelectedDirty_ = false; }
+void Editor::ClearDirtiedSelectedFlags()
+{
+	isSelectedDirty_ = false;
+}
 
 } // namespace EffekseerMaterial

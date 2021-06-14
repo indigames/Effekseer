@@ -12,21 +12,19 @@ struct VS_Input
 
 struct VS_Output
 {
-    vec4 Position;
-    vec4 VColor;
-    vec2 UV1;
-    vec2 UV2;
-    vec3 WorldP;
+    vec4 PosVS;
+    vec4 Color;
+    vec2 UV;
     vec3 WorldN;
-    vec3 WorldT;
     vec3 WorldB;
-    vec2 ScreenUV;
+    vec3 WorldT;
+    vec4 PosP;
 };
 
 struct VS_ConstantBuffer
 {
     mat4 mCamera;
-    mat4 mProj;
+    mat4 mCameraProj;
     vec4 mUVInversed;
     vec4 mflipbookParameter;
 };
@@ -39,39 +37,29 @@ attribute vec4 Input_Normal;
 attribute vec4 Input_Tangent;
 attribute vec2 Input_UV1;
 attribute vec2 Input_UV2;
-varying vec4 _VSPS_VColor;
-varying vec2 _VSPS_UV1;
-varying vec2 _VSPS_UV2;
-varying vec3 _VSPS_WorldP;
+centroid varying vec4 _VSPS_Color;
+centroid varying vec2 _VSPS_UV;
 varying vec3 _VSPS_WorldN;
-varying vec3 _VSPS_WorldT;
 varying vec3 _VSPS_WorldB;
-varying vec2 _VSPS_ScreenUV;
+varying vec3 _VSPS_WorldT;
+varying vec4 _VSPS_PosP;
 
 VS_Output _main(VS_Input Input)
 {
-    VS_Output Output = VS_Output(vec4(0.0), vec4(0.0), vec2(0.0), vec2(0.0), vec3(0.0), vec3(0.0), vec3(0.0), vec3(0.0), vec2(0.0));
-    vec3 worldPos = Input.Pos;
-    vec3 worldNormal = (vec3(Input.Normal.xyz) - vec3(0.5)) * 2.0;
-    vec3 worldTangent = (vec3(Input.Tangent.xyz) - vec3(0.5)) * 2.0;
-    vec3 worldBinormal = cross(worldNormal, worldTangent);
+    VS_Output Output = VS_Output(vec4(0.0), vec4(0.0), vec2(0.0), vec3(0.0), vec3(0.0), vec3(0.0), vec4(0.0));
+    vec4 worldNormal = vec4((Input.Normal.xyz - vec3(0.5)) * 2.0, 0.0);
+    vec4 worldTangent = vec4((Input.Tangent.xyz - vec3(0.5)) * 2.0, 0.0);
+    vec4 worldBinormal = vec4(cross(worldNormal.xyz, worldTangent.xyz), 0.0);
+    vec4 worldPos = vec4(Input.Pos.x, Input.Pos.y, Input.Pos.z, 1.0);
+    Output.PosVS = CBVS0.mCameraProj * worldPos;
+    Output.Color = Input.Color;
     vec2 uv1 = Input.UV1;
-    vec2 uv2 = Input.UV1;
     uv1.y = CBVS0.mUVInversed.x + (CBVS0.mUVInversed.y * uv1.y);
-    uv2.y = CBVS0.mUVInversed.x + (CBVS0.mUVInversed.y * uv2.y);
-    Output.WorldN = worldNormal;
-    Output.WorldB = worldBinormal;
-    Output.WorldT = worldTangent;
-    vec3 pixelNormalDir = vec3(0.5, 0.5, 1.0);
-    vec4 cameraPos = CBVS0.mCamera * vec4(worldPos, 1.0);
-    cameraPos /= vec4(cameraPos.w);
-    Output.Position = CBVS0.mProj * cameraPos;
-    Output.WorldP = worldPos;
-    Output.VColor = Input.Color;
-    Output.UV1 = uv1;
-    Output.UV2 = uv2;
-    Output.ScreenUV = Output.Position.xy / vec2(Output.Position.w);
-    Output.ScreenUV = vec2(Output.ScreenUV.x + 1.0, 1.0 - Output.ScreenUV.y) * 0.5;
+    Output.UV = uv1;
+    Output.WorldN = worldNormal.xyz;
+    Output.WorldB = worldBinormal.xyz;
+    Output.WorldT = worldTangent.xyz;
+    Output.PosP = Output.PosVS;
     return Output;
 }
 
@@ -85,14 +73,12 @@ void main()
     Input.UV1 = Input_UV1;
     Input.UV2 = Input_UV2;
     VS_Output flattenTemp = _main(Input);
-    gl_Position = flattenTemp.Position;
-    _VSPS_VColor = flattenTemp.VColor;
-    _VSPS_UV1 = flattenTemp.UV1;
-    _VSPS_UV2 = flattenTemp.UV2;
-    _VSPS_WorldP = flattenTemp.WorldP;
+    gl_Position = flattenTemp.PosVS;
+    _VSPS_Color = flattenTemp.Color;
+    _VSPS_UV = flattenTemp.UV;
     _VSPS_WorldN = flattenTemp.WorldN;
-    _VSPS_WorldT = flattenTemp.WorldT;
     _VSPS_WorldB = flattenTemp.WorldB;
-    _VSPS_ScreenUV = flattenTemp.ScreenUV;
+    _VSPS_WorldT = flattenTemp.WorldT;
+    _VSPS_PosP = flattenTemp.PosP;
 }
 

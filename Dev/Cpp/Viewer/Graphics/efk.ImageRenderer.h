@@ -9,7 +9,7 @@ namespace efk
 class ImageRenderer
 {
 public:
-	ImageRenderer(EffekseerRenderer::Renderer* renderer)
+	ImageRenderer(const EffekseerRenderer::RendererRef& renderer)
 	{
 	}
 
@@ -20,7 +20,7 @@ public:
 	virtual void Draw(const Effekseer::Vector3D positions[],
 					  const Effekseer::Vector2D uvs[],
 					  const Effekseer::Color colors[],
-					  ::Effekseer::TextureData* texturePtr) = 0;
+					  ::Effekseer::TextureRef texturePtr) = 0;
 
 	virtual void Render() = 0;
 
@@ -30,6 +30,6 @@ public:
 
 	virtual void OnResetDevice() = 0;
 
-	static ImageRenderer* Create(Graphics* graphics, EffekseerRenderer::Renderer* renderer);
+	static ImageRenderer* Create(Graphics* graphics, const EffekseerRenderer::RendererRef& renderer);
 };
 } // namespace efk

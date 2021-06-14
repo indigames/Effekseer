@@ -24,7 +24,7 @@ public:
 	}
 	virtual ~PostEffect() = default;
 
-	virtual void Render(RenderTexture* src, RenderTexture* dest) = 0;
+	virtual void Render(Effekseer::Backend::TextureRef src, Effekseer::Backend::TextureRef dest) = 0;
 
 	virtual void OnLostDevice() = 0;
 
@@ -45,11 +45,11 @@ public:
 		return isValid_;
 	}
 
-	static BloomEffect* CreateBloom(Graphics* graphics, EffekseerRenderer::Renderer* renderer);
+	static BloomEffect* CreateBloom(Graphics* graphics, const EffekseerRenderer::RendererRef& renderer);
 
-	static TonemapEffect* CreateTonemap(Graphics* graphics, EffekseerRenderer::Renderer* renderer);
+	static TonemapEffect* CreateTonemap(Graphics* graphics, const EffekseerRenderer::RendererRef& renderer);
 
-	static LinearToSRGBEffect* CreateLinearToSRGB(Graphics* graphics, EffekseerRenderer::Renderer* renderer);
+	static LinearToSRGBEffect* CreateLinearToSRGB(Graphics* graphics, const EffekseerRenderer::RendererRef& renderer);
 };
 
 class BloomEffect : public PostEffect

@@ -91,13 +91,57 @@ void BasicRuntimeTestPlatform(EffectPlatform* platform, std::string baseResultPa
 	single15Test(u"Material_Refraction", "Material_Refraction");
 	single15Test(u"Material_WorldPositionOffset", "Material_WorldPositionOffset");
 	single15Test(u"BasicRenderSettings_Blend", "BasicRenderSettings_Blend");
+	single15Test(u"BasicRenderSettings_Inherit_Color", "BasicRenderSettings_Inherit_Color");
 	single15Test(u"ForceFieldLocal_Turbulence1", "ForceFieldLocal_Turbulence1");
+	single15Test(u"ForceFieldLocal_Old", "ForceFieldLocal_Old");
+	single15Test(u"Material_FresnelRotatorPolarCoords", "Material_FresnelRotatorPolarCoords");
+
+	single15Test(u"Update_Easing", "Update_Easing");
+	single15Test(u"Update_MultiModel", "Update_MultiModel");
+
+	single15Test(u"Material_UV1", "Material_UV1");
+	single15Test(u"Material_UV2", "Material_UV2");
 
 	{
-		single16Test(u"Flip01", "Flip01");
 		single16Test(u"AlphaBlendTexture01", "AlphaBlendTexture01");
 		single16Test(u"AlphaCutoffEdgeColor01", "AlphaCutoffEdgeColor01");
+		single16Test(u"BasicRenderSettings_Emissive", "BasicRenderSettings_Emissive");
+		single16Test(u"Curve01", "Curve01");
+		single16Test(u"EdgeFallOff01", "EdgeFallOff01");
+		single16Test(u"Flip01", "Flip01");
+		single16Test(u"ForceFieldLocal02", "ForceFieldLocal02");
+		single16Test(u"Material_EffectScale", "Material_EffectScale");
 		single16Test(u"TGA01", "TGA01");
+		single16Test(u"ProcedualModel01", "ProcedualModel01");
+		single16Test(u"ProcedualModel02", "ProcedualModel02");
+		single16Test(u"ProcedualModel03", "ProcedualModel03");
+	}
+
+	{
+		auto cameraMat = platform->GetRenderer()->GetCameraMatrix();
+
+		Effekseer::Matrix44 mat;
+		mat.LookAtRH({0, 0, 10}, {0, 0, 0}, {0, 1, 0});
+		platform->GetRenderer()->SetCameraMatrix(mat);
+		platform->GenerateDepth();
+
+		single16Test(u"SoftParticle01", "SoftParticle01_NotFlipped");
+
+		platform->GetRenderer()->SetCameraMatrix(cameraMat);
+	}
+
+	{
+		auto cameraMat = platform->GetRenderer()->GetCameraMatrix();
+
+		Effekseer::Matrix44 mat;
+		mat.LookAtRH({0, 0, 10}, {0, 0, 0}, {0, 1, 0});
+		platform->GetRenderer()->SetCameraMatrix(mat);
+		platform->GetRenderer()->SetBackgroundTextureUVStyle(EffekseerRenderer::UVStyle::VerticalFlipped);
+		platform->GenerateDepth();
+
+		single16Test(u"SoftParticle01", "SoftParticle01_Flipped");
+
+		platform->GetRenderer()->SetCameraMatrix(cameraMat);
 	}
 }
 
@@ -109,10 +153,13 @@ void BasicRuntimeDeviceLostTest()
 	srand(0);
 
 	EffectPlatformInitializingParameter param;
-
+	// To make fullscreen enabled
+	param.WindowSize = {640, 480};
 	platform->Initialize(param);
 
 	platform->Play((GetDirectoryPathAsU16(__FILE__) + u"../../../../TestData/Effects/10/SimpleLaser.efk").c_str());
+	platform->Play((GetDirectoryPathAsU16(__FILE__) + u"../../../../TestData/Effects/14/Model_Parameters1.efk").c_str());
+	platform->Play((GetDirectoryPathAsU16(__FILE__) + u"../../../../TestData/Effects/16/ProcedualModel01.efkefc").c_str());
 
 	for (size_t i = 0; i < 20; i++)
 	{
@@ -153,7 +200,7 @@ void StartingFrameTest()
 
 	platform->Initialize(param);
 
-	platform->Play((GetDirectoryPathAsU16(__FILE__) + u"../../../../TestData/Effects/10/SimpleLaser.efk").c_str(), 30);
+	platform->Play((GetDirectoryPathAsU16(__FILE__) + u"../../../../TestData/Effects/10/SimpleLaser.efk").c_str(), Effekseer::Vector3D(), 30);
 
 	for (size_t i = 0; i < 20; i++)
 	{
@@ -418,7 +465,11 @@ void ReloadTest()
 		auto restCount1 = platform->GetManager()->GetInstanceCount(handle);
 		platform->TakeScreenshot("Reload_0.png");
 
-		platform->GetEffects()[0]->Reload((GetDirectoryPathAsU16(__FILE__) + u"../../../../TestData/Effects/10/SimpleLaser.efk").c_str());
+		auto manager = platform->GetManager();
+
+		auto effectData = LoadFile((GetDirectoryPathAsU16(__FILE__) + u"../../../../TestData/Effects/10/SimpleLaser.efk").c_str());
+
+		platform->GetEffects()[0]->Reload(&manager, 1, effectData.data(), static_cast<int32_t>(effectData.size()));
 
 		//platform->Update();
 
@@ -488,9 +539,18 @@ void UpdateToMoveTest()
 	}
 }
 
-void BasicRuntimeTest(bool onCI)
+void BasicRuntimeTest()
 {
 
+#ifdef _WIN32
+	{
+		auto platform = std::make_shared<EffectPlatformDX11>();
+		BasicRuntimeTestPlatform(platform.get(), "", "_DX11");
+		platform->Terminate();
+	}
+#endif
+
+#if !defined(__FROM_CI__)
 #ifdef __EFFEKSEER_BUILD_VULKAN__
 	{
 		auto platform = std::make_shared<EffectPlatformVulkan>();
@@ -500,12 +560,6 @@ void BasicRuntimeTest(bool onCI)
 #endif
 
 #ifdef _WIN32
-	{
-		auto platform = std::make_shared<EffectPlatformDX11>();
-		BasicRuntimeTestPlatform(platform.get(), "", "_DX11");
-		platform->Terminate();
-	}
-	if (!onCI)
 	{
 
 #ifdef __EFFEKSEER_BUILD_DX12__
@@ -531,8 +585,6 @@ void BasicRuntimeTest(bool onCI)
 
 #elif defined(__APPLE__)
 
-
-    
 	{
 		auto platform = std::make_shared<EffectPlatformMetal>();
 		BasicRuntimeTestPlatform(platform.get(), "", "_Metal");
@@ -554,6 +606,7 @@ void BasicRuntimeTest(bool onCI)
 	}
 #endif
 #endif
+#endif
 }
 
 void InstanceDisposeTestPlatform(EffectPlatform* platform)
@@ -564,13 +617,22 @@ void InstanceDisposeTestPlatform(EffectPlatform* platform)
 	{
 		auto effect = Effekseer::Effect::Create(
 			platform->GetManager(), (GetDirectoryPathAsU16(__FILE__) + u"../../../../TestData/Effects/14/Model_Parameters1.efk").c_str());
-
-		ES_SAFE_RELEASE(effect);
 	}
 }
 
-void InstanceDisposeTest(bool onCI)
+void InstanceDisposeTest()
 {
+
+#ifdef _WIN32
+	{
+		auto platform = std::make_shared<EffectPlatformDX11>();
+		InstanceDisposeTestPlatform(platform.get());
+		platform->Terminate();
+	}
+#endif
+
+#if !defined(__FROM_CI__)
+
 #ifdef __EFFEKSEER_BUILD_VULKAN__
 	{
 		auto platform = std::make_shared<EffectPlatformVulkan>();
@@ -581,7 +643,6 @@ void InstanceDisposeTest(bool onCI)
 
 #ifdef _WIN32
 #ifdef __EFFEKSEER_BUILD_DX12__
-	if (!onCI)
 	{
 		auto platform = std::make_shared<EffectPlatformDX12>();
 		InstanceDisposeTestPlatform(platform.get());
@@ -589,15 +650,8 @@ void InstanceDisposeTest(bool onCI)
 	}
 #endif
 
-	if (!onCI)
 	{
 		auto platform = std::make_shared<EffectPlatformDX9>();
-		InstanceDisposeTestPlatform(platform.get());
-		platform->Terminate();
-	}
-
-	{
-		auto platform = std::make_shared<EffectPlatformDX11>();
 		InstanceDisposeTestPlatform(platform.get());
 		platform->Terminate();
 	}
@@ -610,12 +664,10 @@ void InstanceDisposeTest(bool onCI)
 	}
 #endif
 
-	if (!onCI)
-	{
-		auto platform = std::make_shared<EffectPlatformGL>();
-		InstanceDisposeTestPlatform(platform.get());
-		platform->Terminate();
-	}
+	auto platform = std::make_shared<EffectPlatformGL>();
+	InstanceDisposeTestPlatform(platform.get());
+	platform->Terminate();
+#endif
 }
 
 void CustomAllocatorTest()
@@ -660,3 +712,81 @@ void StringAndPathHelperTest()
 	if (Effekseer::PathHelper::Relative(std::u16string(u"/a/b/e"), std::u16string(u"/a/b/c")) != std::u16string(u"e"))
 		throw "";
 }
+
+void DX11DefferedContextTest()
+{
+#ifdef _WIN32
+	{
+		srand(0);
+		auto platform = std::make_shared<EffectPlatformDX11>(true);
+		EffectPlatformInitializingParameter param;
+
+		platform->Initialize(param);
+
+		auto h = platform->Play((GetDirectoryPathAsU16(__FILE__) + u"../../../../TestData/Effects/10/SimpleLaser.efk").c_str());
+		platform->GetManager()->SetSpeed(h, 0.5f);
+
+		for (size_t i = 0; i < 20; i++)
+		{
+			platform->Update();
+		}
+
+		platform->Terminate();
+	}
+#endif
+}
+
+void ProceduralModelCacheTest()
+{
+#ifdef _WIN32
+	{
+		srand(0);
+		auto platform = std::make_shared<EffectPlatformDX11>(true);
+		EffectPlatformInitializingParameter param;
+
+		platform->Initialize(param);
+
+		platform->Play((GetDirectoryPathAsU16(__FILE__) + u"../../../../TestData/Effects/16/ProcedualModel01.efkefc").c_str());
+		platform->Play((GetDirectoryPathAsU16(__FILE__) + u"../../../../TestData/Effects/16/ProcedualModel01.efkefc").c_str());
+		platform->Play((GetDirectoryPathAsU16(__FILE__) + u"../../../../TestData/Effects/16/ProcedualModel02.efkefc").c_str());
+		platform->Play((GetDirectoryPathAsU16(__FILE__) + u"../../../../TestData/Effects/16/ProcedualModel02.efkefc").c_str());
+
+		for (size_t i = 0; i < 20; i++)
+		{
+			platform->Update();
+		}
+
+		platform->Terminate();
+	}
+#endif
+}
+
+#if defined(__linux__) || defined(__APPLE__) || defined(WIN32)
+
+TestRegister Runtime_StringAndPathHelperTest("Runtime.StringAndPathHelperTest", []() -> void { StringAndPathHelperTest(); });
+
+TestRegister Runtime_CustomAllocatorTest("Runtime.CustomAllocatorTest", []() -> void { CustomAllocatorTest(); });
+
+TestRegister Runtime_InstanceDisposeTest("Runtime.InstanceDisposeTest", []() -> void { InstanceDisposeTest(); });
+
+TestRegister Runtime_ReloadTest("Runtime.ReloadTest", []() -> void { ReloadTest(); });
+
+TestRegister Runtime_UpdateToMoveTest("Runtime.UpdateToMoveTest", []() -> void { UpdateToMoveTest(); });
+
+TestRegister Runtime_MassPlayTest("Runtime.MassPlayTest", []() -> void { MassPlayTest(); });
+
+TestRegister Runtime_PlaybackSpeedTest("Runtime.PlaybackSpeedTest", []() -> void { PlaybackSpeedTest(); });
+
+TestRegister Runtime_StartingFrameTest("Runtime.StartingFrameTest", []() -> void { StartingFrameTest(); });
+
+TestRegister Runtime_UpdateHandleTest("Runtime.UpdateHandleTest", []() -> void { UpdateHandleTest(); });
+
+TestRegister Runtime_BasicRuntimeTest("Runtime.BasicRuntimeTest", []() -> void { BasicRuntimeTest(); });
+
+TestRegister Runtime_DX11DefferedContextTest("Runtime.DX11DefferedContextTest", []() -> void { DX11DefferedContextTest(); });
+
+TestRegister Runtime_BasicRuntimeDeviceLostTest("Runtime.BasicRuntimeDeviceLostTest", []() -> void { BasicRuntimeDeviceLostTest(); });
+
+TestRegister Runtime_ProceduralModelCacheTest("Runtime.ProceduralModelCacheTest", []() -> void { ProceduralModelCacheTest(); });
+
+#endif

@@ -4,7 +4,7 @@
 namespace EffekseerRendererMetal
 {
 
-VertexBuffer::VertexBuffer(::EffekseerRendererLLGI::GraphicsDevice* graphicsDevice, LLGI::VertexBuffer* buffer, int size, bool isDynamic, bool hasRefCount)
+VertexBuffer::VertexBuffer(::EffekseerRendererLLGI::Backend::GraphicsDevice* graphicsDevice, LLGI::VertexBuffer* buffer, int size, bool isDynamic, bool hasRefCount)
 	: ::EffekseerRendererLLGI::VertexBuffer(graphicsDevice, buffer, size, isDynamic, hasRefCount)
 {
     // create more buffers before-hand
@@ -22,7 +22,7 @@ void VertexBuffer::AddNewBuffer()
     vertexBuffers.push_back(vb);
 }
 
-VertexBuffer* VertexBuffer::Create(::EffekseerRendererLLGI::GraphicsDevice* graphicsDevice, int size, bool isDynamic, bool hasRefCount)
+VertexBuffer* VertexBuffer::Create(::EffekseerRendererLLGI::Backend::GraphicsDevice* graphicsDevice, int size, bool isDynamic, bool hasRefCount)
 {
 	auto vertexBuffer = graphicsDevice->GetGraphics()->CreateVertexBuffer(size);
 	if (vertexBuffer == nullptr)
@@ -63,8 +63,8 @@ bool VertexBuffer::RingBufferLock(int32_t size, int32_t& offset, void*& data, in
 		m_vertexRingOffset += size;
 	}
 
-	data = (uint8_t*)lockedResource_;
-	m_resource = (uint8_t*)lockedResource_;
+	data = (uint8_t*)lockedResource_.data();
+	m_resource = (uint8_t*)lockedResource_.data();
 	m_ringBufferLock = true;
 
 	return true;

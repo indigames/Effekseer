@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <string>
 
+#include <Effekseer.Modules.h>
 #include <Effekseer.h>
 #include <EffekseerRendererGL.h>
 
@@ -29,12 +30,16 @@ class CustomTextureLoader : public ::Effekseer::TextureLoader
 private:
 	::Effekseer::FileInterface* fileInterface_;
 	::Effekseer::DefaultFileInterface defaultFileInterface_;
+	::Effekseer::Backend::GraphicsDeviceRef graphicsDevice_;
 
 public:
 	// FileInterface is a binary loader. A behavior can be changed with a inheritance
 	// FileInterfaceはバイナリローダーです。振る舞いを継承により変更できます。
-	CustomTextureLoader(::Effekseer::FileInterface* fileInterface = nullptr) : fileInterface_(fileInterface)
+	CustomTextureLoader(::Effekseer::Backend::GraphicsDeviceRef graphicsDevice, ::Effekseer::FileInterface* fileInterface = nullptr)
+		: fileInterface_(fileInterface)
 	{
+		graphicsDevice_ = graphicsDevice;
+
 		if (fileInterface_ == nullptr)
 		{
 			fileInterface_ = &defaultFileInterface_;
@@ -43,7 +48,7 @@ public:
 	virtual ~CustomTextureLoader() = default;
 
 public:
-	Effekseer::TextureData* Load(const EFK_CHAR* path, ::Effekseer::TextureType textureType) override
+	Effekseer::TextureRef Load(const EFK_CHAR* path, ::Effekseer::TextureType textureType) override
 	{
 		std::unique_ptr<::Effekseer::FileReader> reader(fileInterface_->OpenRead(path));
 
@@ -61,7 +66,7 @@ public:
 			int bpp;
 			uint8_t* pixels = (uint8_t*)EffekseerUtils::stbi_load_from_memory(
 				(EffekseerUtils::stbi_uc const*)data_texture.data(), static_cast<int>(size_texture), &width, &height, &bpp, 0);
-			
+
 			if (width == 0 || bpp < 3)
 			{
 				// Not supported
@@ -71,50 +76,88 @@ public:
 
 			// Load a image to GPU actually. Please see a code of each backends if you want to know what should be returned
 			// 実際にGPUに画像を読み込む。何を返すべきか知りたい場合、、各バックエンドのコードを読んでください。
-			GLuint texture = 0;
-			glGenTextures(1, &texture);
-			glBindTexture(GL_TEXTURE_2D, texture);
+			::Effekseer::Backend::TextureParameter param;
+			param.Format = ::Effekseer::Backend::TextureFormatType::R8G8B8A8_UNORM;
+			param.GenerateMipmap = true;
+			param.Size[0] = width;
+			param.Size[1] = height;
 
-	
 			if (bpp == 4)
 			{
-				glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
+				param.InitialData.assign(pixels, pixels + width * height * 4);
 			}
-			else if (bpp == 3)
+			else
 			{
-				glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, pixels);
+				param.InitialData.resize(width * height * 4);
+				for (int y = 0; y < height; y++)
+				{
+					for (int x = 0; x < width; x++)
+					{
+						param.InitialData[(x + y * width) * 4 + 0] = pixels[(x + y * width) * 3 + 0];
+						param.InitialData[(x + y * width) * 4 + 1] = pixels[(x + y * width) * 3 + 1];
+						param.InitialData[(x + y * width) * 4 + 2] = pixels[(x + y * width) * 3 + 2];
+						param.InitialData[(x + y * width) * 4 + 3] = 255;
+					}
+				}
 			}
 
-			glBindTexture(GL_TEXTURE_2D, 0);
-
-			auto textureData = new Effekseer::TextureData();
-			textureData->UserPtr = nullptr;
-			textureData->UserID = texture;
-			textureData->TextureFormat = Effekseer::TextureFormatType::ABGR8;
-			textureData->Width = width;
-			textureData->Height = height;
-			textureData->HasMipmap = false;
-
-			EffekseerUtils::stbi_image_free(pixels);
-			return textureData;
+			auto texture = ::Effekseer::MakeRefPtr<::Effekseer::Texture>();
+			texture->SetBackend(graphicsDevice_->CreateTexture(param));
+			return texture;
 		}
 
 		return nullptr;
 	}
 
-	void Unload(Effekseer::TextureData* data) override
+	void Unload(Effekseer::TextureRef data) override
 	{
-		if (data != nullptr && data->UserPtr != nullptr)
-		{
-			GLuint texture = static_cast<GLuint>(data->UserID);
-			glDeleteTextures(1, &texture);
-		}
+		// Do nothing
+	}
+};
 
-		if (data != nullptr)
+class CustomModelLoader : public ::Effekseer::ModelLoader
+{
+private:
+	::Effekseer::DefaultFileInterface defaultFileInterface_;
+	::Effekseer::FileInterface* fileInterface_;
+
+public:
+	CustomModelLoader(::Effekseer::FileInterface* fileInterface = nullptr) : fileInterface_(fileInterface)
+	{
+		if (fileInterface == nullptr)
 		{
-			delete data;
+			fileInterface_ = &defaultFileInterface_;
 		}
 	}
+
+	~CustomModelLoader() override = default;
+
+public:
+	Effekseer::ModelRef Load(const char16_t* path) override
+	{
+		std::unique_ptr<::Effekseer::FileReader> reader(fileInterface_->OpenRead(path));
+		if (reader.get() == nullptr)
+		{
+			return nullptr;
+		}
+
+		size_t size = reader->GetLength();
+		std::unique_ptr<uint8_t[]> data(new uint8_t[size]);
+		reader->Read(data.get(), size);
+
+		auto model = Load(data.get(), (int32_t)size);
+
+		return model;
+	}
+
+	Effekseer::ModelRef Load(const void* data, int32_t size) override
+	{
+		auto model = ::Effekseer::MakeRefPtr<::Effekseer::Model>((const uint8_t*)data, size);
+
+		return model;
+	}
+
+	void Unload(Effekseer::ModelRef data) override {}
 };
 
 int main(int argc, char** argv)
@@ -140,12 +183,17 @@ int main(int argc, char** argv)
 	manager->SetModelRenderer(renderer->CreateModelRenderer());
 
 	// Specify a texture, model and material loader
-	// The texture loader is extended by yourself.
+	// The texture and model loaders are extended by yourself.
 	// テクスチャ、モデル、マテリアルローダーの設定する。
-	// テクスチャローダーがで拡張されている。
-	manager->SetTextureLoader(new CustomTextureLoader());
-	manager->SetModelLoader(renderer->CreateModelLoader());
-	manager->SetMaterialLoader(renderer->CreateMaterialLoader());
+	// テクスチャとモデルローダーが拡張されている。
+	manager->SetTextureLoader(::Effekseer::TextureLoaderRef(new CustomTextureLoader(renderer->GetGraphicsDevice())));
+	manager->SetModelLoader(::Effekseer::MakeRefPtr<CustomModelLoader>());
+
+
+	// You can specify only a file loader
+	// ファイルローダーのみを指定することもできる。
+	::Effekseer::DefaultFileInterface fileInterface;
+	manager->SetMaterialLoader(renderer->CreateMaterialLoader(&fileInterface));
 
 	// Specify a position of view
 	// 視点位置を確定
@@ -215,17 +263,13 @@ int main(int argc, char** argv)
 		time++;
 	}
 
-	// Release effects
-	// エフェクトの解放
-	ES_SAFE_RELEASE(effect);
-
 	// Dispose the manager
 	// マネージャーの破棄
-	manager->Destroy();
+	manager.Reset();
 
 	// Dispose the renderer
 	// レンダラーの破棄
-	renderer->Destroy();
+	renderer.Reset();
 
 	TerminateWindowAndDevice();
 

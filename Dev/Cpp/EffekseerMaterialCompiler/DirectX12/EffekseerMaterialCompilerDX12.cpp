@@ -21,26 +21,26 @@ static void Serialize(std::vector<uint8_t>& dst, const LLGI::CompilerResult& res
 	for (size_t i = 0; i < result.Binary.size(); i++)
 	{
 		binarySize += sizeof(uint32_t);
-		binarySize += result.Binary[i].size();
+		binarySize += (uint32_t)result.Binary[i].size();
 	}
 
 	dst.resize(binarySize);
 
 	uint32_t offset = 0;
-	uint32_t count = result.Binary.size();
+	uint32_t count = (uint32_t)result.Binary.size();
 
-	memcpy(dst.data() + offset, &count, sizeof(int32_t));
-	offset += sizeof(int32_t);
+	memcpy(dst.data() + offset, &count, sizeof(uint32_t));
+	offset += (uint32_t)sizeof(int32_t);
 
 	for (size_t i = 0; i < result.Binary.size(); i++)
 	{
-		uint32_t size = result.Binary[i].size();
+		uint32_t size = (uint32_t)result.Binary[i].size();
 
-		memcpy(dst.data() + offset, &size, sizeof(int32_t));
+		memcpy(dst.data() + offset, &size, sizeof(uint32_t));
 		offset += sizeof(int32_t);
 
 		memcpy(dst.data() + offset, result.Binary[i].data(), result.Binary[i].size());
-		offset += result.Binary[i].size();
+		offset += (uint32_t)result.Binary[i].size();
 	}
 }
 
@@ -57,7 +57,9 @@ namespace DX12
 namespace Effekseer
 {
 
-class CompiledMaterialBinaryDX12 : public CompiledMaterialBinary, ReferenceObject
+static const int32_t DX12_InstanceCount = 40;
+
+class CompiledMaterialBinaryDX12 : public CompiledMaterialBinary, public ReferenceObject
 {
 private:
 	std::array<std::vector<uint8_t>, static_cast<int32_t>(MaterialShaderType::Max)> vertexShaders_;
@@ -90,7 +92,7 @@ public:
 
 	int32_t GetVertexShaderSize(MaterialShaderType type) const override
 	{
-		return vertexShaders_.at(static_cast<int>(type)).size();
+		return (int32_t)vertexShaders_.at(static_cast<int>(type)).size();
 	}
 
 	const uint8_t* GetPixelShaderData(MaterialShaderType type) const override
@@ -100,7 +102,7 @@ public:
 
 	int32_t GetPixelShaderSize(MaterialShaderType type) const override
 	{
-		return pixelShaders_.at(static_cast<int>(type)).size();
+		return (int32_t)pixelShaders_.at(static_cast<int>(type)).size();
 	}
 
 	int AddRef() override
@@ -119,7 +121,7 @@ public:
 	}
 };
 
-CompiledMaterialBinary* MaterialCompilerDX12::Compile(Material* material, int32_t maximumTextureCount)
+CompiledMaterialBinary* MaterialCompilerDX12::Compile(MaterialFile* materialFile, int32_t maximumTextureCount)
 {
 	auto compiler = LLGI::CreateSharedPtr(new LLGI::CompilerDX12());
 
@@ -165,7 +167,7 @@ CompiledMaterialBinary* MaterialCompilerDX12::Compile(Material* material, int32_
 		return ret;
 	};
 
-	auto saveBinary = [&material, &binary, &convertToVectorVS, &convertToVectorPS, &maximumTextureCount](MaterialShaderType type) {
+	auto saveBinary = [&materialFile, &binary, &convertToVectorVS, &convertToVectorPS, &maximumTextureCount](MaterialShaderType type) {
 		auto generator = DirectX::ShaderGenerator(DX12::material_common_define,
 												  DX12::material_common_vs_functions,
 												  DX12::material_sprite_vs_pre,
@@ -183,12 +185,12 @@ CompiledMaterialBinary* MaterialCompilerDX12::Compile(Material* material, int32_
 												  DX12::g_material_ps_suf2_refraction,
 												  DirectX::ShaderGeneratorTarget::DirectX12);
 
-		auto shader = generator.GenerateShader(material, type, maximumTextureCount, 0, 1);
+		auto shader = generator.GenerateShader(materialFile, type, maximumTextureCount, 0, DX12_InstanceCount);
 		binary->SetVertexShaderData(type, convertToVectorVS(shader.CodeVS));
 		binary->SetPixelShaderData(type, convertToVectorPS(shader.CodePS));
 	};
 
-	if (material->GetHasRefraction())
+	if (materialFile->GetHasRefraction())
 	{
 		saveBinary(MaterialShaderType::Refraction);
 		saveBinary(MaterialShaderType::RefractionModel);
@@ -200,9 +202,9 @@ CompiledMaterialBinary* MaterialCompilerDX12::Compile(Material* material, int32_
 	return binary;
 }
 
-CompiledMaterialBinary* MaterialCompilerDX12::Compile(Material* material)
+CompiledMaterialBinary* MaterialCompilerDX12::Compile(MaterialFile* materialFile)
 {
-	return Compile(material, Effekseer::UserTextureSlotMax);
+	return Compile(materialFile, Effekseer::UserTextureSlotMax);
 }
 
 } // namespace Effekseer

@@ -32,7 +32,7 @@ namespace Effekseer.IO
 		public class FileInfo
 		{
 			public FileType Type;
-			public string Name;
+			public string RelativePath;
 			public string HashName;
 			public DateTime LastWriteTime;
 			public byte[] Data;
@@ -62,33 +62,49 @@ namespace Effekseer.IO
 			DateTime lastWriteTime = File.GetLastWriteTime(path);
 			Data.NodeRoot rootNode = Core.LoadFromFile(path);
 
-			// Load all dependent resource files
-			var resourcePaths = Utils.Misc.FindResourcePaths(rootNode, Binary.ExporterVersion.Latest);
-			var dependencies = AddEffectDependencies(resourcePaths);
+			var backedupDelegate = Core.OnFileLoaded;
 
-			var efkefc = new EfkEfc();
-			FileInfo file = new FileInfo();
-			file.Type = FileType.Effect;
-			file.Name = Path.GetFileName(path);
-			file.Data = efkefc.Save(rootNode, Core.SaveAsXmlDocument(rootNode));
-			file.HashName = ComputeHashName(file.Data);
-			file.LastWriteTime = lastWriteTime;
-			file.Dependencies = dependencies;
+			try
+			{
+				Core.OnFileLoaded = (filePath) =>
+				{
+					string hashName = Path.GetFileName(filePath);
+					var entry = ResourceFiles.Find(r => r.HashName == hashName);
+					return (entry != null) ? entry.Data : null;
+				};
 
-			EffectFiles.Add(file);
+				// Load all dependent resource files
+				var resourcePaths = Utils.Misc.FindResourcePaths(rootNode, Binary.ExporterVersion.Latest);
+				var dependencies = AddEffectDependencies(resourcePaths);
 
-			return file;
+				var efkefc = new EfkEfc();
+				FileInfo file = new FileInfo();
+				file.Type = FileType.Effect;
+				file.RelativePath = Path.GetFileName(path);
+				file.Data = efkefc.Save(rootNode, Core.SaveAsXmlDocument(rootNode));
+				file.HashName = ComputeHashName(file.Data);
+				file.LastWriteTime = lastWriteTime;
+				file.Dependencies = dependencies;
+
+				EffectFiles.Add(file);
+
+				return file;
+			}
+			finally
+			{
+				Core.OnFileLoaded = backedupDelegate;
+			}
 		}
 
-		public FileInfo AddResource(string path, string name, FileType type)
+		public FileInfo AddResource(string absolutePath, string relativePath, FileType type)
 		{
-			if (!File.Exists(path))
+			if (!File.Exists(absolutePath))
 			{
 				return null;
 			}
 
-			DateTime lastWriteTime = File.GetLastWriteTime(path);
-			byte[] resourceData = File.ReadAllBytes(path);
+			DateTime lastWriteTime = File.GetLastWriteTime(absolutePath);
+			byte[] resourceData = File.ReadAllBytes(absolutePath);
 			if (resourceData == null)
 			{
 				throw new Exception("failed open file.");
@@ -100,7 +116,7 @@ namespace Effekseer.IO
 			{
 				file = new FileInfo();
 				file.Type = type;
-				file.Name = name;
+				file.RelativePath = relativePath;
 				file.Data = resourceData;
 				file.HashName = hashName;
 				file.LastWriteTime = lastWriteTime;
@@ -138,7 +154,7 @@ namespace Effekseer.IO
 
 						dependencies.Add(file);
 
-						resource.SetRelativePathDirectly(file.HashName);
+						resource.SetRelativePathDirectly(file.HashName, true);
 					}
 				}
 			}
@@ -202,7 +218,6 @@ namespace Effekseer.IO
 					}
 
 					file.Data = material.SaveToBytes();
-					file.HashName = ComputeHashName(file.Data);
 
 					return dependencies.ToArray();
 				}
@@ -235,7 +250,7 @@ namespace Effekseer.IO
 					var fileinfo = new JObject();
 
 					fileinfo["type"] = file.Type.ToString();
-					fileinfo["name"] = file.Name;
+					fileinfo["relative_path"] = file.RelativePath;
 
 					if (file.Dependencies != null)
 					{
@@ -303,7 +318,17 @@ namespace Effekseer.IO
 					var entry = zip.GetEntry(kv.Key);
 					file.HashName = kv.Key;
 					file.Type = (FileType)Enum.Parse(typeof(FileType), (string)kv.Value["type"]);
-					file.Name = (string)kv.Value["name"];
+
+					if (kv.Value.ContainsKey("name"))
+					{
+						// Compatiblity
+						file.RelativePath = (string)kv.Value["name"];
+					}
+					else
+					{
+						file.RelativePath = (string)kv.Value["relative_path"];
+					}
+
 					file.LastWriteTime = entry.LastWriteTime.DateTime;
 					file.Data = new System.IO.BinaryReader(entry.Open()).ReadBytes((int)entry.Length);
 
@@ -352,57 +377,74 @@ namespace Effekseer.IO
 				extractFiles = AllFiles.ToArray();
 			}
 
-			// Extract effect files
-			foreach (var file in EffectFiles)
+			var backedupDelegate = Core.OnFileLoaded;
+
+			try
 			{
-				if (!extractFiles.Contains(file))
+				// Extract resource files
+				foreach (var file in ResourceFiles)
 				{
-					continue;
+					if (!extractFiles.Contains(file))
+					{
+						continue;
+					}
+
+					string filePath = Path.Combine(dirPath, file.RelativePath);
+					string resourceDirPath = Path.GetDirectoryName(filePath);
+					if (!Directory.Exists(resourceDirPath))
+					{
+						Directory.CreateDirectory(resourceDirPath);
+					}
+
+					byte[] data = ApplyResourceDependencies(file, dirPath, filePath);
+					if (data != null)
+					{
+						File.WriteAllBytes(filePath, data);
+						File.SetLastWriteTime(filePath, file.LastWriteTime);
+					}
 				}
 
-				string filePath = Path.Combine(dirPath, file.Name);
-
-				EfkEfc efkefc = new EfkEfc();
-				var doc = efkefc.Load(file.Data);
-				if (doc == null) return false;
-
-				NodeRoot root = Core.LoadFromXml(doc, filePath);
-				if (root == null) return false;
-
-				// Resolve the path of dependent resources
-				var resourcePaths = Utils.Misc.FindResourcePaths(root, Binary.ExporterVersion.Latest);
-				foreach (var list in resourcePaths.All)
+				// Extract effect files
+				foreach (var file in EffectFiles)
 				{
-					ApplyEffectDependencies(list);
-				}
+					if (!extractFiles.Contains(file))
+					{
+						continue;
+					}
 
-				// Write effect file
-				byte[] data = efkefc.Save(root, Core.SaveAsXmlDocument(root));
-				File.WriteAllBytes(filePath, data);
-				File.SetLastWriteTime(filePath, file.LastWriteTime);
-			}
+					string filePath = Path.Combine(dirPath, file.RelativePath);
 
-			// Extract resource files
-			foreach (var file in ResourceFiles)
-			{
-				if (!extractFiles.Contains(file))
-				{
-					continue;
-				}
+					EfkEfc efkefc = new EfkEfc();
+					var doc = efkefc.Load(file.Data);
+					if (doc == null) return false;
 
-				string filePath = Path.Combine(dirPath, file.Name);
-				string resourceDirPath = Path.GetDirectoryName(filePath);
-				if (!Directory.Exists(resourceDirPath))
-				{
-					Directory.CreateDirectory(resourceDirPath);
-				}
+					Core.OnFileLoaded = (path) =>
+					{
+						string hashName = Path.GetFileName(path);
+						var entry = ResourceFiles.Find(r => r.HashName == hashName);
+						return (entry != null) ? entry.Data : null;
+					};
 
-				byte[] data = ApplyResourceDependencies(file, dirPath, filePath);
-				if (data != null)
-				{
+					NodeRoot root = Core.LoadFromXml(doc, filePath);
+					if (root == null) return false;
+
+					// Resolve the path of dependent resources
+					var resourcePaths = Utils.Misc.FindResourcePaths(root, Binary.ExporterVersion.Latest);
+					foreach (var list in resourcePaths.All)
+					{
+						ApplyEffectDependencies(list);
+					}
+
+					// Write effect file
+					Core.OnFileLoaded = backedupDelegate;
+					byte[] data = efkefc.Save(root, Core.SaveAsXmlDocument(root));
 					File.WriteAllBytes(filePath, data);
 					File.SetLastWriteTime(filePath, file.LastWriteTime);
 				}
+			}
+			finally
+			{
+				Core.OnFileLoaded = backedupDelegate;
 			}
 
 			return true;
@@ -416,7 +458,7 @@ namespace Effekseer.IO
 				var entry = ResourceFiles.Find(r => r.HashName == hashName);
 				if (entry != null)
 				{
-					resource.SetRelativePath(entry.Name);
+					resource.SetRelativePathDirectly(entry.RelativePath, true);
 				}
 			}
 		}
@@ -431,7 +473,7 @@ namespace Effekseer.IO
 					bool result = ReplaceMaterialPaths(material, (path) =>
 					{
 						var resfile = AllFiles.First(f => f.HashName == path);
-						var fullPath = Path.Combine(exportDirPath, resfile.Name);
+						var fullPath = Path.Combine(exportDirPath, resfile.RelativePath);
 						fullPath = Utils.Misc.BackSlashToSlash(fullPath);
 						path = Utils.Misc.GetRelativePath(resourcePath, fullPath);
 						return path;

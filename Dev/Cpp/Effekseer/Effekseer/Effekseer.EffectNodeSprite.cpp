@@ -1,20 +1,15 @@
-﻿
+﻿#include "Effekseer.EffectNodeSprite.h"
 
-//----------------------------------------------------------------------------------
-//
-//----------------------------------------------------------------------------------
 #include "Effekseer.Effect.h"
 #include "Effekseer.EffectImplemented.h"
 #include "Effekseer.EffectNode.h"
 #include "Effekseer.Manager.h"
 #include "Effekseer.Vector3D.h"
-#include "SIMD/Effekseer.SIMDUtils.h"
+#include "SIMD/Utils.h"
 
 #include "Effekseer.Instance.h"
 #include "Effekseer.InstanceContainer.h"
 #include "Effekseer.InstanceGlobal.h"
-
-#include "Effekseer.EffectNodeSprite.h"
 
 #include "Renderer/Effekseer.SpriteRenderer.h"
 
@@ -28,7 +23,7 @@ namespace Effekseer
 //----------------------------------------------------------------------------------
 //
 //----------------------------------------------------------------------------------
-void EffectNodeSprite::LoadRendererParameter(unsigned char*& pos, Setting* setting)
+void EffectNodeSprite::LoadRendererParameter(unsigned char*& pos, const SettingRef& setting)
 {
 	int32_t type = 0;
 	memcpy(&type, pos, sizeof(int));
@@ -124,7 +119,7 @@ void EffectNodeSprite::LoadRendererParameter(unsigned char*& pos, Setting* setti
 		memcpy(&SpriteTexture, pos, sizeof(int));
 		pos += sizeof(int);
 		RendererCommon.ColorTextureIndex = SpriteTexture;
-		RendererCommon.BasicParameter.Texture1Index = SpriteTexture;
+		RendererCommon.BasicParameter.TextureIndexes[0] = SpriteTexture;
 	}
 
 	// 右手系左手系変換
@@ -151,10 +146,10 @@ void EffectNodeSprite::LoadRendererParameter(unsigned char*& pos, Setting* setti
 //----------------------------------------------------------------------------------
 //
 //----------------------------------------------------------------------------------
-void EffectNodeSprite::BeginRendering(int32_t count, Manager* manager)
+void EffectNodeSprite::BeginRendering(int32_t count, Manager* manager, void* userData)
 {
-	SpriteRenderer* renderer = manager->GetSpriteRenderer();
-	if (renderer != NULL)
+	SpriteRendererRef renderer = manager->GetSpriteRenderer();
+	if (renderer != nullptr)
 	{
 		SpriteRenderer::NodeParameter nodeParameter;
 		// nodeParameter.TextureFilter = RendererCommon.FilterType;
@@ -172,18 +167,21 @@ void EffectNodeSprite::BeginRendering(int32_t count, Manager* manager)
 
 		nodeParameter.EnableViewOffset = (TranslationType == ParameterTranslationType_ViewOffset);
 
-		renderer->BeginRendering(nodeParameter, count, m_userData);
+		nodeParameter.UserData = GetRenderingUserData();
+		nodeParameter.Maginification = GetEffect()->GetMaginification();
+
+		renderer->BeginRendering(nodeParameter, count, userData);
 	}
 }
 
 //----------------------------------------------------------------------------------
 //
 //----------------------------------------------------------------------------------
-void EffectNodeSprite::Rendering(const Instance& instance, const Instance* next_instance, Manager* manager)
+void EffectNodeSprite::Rendering(const Instance& instance, const Instance* next_instance, Manager* manager, void* userData)
 {
 	const InstanceValues& instValues = instance.rendererValues.sprite;
-	SpriteRenderer* renderer = manager->GetSpriteRenderer();
-	if (renderer != NULL)
+	SpriteRendererRef renderer = manager->GetSpriteRenderer();
+	if (renderer != nullptr)
 	{
 		SpriteRenderer::NodeParameter nodeParameter;
 		// nodeParameter.TextureFilter = RendererCommon.FilterType;
@@ -200,6 +198,7 @@ void EffectNodeSprite::Rendering(const Instance& instance, const Instance* next_
 		nodeParameter.ZSort = DepthValues.ZSort;
 
 		nodeParameter.EnableViewOffset = (TranslationType == ParameterTranslationType_ViewOffset);
+		nodeParameter.Maginification = GetEffect()->GetMaginification();
 
 		SpriteRenderer::InstanceParameter instanceParameter;
 		instanceParameter.AllColor = instValues._color;
@@ -280,17 +279,19 @@ void EffectNodeSprite::Rendering(const Instance& instance, const Instance* next_
 
 		CalcCustomData(&instance, instanceParameter.CustomData1, instanceParameter.CustomData2);
 
-		renderer->Rendering(nodeParameter, instanceParameter, m_userData);
+		nodeParameter.UserData = GetRenderingUserData();
+
+		renderer->Rendering(nodeParameter, instanceParameter, userData);
 	}
 }
 
 //----------------------------------------------------------------------------------
 //
 //----------------------------------------------------------------------------------
-void EffectNodeSprite::EndRendering(Manager* manager)
+void EffectNodeSprite::EndRendering(Manager* manager, void* userData)
 {
-	SpriteRenderer* renderer = manager->GetSpriteRenderer();
-	if (renderer != NULL)
+	SpriteRendererRef renderer = manager->GetSpriteRenderer();
+	if (renderer != nullptr)
 	{
 		SpriteRenderer::NodeParameter nodeParameter;
 		// nodeParameter.TextureFilter = RendererCommon.FilterType;
@@ -306,14 +307,17 @@ void EffectNodeSprite::EndRendering(Manager* manager)
 		nodeParameter.DepthParameterPtr = &DepthValues.DepthParameter;
 		nodeParameter.BasicParameterPtr = &RendererCommon.BasicParameter;
 
-		renderer->EndRendering(nodeParameter, m_userData);
+		nodeParameter.UserData = GetRenderingUserData();
+		nodeParameter.Maginification = GetEffect()->GetMaginification();
+
+		renderer->EndRendering(nodeParameter, userData);
 	}
 }
 
 //----------------------------------------------------------------------------------
 //
 //----------------------------------------------------------------------------------
-void EffectNodeSprite::InitializeRenderedInstance(Instance& instance, Manager* manager)
+void EffectNodeSprite::InitializeRenderedInstance(Instance& instance, InstanceGroup& instanceGroup, Manager* manager)
 {
 	InstanceValues& instValues = instance.rendererValues.sprite;
 	IRandObject& rand = instance.GetRandObject();
@@ -363,7 +367,7 @@ void EffectNodeSprite::InitializeRenderedInstance(Instance& instance, Manager* m
 //----------------------------------------------------------------------------------
 //
 //----------------------------------------------------------------------------------
-void EffectNodeSprite::UpdateRenderedInstance(Instance& instance, Manager* manager)
+void EffectNodeSprite::UpdateRenderedInstance(Instance& instance, InstanceGroup& instanceGroup, Manager* manager)
 {
 	InstanceValues& instValues = instance.rendererValues.sprite;
 

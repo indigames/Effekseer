@@ -1,8 +1,10 @@
-﻿
+#include "Effekseer.Manager.h"
+#include "Effekseer.ManagerImplemented.h"
 
 #include "Effekseer.Effect.h"
 #include "Effekseer.EffectImplemented.h"
-#include "SIMD/Effekseer.SIMDUtils.h"
+#include "Effekseer.Resource.h"
+#include "SIMD/Utils.h"
 
 #include "Effekseer.EffectNode.h"
 #include "Effekseer.Instance.h"
@@ -10,10 +12,9 @@
 #include "Effekseer.InstanceContainer.h"
 #include "Effekseer.InstanceGlobal.h"
 #include "Effekseer.InstanceGroup.h"
-#include "Effekseer.Manager.h"
-#include "Effekseer.ManagerImplemented.h"
 
 #include "Effekseer.DefaultEffectLoader.h"
+#include "Effekseer.MaterialLoader.h"
 #include "Effekseer.TextureLoader.h"
 
 #include "Effekseer.Setting.h"
@@ -27,10 +28,13 @@
 #include "Effekseer.SoundLoader.h"
 #include "Sound/Effekseer.SoundPlayer.h"
 
-#include "Effekseer.ModelLoader.h"
+#include "Effekseer.CurveLoader.h"
+#include "Model/ModelLoader.h"
 
 #include <algorithm>
 #include <iostream>
+
+#include "Utils/Profiler.h"
 
 namespace Effekseer
 {
@@ -40,17 +44,33 @@ static int64_t GetTime(void)
 	return std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
 }
 
+//! TODO should be moved
+static std::function<void(LogType, const std::string&)> g_logger;
+
+void SetLogger(const std::function<void(LogType, const std::string&)>& logger)
+{
+	g_logger = logger;
+}
+
+void Log(LogType logType, const std::string& message)
+{
+	if (g_logger != nullptr)
+	{
+		g_logger(logType, message);
+	}
+}
+
 Manager::DrawParameter::DrawParameter()
 {
 	CameraCullingMask = 1;
 }
 
-Manager* Manager::Create(int instance_max, bool autoFlip)
+ManagerRef Manager::Create(int instance_max, bool autoFlip)
 {
-	return new ManagerImplemented(instance_max, autoFlip);
+	return MakeRefPtr<ManagerImplemented>(instance_max, autoFlip);
 }
 
-Mat43f* ManagerImplemented::DrawSet::GetEnabledGlobalMatrix()
+SIMD::Mat43f* ManagerImplemented::DrawSet::GetEnabledGlobalMatrix()
 {
 	if (IsPreupdated)
 	{
@@ -94,7 +114,7 @@ void ManagerImplemented::DrawSet::CopyMatrixFromInstanceToRoot()
 	}
 }
 
-Handle ManagerImplemented::AddDrawSet(Effect* effect, InstanceContainer* pInstanceContainer, InstanceGlobal* pGlobalPointer)
+Handle ManagerImplemented::AddDrawSet(const EffectRef& effect, InstanceContainer* pInstanceContainer, InstanceGlobal* pGlobalPointer)
 {
 	Handle Temp = m_NextHandle;
 
@@ -107,8 +127,6 @@ Handle ManagerImplemented::AddDrawSet(Effect* effect, InstanceContainer* pInstan
 
 	DrawSet drawset(effect, pInstanceContainer, pGlobalPointer);
 	drawset.Self = Temp;
-
-	ES_SAFE_ADDREF(effect);
 
 	m_DrawSets[Temp] = drawset;
 
@@ -145,23 +163,10 @@ void ManagerImplemented::StopStoppingEffects()
 
 				if (pRootInstance && pRootInstance->GetState() == INSTANCE_STATE_ACTIVE && !pRootInstance->IsFirstTime())
 				{
-					int maxcreate_count = 0;
-					bool canRemoved = true;
-					for (int i = 0; i < pRootInstance->m_pEffectNode->GetChildrenCount(); i++)
-					{
-						auto child = (EffectNodeImplemented*)pRootInstance->m_pEffectNode->GetChild(i);
-
-						if (pRootInstance->maxGenerationChildrenCount[i] > pRootInstance->m_generatedChildrenCount[i])
-						{
-							canRemoved = false;
-							break;
-						}
-					}
-
-					if (canRemoved)
+					if (!pRootInstance->AreChildrenActive())
 					{
 						// when a sound is not playing.
-						if (!GetSoundPlayer() || !GetSoundPlayer()->CheckPlayingTag(draw_set.GlobalPointer))
+						if (m_soundPlayer == nullptr || !m_soundPlayer->CheckPlayingTag(draw_set.GlobalPointer))
 						{
 							isRemoving = true;
 						}
@@ -201,16 +206,15 @@ void ManagerImplemented::GCDrawSet(bool isRemovingManager)
 				ReleaseInstanceContainer(drawset.InstanceContainerPointer);
 			}
 
-			ES_SAFE_RELEASE(drawset.ParameterPointer);
+			drawset.ParameterPointer = nullptr;
 			ES_SAFE_DELETE(drawset.GlobalPointer);
 
-			if (m_cullingWorld != NULL && drawset.CullingObjectPointer != nullptr)
+			if (m_cullingWorld != nullptr && drawset.CullingObjectPointer != nullptr)
 			{
-				m_cullingWorld->RemoveObject(drawset.CullingObjectPointer);
 				Culling3D::SafeRelease(drawset.CullingObjectPointer);
 			}
 
-			m_RemovingDrawSets[1].erase(it++);
+			it = m_RemovingDrawSets[1].erase(it);
 		}
 		m_RemovingDrawSets[1].clear();
 	}
@@ -229,7 +233,7 @@ void ManagerImplemented::GCDrawSet(bool isRemovingManager)
 			}
 
 			m_RemovingDrawSets[1][(*it).first] = (*it).second;
-			m_RemovingDrawSets[0].erase(it++);
+			it = m_RemovingDrawSets[0].erase(it);
 		}
 		m_RemovingDrawSets[0].clear();
 	}
@@ -242,13 +246,18 @@ void ManagerImplemented::GCDrawSet(bool isRemovingManager)
 
 			if (draw_set.IsRemoving)
 			{
-				if ((*it).second.RemovingCallback != NULL)
+				if ((*it).second.RemovingCallback != nullptr)
 				{
 					(*it).second.RemovingCallback(this, (*it).first, isRemovingManager);
 				}
 
+				if (m_cullingWorld != NULL && (*it).second.CullingObjectPointer != nullptr)
+				{
+					m_cullingWorld->RemoveObject((*it).second.CullingObjectPointer);
+				}
+
 				m_RemovingDrawSets[0][(*it).first] = (*it).second;
-				m_DrawSets.erase(it++);
+				it = m_DrawSets.erase(it);
 			}
 			else
 			{
@@ -259,7 +268,7 @@ void ManagerImplemented::GCDrawSet(bool isRemovingManager)
 }
 
 InstanceContainer* ManagerImplemented::CreateInstanceContainer(
-	EffectNode* pEffectNode, InstanceGlobal* pGlobal, bool isRoot, const Mat43f& rootMatrix, Instance* pParent)
+	EffectNode* pEffectNode, InstanceGlobal* pGlobal, bool isRoot, const SIMD::Mat43f& rootMatrix, Instance* pParent)
 {
 	if (pooledContainers_.empty())
 	{
@@ -290,7 +299,7 @@ InstanceContainer* ManagerImplemented::CreateInstanceContainer(
 			return nullptr;
 		}
 
-		auto instance = group->CreateInstance();
+		auto instance = group->CreateRootInstance();
 		if (instance == nullptr)
 		{
 			group->IsReferencedFromInstance = false;
@@ -346,7 +355,7 @@ void ManagerImplemented::ExecuteEvents()
 			}
 
 			ds.second.IsRemoving = true;
-			if (GetSoundPlayer() != NULL)
+			if (GetSoundPlayer() != nullptr)
 			{
 				GetSoundPlayer()->StopTag(ds.second.GlobalPointer);
 			}
@@ -364,27 +373,57 @@ void ManagerImplemented::ExecuteEvents()
 	}
 }
 
+void ManagerImplemented::StoreSortingDrawSets(const Manager::DrawParameter& drawParameter)
+{
+	sortedRenderingDrawSets_.clear();
+
+	if (m_culled)
+	{
+		for (size_t i = 0; i < m_culledObjects.size(); i++)
+		{
+			DrawSet& drawSet = *m_culledObjects[i];
+			sortedRenderingDrawSets_.emplace_back(drawSet);
+		}
+	}
+	else
+	{
+		for (const auto& ds : m_renderingDrawSets)
+		{
+			sortedRenderingDrawSets_.emplace_back(ds);
+		}
+	}
+
+	if (drawParameter.IsSortingEffectsEnabled)
+	{
+		std::sort(sortedRenderingDrawSets_.begin(), sortedRenderingDrawSets_.end(), [&](const DrawSet& a, const DrawSet& b) -> bool {
+			const auto da = SIMD::Vec3f::Dot(a.GlobalMatrix.GetTranslation() - drawParameter.CameraPosition, drawParameter.CameraFrontDirection);
+			const auto db = SIMD::Vec3f::Dot(b.GlobalMatrix.GetTranslation() - drawParameter.CameraPosition, drawParameter.CameraFrontDirection);
+			return da > db;
+		});
+	}
+}
+
 ManagerImplemented::ManagerImplemented(int instance_max, bool autoFlip)
 	: m_autoFlip(autoFlip)
 	, m_NextHandle(0)
 	, m_instance_max(instance_max)
-	, m_setting(NULL)
+	, m_setting(nullptr)
 	, m_sequenceNumber(0)
 
-	, m_cullingWorld(NULL)
+	, m_cullingWorld(nullptr)
 	, m_culled(false)
 
-	, m_spriteRenderer(NULL)
-	, m_ribbonRenderer(NULL)
-	, m_ringRenderer(NULL)
-	, m_modelRenderer(NULL)
-	, m_trackRenderer(NULL)
+	, m_spriteRenderer(nullptr)
+	, m_ribbonRenderer(nullptr)
+	, m_ringRenderer(nullptr)
+	, m_modelRenderer(nullptr)
+	, m_trackRenderer(nullptr)
 
-	, m_soundPlayer(NULL)
+	, m_soundPlayer(nullptr)
 
-	, m_MallocFunc(NULL)
-	, m_FreeFunc(NULL)
-	, m_randFunc(NULL)
+	, m_MallocFunc(nullptr)
+	, m_FreeFunc(nullptr)
+	, m_randFunc(nullptr)
 	, m_randMax(0)
 {
 	m_setting = Setting::Create();
@@ -422,12 +461,17 @@ ManagerImplemented::ManagerImplemented(int instance_max, bool autoFlip)
 		pooledContainers_.push((InstanceContainer*)&reservedContainerBuffer_[i * sizeof(InstanceContainer)]);
 	}
 
-	m_setting->SetEffectLoader(new DefaultEffectLoader());
+	m_setting->SetEffectLoader(Effect::CreateEffectLoader());
 	EffekseerPrintDebug("*** Create : Manager\n");
 }
 
 ManagerImplemented::~ManagerImplemented()
 {
+	if (m_WorkerThreads.size() > 0)
+	{
+		m_WorkerThreads[0].WaitForComplete();
+	}
+
 	StopAllEffects();
 
 	ExecuteEvents();
@@ -441,19 +485,9 @@ ManagerImplemented::~ManagerImplemented()
 	// ES_SAFE_DELETE_ARRAY( m_reserved_instances_buffer );
 
 	Culling3D::SafeRelease(m_cullingWorld);
-
-	ES_SAFE_DELETE(m_spriteRenderer);
-	ES_SAFE_DELETE(m_ribbonRenderer);
-	ES_SAFE_DELETE(m_modelRenderer);
-	ES_SAFE_DELETE(m_trackRenderer);
-	ES_SAFE_DELETE(m_ringRenderer);
-
-	ES_SAFE_DELETE(m_soundPlayer);
-
-	ES_SAFE_RELEASE(m_setting);
 }
 
-Instance* ManagerImplemented::CreateInstance(EffectNode* pEffectNode, InstanceContainer* pContainer, InstanceGroup* pGroup)
+Instance* ManagerImplemented::CreateInstance(EffectNodeImplemented* pEffectNode, InstanceContainer* pContainer, InstanceGroup* pGroup)
 {
 	int32_t generationNumber = pEffectNode->GetGeneration();
 	assert(generationNumber < GenerationsMax);
@@ -483,7 +517,7 @@ Instance* ManagerImplemented::CreateInstance(EffectNode* pEffectNode, InstanceCo
 	return nullptr;
 }
 
-InstanceGroup* ManagerImplemented::CreateInstanceGroup(EffectNode* pEffectNode, InstanceContainer* pContainer, InstanceGlobal* pGlobal)
+InstanceGroup* ManagerImplemented::CreateInstanceGroup(EffectNodeImplemented* pEffectNode, InstanceContainer* pContainer, InstanceGlobal* pGlobal)
 {
 	if (pooledGroups_.empty())
 	{
@@ -500,25 +534,6 @@ void ManagerImplemented::ReleaseGroup(InstanceGroup* group)
 	pooledGroups_.push(group);
 }
 
-void ManagerImplemented::Destroy()
-{
-	if (m_WorkerThreads.size() > 0)
-	{
-		m_WorkerThreads[0].WaitForComplete();
-	}
-
-	StopAllEffects();
-
-	ExecuteEvents();
-
-	for (int i = 0; i < 5; i++)
-	{
-		GCDrawSet(true);
-	}
-
-	Release();
-}
-
 void ManagerImplemented::LaunchWorkerThreads(uint32_t threadCount)
 {
 	m_WorkerThreads.resize(threadCount);
@@ -529,7 +544,7 @@ void ManagerImplemented::LaunchWorkerThreads(uint32_t threadCount)
 	}
 }
 
-uintptr_t ManagerImplemented::GetWorkerThreadHandle(uint32_t threadID)
+ThreadNativeHandleType ManagerImplemented::GetWorkerThreadHandle(uint32_t threadID)
 {
 	if (threadID < m_WorkerThreads.size())
 	{
@@ -593,140 +608,132 @@ void ManagerImplemented::SetCoordinateSystem(CoordinateSystem coordinateSystem)
 	m_setting->SetCoordinateSystem(coordinateSystem);
 }
 
-SpriteRenderer* ManagerImplemented::GetSpriteRenderer()
+SpriteRendererRef ManagerImplemented::GetSpriteRenderer()
 {
 	return m_spriteRenderer;
 }
 
-void ManagerImplemented::SetSpriteRenderer(SpriteRenderer* renderer)
+void ManagerImplemented::SetSpriteRenderer(SpriteRendererRef renderer)
 {
-	ES_SAFE_DELETE(m_spriteRenderer);
 	m_spriteRenderer = renderer;
 }
 
-RibbonRenderer* ManagerImplemented::GetRibbonRenderer()
+RibbonRendererRef ManagerImplemented::GetRibbonRenderer()
 {
 	return m_ribbonRenderer;
 }
 
-void ManagerImplemented::SetRibbonRenderer(RibbonRenderer* renderer)
+void ManagerImplemented::SetRibbonRenderer(RibbonRendererRef renderer)
 {
-	ES_SAFE_DELETE(m_ribbonRenderer);
 	m_ribbonRenderer = renderer;
 }
 
-RingRenderer* ManagerImplemented::GetRingRenderer()
+RingRendererRef ManagerImplemented::GetRingRenderer()
 {
 	return m_ringRenderer;
 }
 
-void ManagerImplemented::SetRingRenderer(RingRenderer* renderer)
+void ManagerImplemented::SetRingRenderer(RingRendererRef renderer)
 {
-	ES_SAFE_DELETE(m_ringRenderer);
 	m_ringRenderer = renderer;
 }
 
-ModelRenderer* ManagerImplemented::GetModelRenderer()
+ModelRendererRef ManagerImplemented::GetModelRenderer()
 {
 	return m_modelRenderer;
 }
 
-void ManagerImplemented::SetModelRenderer(ModelRenderer* renderer)
+void ManagerImplemented::SetModelRenderer(ModelRendererRef renderer)
 {
-	ES_SAFE_DELETE(m_modelRenderer);
 	m_modelRenderer = renderer;
 }
 
-TrackRenderer* ManagerImplemented::GetTrackRenderer()
+TrackRendererRef ManagerImplemented::GetTrackRenderer()
 {
 	return m_trackRenderer;
 }
 
-void ManagerImplemented::SetTrackRenderer(TrackRenderer* renderer)
+void ManagerImplemented::SetTrackRenderer(TrackRendererRef renderer)
 {
-	ES_SAFE_DELETE(m_trackRenderer);
 	m_trackRenderer = renderer;
 }
 
-SoundPlayer* ManagerImplemented::GetSoundPlayer()
+SoundPlayerRef ManagerImplemented::GetSoundPlayer()
 {
 	return m_soundPlayer;
 }
 
-void ManagerImplemented::SetSoundPlayer(SoundPlayer* soundPlayer)
+void ManagerImplemented::SetSoundPlayer(SoundPlayerRef soundPlayer)
 {
-	ES_SAFE_DELETE(m_soundPlayer);
 	m_soundPlayer = soundPlayer;
 }
 
-Setting* ManagerImplemented::GetSetting()
+const SettingRef& ManagerImplemented::GetSetting() const
 {
 	return m_setting;
 }
 
-void ManagerImplemented::SetSetting(Setting* setting)
+void ManagerImplemented::SetSetting(const SettingRef& setting)
 {
-	ES_SAFE_RELEASE(m_setting);
 	m_setting = setting;
-	ES_SAFE_ADDREF(m_setting);
 }
 
-EffectLoader* ManagerImplemented::GetEffectLoader()
+EffectLoaderRef ManagerImplemented::GetEffectLoader()
 {
 	return m_setting->GetEffectLoader();
 }
 
-void ManagerImplemented::SetEffectLoader(EffectLoader* effectLoader)
+void ManagerImplemented::SetEffectLoader(EffectLoaderRef effectLoader)
 {
 	m_setting->SetEffectLoader(effectLoader);
 }
 
-TextureLoader* ManagerImplemented::GetTextureLoader()
+TextureLoaderRef ManagerImplemented::GetTextureLoader()
 {
 	return m_setting->GetTextureLoader();
 }
 
-void ManagerImplemented::SetTextureLoader(TextureLoader* textureLoader)
+void ManagerImplemented::SetTextureLoader(TextureLoaderRef textureLoader)
 {
 	m_setting->SetTextureLoader(textureLoader);
 }
 
-SoundLoader* ManagerImplemented::GetSoundLoader()
+SoundLoaderRef ManagerImplemented::GetSoundLoader()
 {
 	return m_setting->GetSoundLoader();
 }
 
-void ManagerImplemented::SetSoundLoader(SoundLoader* soundLoader)
+void ManagerImplemented::SetSoundLoader(SoundLoaderRef soundLoader)
 {
 	m_setting->SetSoundLoader(soundLoader);
 }
 
-ModelLoader* ManagerImplemented::GetModelLoader()
+ModelLoaderRef ManagerImplemented::GetModelLoader()
 {
 	return m_setting->GetModelLoader();
 }
 
-void ManagerImplemented::SetModelLoader(ModelLoader* modelLoader)
+void ManagerImplemented::SetModelLoader(ModelLoaderRef modelLoader)
 {
 	m_setting->SetModelLoader(modelLoader);
 }
 
-MaterialLoader* ManagerImplemented::GetMaterialLoader()
+MaterialLoaderRef ManagerImplemented::GetMaterialLoader()
 {
 	return m_setting->GetMaterialLoader();
 }
 
-void ManagerImplemented::SetMaterialLoader(MaterialLoader* loader)
+void ManagerImplemented::SetMaterialLoader(MaterialLoaderRef loader)
 {
 	m_setting->SetMaterialLoader(loader);
 }
 
-CurveLoader* ManagerImplemented::GetCurveLoader()
+CurveLoaderRef ManagerImplemented::GetCurveLoader()
 {
 	return m_setting->GetCurveLoader();
 }
 
-void ManagerImplemented::SetCurveLoader(CurveLoader* loader)
+void ManagerImplemented::SetCurveLoader(CurveLoaderRef loader)
 {
 	m_setting->SetCurveLoader(loader);
 }
@@ -758,7 +765,7 @@ void ManagerImplemented::StopRoot(Handle handle)
 	}
 }
 
-void ManagerImplemented::StopRoot(Effect* effect)
+void ManagerImplemented::StopRoot(const EffectRef& effect)
 {
 	for (auto& it : m_DrawSets)
 	{
@@ -831,6 +838,8 @@ void ManagerImplemented::SetMatrix(Handle handle, const Matrix43& mat)
 		if (mat_ != nullptr)
 		{
 			(*mat_) = mat;
+			Vector3D t;
+			mat.GetSRT(drawSet.Scaling, drawSet.Rotation, t);
 			drawSet.CopyMatrixFromInstanceToRoot();
 			drawSet.IsParameterChanged = true;
 		}
@@ -909,14 +918,11 @@ void ManagerImplemented::SetRotation(Handle handle, float x, float y, float z)
 
 		if (mat_ != nullptr)
 		{
-			Mat43f r;
-			Vec3f s, t;
+			const auto t = mat_->GetTranslation();
 
-			mat_->GetSRT(s, r, t);
+			drawSet.Rotation.RotationZXY(z, x, y);
 
-			r = Mat43f::RotationZXY(z, x, y);
-
-			*mat_ = Mat43f::SRT(s, r, t);
+			*mat_ = SIMD::Mat43f::SRT(drawSet.Scaling, drawSet.Rotation, t);
 
 			drawSet.CopyMatrixFromInstanceToRoot();
 			drawSet.IsParameterChanged = true;
@@ -934,14 +940,11 @@ void ManagerImplemented::SetRotation(Handle handle, const Vector3D& axis, float 
 
 		if (mat_ != nullptr)
 		{
-			Mat43f r;
-			Vec3f s, t;
+			const auto t = mat_->GetTranslation();
 
-			mat_->GetSRT(s, r, t);
+			drawSet.Rotation.RotationAxis(axis, angle);
 
-			r = Mat43f::RotationAxis(axis, angle);
-
-			*mat_ = Mat43f::SRT(s, r, t);
+			*mat_ = SIMD::Mat43f::SRT(drawSet.Scaling, drawSet.Rotation, t);
 
 			drawSet.CopyMatrixFromInstanceToRoot();
 			drawSet.IsParameterChanged = true;
@@ -959,14 +962,11 @@ void ManagerImplemented::SetScale(Handle handle, float x, float y, float z)
 
 		if (mat_ != nullptr)
 		{
-			Mat43f r;
-			Vec3f s, t;
+			const auto t = mat_->GetTranslation();
 
-			mat_->GetSRT(s, r, t);
+			drawSet.Scaling = { x, y, z };
 
-			s = Vec3f(x, y, z);
-
-			*mat_ = Mat43f::SRT(s, r, t);
+			*mat_ = SIMD::Mat43f::SRT(drawSet.Scaling, drawSet.Rotation, t);
 
 			drawSet.CopyMatrixFromInstanceToRoot();
 			drawSet.IsParameterChanged = true;
@@ -1194,8 +1194,20 @@ void ManagerImplemented::SetAutoDrawing(Handle handle, bool autoDraw)
 	}
 }
 
+void ManagerImplemented::SetUserData(Handle handle, void* userData)
+{
+	auto it = m_DrawSets.find(handle);
+
+	if (it != m_DrawSets.end())
+	{
+		it->second.GlobalPointer->SetUserData(userData);
+	}
+}
+
 void ManagerImplemented::Flip()
 {
+	PROFILER_BLOCK("Manager::Flip", profiler::colors::Red);
+
 	if (!m_autoFlip)
 	{
 		m_renderingMutex.lock();
@@ -1237,7 +1249,7 @@ void ManagerImplemented::Flip()
 		for (auto& it : m_DrawSets)
 		{
 			DrawSet& ds = it.second;
-			EffectImplemented* effect = (EffectImplemented*)ds.ParameterPointer;
+			EffectImplemented* effect = (EffectImplemented*)ds.ParameterPointer.Get();
 
 			if (ds.InstanceContainerPointer == nullptr)
 			{
@@ -1246,11 +1258,11 @@ void ManagerImplemented::Flip()
 
 			if (ds.IsParameterChanged)
 			{
-				if (m_cullingWorld != NULL)
+				if (m_cullingWorld != nullptr)
 				{
 					auto isCreated = false;
 
-					if (ds.CullingObjectPointer == NULL)
+					if (ds.CullingObjectPointer == nullptr)
 					{
 						ds.CullingObjectPointer = Culling3D::Object::Create();
 						if (effect->Culling.Shape == CullingShape::Sphere)
@@ -1279,7 +1291,7 @@ void ManagerImplemented::Flip()
 						location.Y = mat_->Y.GetW();
 						location.Z = mat_->Z.GetW();
 					}
-					
+
 					ds.CullingObjectPointer->SetPosition(Culling3D::Vector3DF(location.X, location.Y, location.Z));
 
 					if (effect->Culling.Shape == CullingShape::Sphere)
@@ -1287,14 +1299,18 @@ void ManagerImplemented::Flip()
 						float radius = effect->Culling.Sphere.Radius;
 
 						{
-							Vec3f s = pInstance->GetGlobalMatrix43().GetScale();
+							SIMD::Vec3f s = pInstance->GetGlobalMatrix43().GetScale();
 							radius *= s.GetLength();
+							SIMD::Vec3f culling_pos = SIMD::Vec3f::Transform(SIMD::Vec3f(effect->Culling.Location), pInstance->GetGlobalMatrix43());
+							ds.CullingObjectPointer->SetPosition(Culling3D::Vector3DF(culling_pos.GetX(), culling_pos.GetY(), culling_pos.GetZ()));
 						}
 
 						if (ds.DoUseBaseMatrix)
 						{
-							Vec3f s = ds.BaseMatrix.GetScale();
+							SIMD::Vec3f s = ds.BaseMatrix.GetScale();
 							radius *= s.GetLength();
+							SIMD::Vec3f culling_pos = SIMD::Vec3f::Transform(SIMD::Vec3f(effect->Culling.Location), ds.BaseMatrix);
+							ds.CullingObjectPointer->SetPosition(Culling3D::Vector3DF(culling_pos.GetX(), culling_pos.GetY(), culling_pos.GetZ()));
 						}
 
 						ds.CullingObjectPointer->ChangeIntoSphere(radius);
@@ -1302,7 +1318,7 @@ void ManagerImplemented::Flip()
 
 					if (isCreated)
 					{
-						m_cullingWorld->AddObject(ds.CullingObjectPointer);					
+						m_cullingWorld->AddObject(ds.CullingObjectPointer);
 					}
 				}
 				ds.IsParameterChanged = false;
@@ -1312,7 +1328,7 @@ void ManagerImplemented::Flip()
 			m_renderingDrawSetMaps[it.first] = it.second;
 		}
 
-		if (m_cullingWorld != NULL)
+		if (m_cullingWorld != nullptr)
 		{
 			for (size_t i = 0; i < m_renderingDrawSets.size(); i++)
 			{
@@ -1341,6 +1357,8 @@ void ManagerImplemented::Update(float deltaFrame)
 
 void ManagerImplemented::Update(const UpdateParameter& parameter)
 {
+	PROFILER_BLOCK("Manager::Update", profiler::colors::Red);
+
 	if (m_WorkerThreads.size() == 0)
 	{
 		DoUpdate(parameter);
@@ -1350,11 +1368,19 @@ void ManagerImplemented::Update(const UpdateParameter& parameter)
 		m_WorkerThreads[0].WaitForComplete();
 		// Process on worker thread
 		m_WorkerThreads[0].RunAsync([this, parameter]() { DoUpdate(parameter); });
+
+		if (parameter.SyncUpdate)
+		{
+			m_WorkerThreads[0].WaitForComplete();
+		}
 	}
+
+	ExecuteSounds();
 }
 
 void ManagerImplemented::DoUpdate(const UpdateParameter& parameter)
 {
+	PROFILER_BLOCK("Manager::DoUpdate", profiler::colors::Red);
 	// start to measure time
 	int64_t beginTime = ::Effekseer::GetTime();
 
@@ -1431,6 +1457,7 @@ void ManagerImplemented::DoUpdate(const UpdateParameter& parameter)
 					const uint32_t chunkOffset = threadID;
 					// Process on worker thread
 					m_WorkerThreads[threadID].RunAsync([this, &chunks, chunkOffset, chunkStep]() {
+						PROFILER_BLOCK("DoUpdate::RunAsync", profiler::colors::Red);
 						for (size_t i = chunkOffset; i < chunks.size(); i += chunkStep)
 						{
 							chunks[i]->UpdateInstances();
@@ -1536,6 +1563,8 @@ void ManagerImplemented::UpdateHandle(Handle handle, float deltaFrame)
 			UpdateHandleInternal(drawSet);
 		}
 	}
+
+	ExecuteSounds();
 }
 
 void ManagerImplemented::UpdateHandleToMoveToFrame(Handle handle, float frame)
@@ -1582,7 +1611,7 @@ void ManagerImplemented::UpdateInstancesByInstanceGlobal(const DrawSet& drawSet)
 void ManagerImplemented::UpdateHandleInternal(DrawSet& drawSet)
 {
 	// calculate dynamic parameters
-	auto e = static_cast<EffectImplemented*>(drawSet.ParameterPointer);
+	auto e = static_cast<EffectImplemented*>(drawSet.ParameterPointer.Get());
 	assert(e != nullptr);
 	assert(drawSet.GlobalPointer->dynamicEqResults.size() >= e->dynamicEquation.size());
 
@@ -1624,7 +1653,7 @@ void ManagerImplemented::Preupdate(DrawSet& drawSet)
 
 	// Create an instance through a container
 	InstanceContainer* pContainer =
-		CreateInstanceContainer(drawSet.ParameterPointer->GetRoot(), drawSet.GlobalPointer, true, drawSet.GlobalMatrix, NULL);
+		CreateInstanceContainer(drawSet.ParameterPointer->GetRoot(), drawSet.GlobalPointer, true, drawSet.GlobalMatrix, nullptr);
 
 	drawSet.InstanceContainerPointer = pContainer;
 	drawSet.IsPreupdated = true;
@@ -1654,8 +1683,8 @@ bool ManagerImplemented::IsClippedWithDepth(DrawSet& drawSet, InstanceContainer*
 	if (container->m_pEffectNode->DepthValues.DepthParameter.DepthClipping > FLT_MAX / 10)
 		return false;
 
-	Vec3f pos = drawSet.GlobalMatrix.GetTranslation();
-	auto distance = Vec3f::Dot(Vec3f(drawParameter.CameraPosition) - pos, Vec3f(drawParameter.CameraDirection));
+	SIMD::Vec3f pos = drawSet.GlobalMatrix.GetTranslation();
+	auto distance = SIMD::Vec3f::Dot(pos - SIMD::Vec3f(drawParameter.CameraPosition), SIMD::Vec3f(drawParameter.CameraFrontDirection));
 	if (container->m_pEffectNode->DepthValues.DepthParameter.DepthClipping < distance)
 	{
 		return true;
@@ -1677,8 +1706,12 @@ void ManagerImplemented::StopWithoutRemoveDrawSet(DrawSet& drawSet)
 
 void ManagerImplemented::ResetAndPlayWithDataSet(DrawSet& drawSet, float frame)
 {
+	assert(drawSet.ParameterPointer != nullptr);
+	auto effect = drawSet.ParameterPointer->GetRoot();
+	assert(effect != nullptr);
+
 	auto pGlobal = drawSet.GlobalPointer;
-	auto e = static_cast<EffectImplemented*>(drawSet.ParameterPointer);
+	auto e = static_cast<EffectImplemented*>(drawSet.ParameterPointer.Get());
 
 	// reallocate
 	pGlobal->GetRandObject().SetSeed(drawSet.RandomSeed);
@@ -1698,7 +1731,7 @@ void ManagerImplemented::ResetAndPlayWithDataSet(DrawSet& drawSet, float frame)
 	pGlobal->ResetUpdatedFrame();
 
 	// Create an instance through a container
-	//drawSet.InstanceContainerPointer = CreateInstanceContainer(e->GetRoot(), drawSet.GlobalPointer, true, drawSet.GlobalMatrix, NULL);
+	//drawSet.InstanceContainerPointer = CreateInstanceContainer(e->GetRoot(), drawSet.GlobalPointer, true, drawSet.GlobalMatrix, nullptr);
 
 	auto isShown = drawSet.IsShown;
 	drawSet.IsShown = false;
@@ -1722,79 +1755,73 @@ void ManagerImplemented::ResetAndPlayWithDataSet(DrawSet& drawSet, float frame)
 
 	UpdateInstancesByInstanceGlobal(drawSet);
 	UpdateHandleInternal(drawSet);
-		
+
 	//drawSet.InstanceContainerPointer->Update(true, drawSet.IsShown);
 	drawSet.GlobalPointer->EndDeltaFrame();
 }
 
 void ManagerImplemented::Draw(const Manager::DrawParameter& drawParameter)
 {
+	PROFILER_BLOCK("Manager::Draw", profiler::colors::Blue);
+
 	if (m_WorkerThreads.size() > 0)
 	{
 		m_WorkerThreads[0].WaitForComplete();
 	}
 
-	std::lock_guard<std::mutex> lock(m_renderingMutex);
+	std::lock_guard<std::recursive_mutex> lock(m_renderingMutex);
 
 	// start to record a time
 	int64_t beginTime = ::Effekseer::GetTime();
 
-	if (m_culled)
-	{
-		for (size_t i = 0; i < m_culledObjects.size(); i++)
+	const auto render = [this, &drawParameter](DrawSet& drawSet) -> void {
+		if (drawSet.InstanceContainerPointer == nullptr)
 		{
-			DrawSet& drawSet = *m_culledObjects[i];
-			if (drawSet.InstanceContainerPointer == nullptr)
-			{
-				continue;
-			}
+			return;
+		}
 
-			if (drawSet.IsShown && drawSet.IsAutoDrawing && ((drawParameter.CameraCullingMask & (1 << drawSet.Layer)) != 0))
+		if (drawSet.IsShown && drawSet.IsAutoDrawing && ((drawParameter.CameraCullingMask & (1 << drawSet.Layer)) != 0))
+		{
+			if (drawSet.GlobalPointer->RenderedInstanceContainers.size() > 0)
 			{
-				if (drawSet.GlobalPointer->RenderedInstanceContainers.size() > 0)
+				for (auto& c : drawSet.GlobalPointer->RenderedInstanceContainers)
 				{
-					for (auto& c : drawSet.GlobalPointer->RenderedInstanceContainers)
-					{
-						if (IsClippedWithDepth(drawSet, c, drawParameter))
-							continue;
+					if (IsClippedWithDepth(drawSet, c, drawParameter))
+						continue;
 
-						c->Draw(false);
-					}
-				}
-				else
-				{
-					drawSet.InstanceContainerPointer->Draw(true);
+					c->Draw(false);
 				}
 			}
+			else
+			{
+				drawSet.InstanceContainerPointer->Draw(true);
+			}
+		}
+	};
+
+	if (drawParameter.IsSortingEffectsEnabled)
+	{
+		StoreSortingDrawSets(drawParameter);
+
+		for (auto& drawSet : sortedRenderingDrawSets_)
+		{
+			render(drawSet);
 		}
 	}
 	else
 	{
-		for (size_t i = 0; i < m_renderingDrawSets.size(); i++)
+		if (m_culled)
 		{
-			DrawSet& drawSet = m_renderingDrawSets[i];
-
-			if (drawSet.InstanceContainerPointer == nullptr)
+			for (size_t i = 0; i < m_culledObjects.size(); i++)
 			{
-				continue;
+				render(*m_culledObjects[i]);
 			}
-
-			if (drawSet.IsShown && drawSet.IsAutoDrawing && ((drawParameter.CameraCullingMask & (1 << drawSet.Layer)) != 0))
+		}
+		else
+		{
+			for (size_t i = 0; i < m_renderingDrawSets.size(); i++)
 			{
-				if (drawSet.GlobalPointer->RenderedInstanceContainers.size() > 0)
-				{
-					for (auto& c : drawSet.GlobalPointer->RenderedInstanceContainers)
-					{
-						if (IsClippedWithDepth(drawSet, c, drawParameter))
-							continue;
-
-						c->Draw(false);
-					}
-				}
-				else
-				{
-					drawSet.InstanceContainerPointer->Draw(true);
-				}
+				render(m_renderingDrawSets[i]);
 			}
 		}
 	}
@@ -1805,56 +1832,53 @@ void ManagerImplemented::Draw(const Manager::DrawParameter& drawParameter)
 
 void ManagerImplemented::DrawBack(const Manager::DrawParameter& drawParameter)
 {
-	std::lock_guard<std::mutex> lock(m_renderingMutex);
+	std::lock_guard<std::recursive_mutex> lock(m_renderingMutex);
 
 	// start to record a time
 	int64_t beginTime = ::Effekseer::GetTime();
 
-	if (m_culled)
-	{
-		for (size_t i = 0; i < m_culledObjects.size(); i++)
+	const auto render = [this, &drawParameter](DrawSet& drawSet) -> void {
+		if (drawSet.InstanceContainerPointer == nullptr)
 		{
-			DrawSet& drawSet = *m_culledObjects[i];
+			return;
+		}
 
-			if (drawSet.InstanceContainerPointer == nullptr)
+		if (drawSet.IsShown && drawSet.IsAutoDrawing && ((drawParameter.CameraCullingMask & (1 << drawSet.Layer)) != 0))
+		{
+			auto e = (EffectImplemented*)drawSet.ParameterPointer.Get();
+			for (int32_t j = 0; j < e->renderingNodesThreshold; j++)
 			{
-				continue;
-			}
+				if (IsClippedWithDepth(drawSet, drawSet.GlobalPointer->RenderedInstanceContainers[j], drawParameter))
+					continue;
 
-			if (drawSet.IsShown && drawSet.IsAutoDrawing && ((drawParameter.CameraCullingMask & (1 << drawSet.Layer)) != 0))
-			{
-				auto e = (EffectImplemented*)drawSet.ParameterPointer;
-				for (int32_t j = 0; j < e->renderingNodesThreshold; j++)
-				{
-					if (IsClippedWithDepth(drawSet, drawSet.GlobalPointer->RenderedInstanceContainers[j], drawParameter))
-						continue;
-
-					drawSet.GlobalPointer->RenderedInstanceContainers[j]->Draw(false);
-				}
+				drawSet.GlobalPointer->RenderedInstanceContainers[j]->Draw(false);
 			}
+		}
+	};
+
+	if (drawParameter.IsSortingEffectsEnabled)
+	{
+		StoreSortingDrawSets(drawParameter);
+
+		for (auto& drawSet : sortedRenderingDrawSets_)
+		{
+			render(drawSet);
 		}
 	}
 	else
 	{
-		for (size_t i = 0; i < m_renderingDrawSets.size(); i++)
+		if (m_culled)
 		{
-			DrawSet& drawSet = m_renderingDrawSets[i];
-
-			if (drawSet.InstanceContainerPointer == nullptr)
+			for (size_t i = 0; i < m_culledObjects.size(); i++)
 			{
-				continue;
+				render(*m_culledObjects[i]);
 			}
-
-			if (drawSet.IsShown && drawSet.IsAutoDrawing && ((drawParameter.CameraCullingMask & (1 << drawSet.Layer)) != 0))
+		}
+		else
+		{
+			for (size_t i = 0; i < m_renderingDrawSets.size(); i++)
 			{
-				auto e = (EffectImplemented*)drawSet.ParameterPointer;
-				for (int32_t j = 0; j < e->renderingNodesThreshold; j++)
-				{
-					if (IsClippedWithDepth(drawSet, drawSet.GlobalPointer->RenderedInstanceContainers[j], drawParameter))
-						continue;
-
-					drawSet.GlobalPointer->RenderedInstanceContainers[j]->Draw(false);
-				}
+				render(m_renderingDrawSets[i]);
 			}
 		}
 	}
@@ -1865,70 +1889,60 @@ void ManagerImplemented::DrawBack(const Manager::DrawParameter& drawParameter)
 
 void ManagerImplemented::DrawFront(const Manager::DrawParameter& drawParameter)
 {
-	std::lock_guard<std::mutex> lock(m_renderingMutex);
+	std::lock_guard<std::recursive_mutex> lock(m_renderingMutex);
 
 	// start to record a time
 	int64_t beginTime = ::Effekseer::GetTime();
 
-	if (m_culled)
-	{
-		for (size_t i = 0; i < m_culledObjects.size(); i++)
+	const auto render = [this, &drawParameter](DrawSet& drawSet) -> void {
+		if (drawSet.InstanceContainerPointer == nullptr)
 		{
-			DrawSet& drawSet = *m_culledObjects[i];
+			return;
+		}
 
-			if (drawSet.InstanceContainerPointer == nullptr)
+		if (drawSet.IsShown && drawSet.IsAutoDrawing && ((drawParameter.CameraCullingMask & (1 << drawSet.Layer)) != 0))
+		{
+			if (drawSet.GlobalPointer->RenderedInstanceContainers.size() > 0)
 			{
-				continue;
-			}
-
-			if (drawSet.IsShown && drawSet.IsAutoDrawing && ((drawParameter.CameraCullingMask & (1 << drawSet.Layer)) != 0))
-			{
-				if (drawSet.GlobalPointer->RenderedInstanceContainers.size() > 0)
+				auto e = (EffectImplemented*)drawSet.ParameterPointer.Get();
+				for (size_t j = e->renderingNodesThreshold; j < drawSet.GlobalPointer->RenderedInstanceContainers.size(); j++)
 				{
-					auto e = (EffectImplemented*)drawSet.ParameterPointer;
-					for (size_t j = e->renderingNodesThreshold; j < drawSet.GlobalPointer->RenderedInstanceContainers.size(); j++)
-					{
-						if (IsClippedWithDepth(drawSet, drawSet.GlobalPointer->RenderedInstanceContainers[j], drawParameter))
-							continue;
+					if (IsClippedWithDepth(drawSet, drawSet.GlobalPointer->RenderedInstanceContainers[j], drawParameter))
+						continue;
 
-						drawSet.GlobalPointer->RenderedInstanceContainers[j]->Draw(false);
-					}
-				}
-				else
-				{
-					drawSet.InstanceContainerPointer->Draw(true);
+					drawSet.GlobalPointer->RenderedInstanceContainers[j]->Draw(false);
 				}
 			}
+			else
+			{
+				drawSet.InstanceContainerPointer->Draw(true);
+			}
+		}
+	};
+
+	if (drawParameter.IsSortingEffectsEnabled)
+	{
+		StoreSortingDrawSets(drawParameter);
+
+		for (auto& drawSet : sortedRenderingDrawSets_)
+		{
+			render(drawSet);
 		}
 	}
 	else
 	{
-		for (size_t i = 0; i < m_renderingDrawSets.size(); i++)
+		if (m_culled)
 		{
-			DrawSet& drawSet = m_renderingDrawSets[i];
-
-			if (drawSet.InstanceContainerPointer == nullptr)
+			for (size_t i = 0; i < m_culledObjects.size(); i++)
 			{
-				continue;
+				render(*m_culledObjects[i]);
 			}
-
-			if (drawSet.IsShown && drawSet.IsAutoDrawing && ((drawParameter.CameraCullingMask & (1 << drawSet.Layer)) != 0))
+		}
+		else
+		{
+			for (size_t i = 0; i < m_renderingDrawSets.size(); i++)
 			{
-				if (drawSet.GlobalPointer->RenderedInstanceContainers.size() > 0)
-				{
-					auto e = (EffectImplemented*)drawSet.ParameterPointer;
-					for (size_t j = e->renderingNodesThreshold; j < drawSet.GlobalPointer->RenderedInstanceContainers.size(); j++)
-					{
-						if (IsClippedWithDepth(drawSet, drawSet.GlobalPointer->RenderedInstanceContainers[j], drawParameter))
-							continue;
-
-						drawSet.GlobalPointer->RenderedInstanceContainers[j]->Draw(false);
-					}
-				}
-				else
-				{
-					drawSet.InstanceContainerPointer->Draw(true);
-				}
+				render(m_renderingDrawSets[i]);
 			}
 		}
 	}
@@ -1937,17 +1951,17 @@ void ManagerImplemented::DrawFront(const Manager::DrawParameter& drawParameter)
 	m_drawTime = (int)(Effekseer::GetTime() - beginTime);
 }
 
-Handle ManagerImplemented::Play(Effect* effect, float x, float y, float z)
+Handle ManagerImplemented::Play(const EffectRef& effect, float x, float y, float z)
 {
 	return Play(effect, Vector3D(x, y, z), 0);
 }
 
-Handle ManagerImplemented::Play(Effect* effect, const Vector3D& position, int32_t startFrame)
+Handle ManagerImplemented::Play(const EffectRef& effect, const Vector3D& position, int32_t startFrame)
 {
 	if (effect == nullptr)
 		return -1;
 
-	auto e = (EffectImplemented*)effect;
+	auto e = effect->GetImplemented();
 
 	// Create root
 	InstanceGlobal* pGlobal = new InstanceGlobal();
@@ -1978,7 +1992,7 @@ Handle ManagerImplemented::Play(Effect* effect, const Vector3D& position, int32_
 
 	auto& drawSet = m_DrawSets[handle];
 
-	drawSet.GlobalMatrix = Mat43f::Translation(position);
+	drawSet.GlobalMatrix = SIMD::Mat43f::Translation(position);
 
 	drawSet.IsParameterChanged = true;
 	drawSet.StartFrame = startFrame;
@@ -2002,7 +2016,12 @@ int ManagerImplemented::GetCameraCullingMaskToShowAllEffects()
 
 void ManagerImplemented::DrawHandle(Handle handle, const Manager::DrawParameter& drawParameter)
 {
-	std::lock_guard<std::mutex> lock(m_renderingMutex);
+	if (m_WorkerThreads.size() > 0)
+	{
+		m_WorkerThreads[0].WaitForComplete();
+	}
+
+	std::lock_guard<std::recursive_mutex> lock(m_renderingMutex);
 
 	auto it = m_renderingDrawSetMaps.find(handle);
 	if (it != m_renderingDrawSetMaps.end())
@@ -2062,13 +2081,18 @@ void ManagerImplemented::DrawHandle(Handle handle, const Manager::DrawParameter&
 
 void ManagerImplemented::DrawHandleBack(Handle handle, const Manager::DrawParameter& drawParameter)
 {
-	std::lock_guard<std::mutex> lock(m_renderingMutex);
+	if (m_WorkerThreads.size() > 0)
+	{
+		m_WorkerThreads[0].WaitForComplete();
+	}
+
+	std::lock_guard<std::recursive_mutex> lock(m_renderingMutex);
 
 	std::map<Handle, DrawSet>::iterator it = m_renderingDrawSetMaps.find(handle);
 	if (it != m_renderingDrawSetMaps.end())
 	{
 		DrawSet& drawSet = it->second;
-		auto e = (EffectImplemented*)drawSet.ParameterPointer;
+		auto e = (EffectImplemented*)drawSet.ParameterPointer.Get();
 
 		if (m_culled)
 		{
@@ -2104,13 +2128,18 @@ void ManagerImplemented::DrawHandleBack(Handle handle, const Manager::DrawParame
 
 void ManagerImplemented::DrawHandleFront(Handle handle, const Manager::DrawParameter& drawParameter)
 {
-	std::lock_guard<std::mutex> lock(m_renderingMutex);
+	if (m_WorkerThreads.size() > 0)
+	{
+		m_WorkerThreads[0].WaitForComplete();
+	}
+
+	std::lock_guard<std::recursive_mutex> lock(m_renderingMutex);
 
 	std::map<Handle, DrawSet>::iterator it = m_renderingDrawSetMaps.find(handle);
 	if (it != m_renderingDrawSetMaps.end())
 	{
 		DrawSet& drawSet = it->second;
-		auto e = (EffectImplemented*)drawSet.ParameterPointer;
+		auto e = (EffectImplemented*)drawSet.ParameterPointer.Get();
 
 		if (drawSet.InstanceContainerPointer == nullptr)
 		{
@@ -2178,7 +2207,7 @@ int32_t ManagerImplemented::GetRestInstancesCount() const
 	return static_cast<int32_t>(pooledChunks_.size()) * InstanceChunk::InstancesOfChunk;
 }
 
-void ManagerImplemented::BeginReloadEffect(Effect* effect, bool doLockThread)
+void ManagerImplemented::BeginReloadEffect(const EffectRef& effect, bool doLockThread)
 {
 	if (doLockThread)
 	{
@@ -2201,7 +2230,7 @@ void ManagerImplemented::BeginReloadEffect(Effect* effect, bool doLockThread)
 	}
 }
 
-void ManagerImplemented::EndReloadEffect(Effect* effect, bool doLockThread)
+void ManagerImplemented::EndReloadEffect(const EffectRef& effect, bool doLockThread)
 {
 	for (auto& it : m_DrawSets)
 	{
@@ -2215,11 +2244,7 @@ void ManagerImplemented::EndReloadEffect(Effect* effect, bool doLockThread)
 			continue;
 		}
 
-		auto e = static_cast<EffectImplemented*>(effect);
-		auto pGlobal = ds.GlobalPointer;
-
 		ResetAndPlayWithDataSet(ds, ds.GlobalPointer->GetUpdatedFrame());
-
 	}
 
 	Flip();
@@ -2241,7 +2266,7 @@ void ManagerImplemented::CreateCullingWorld(float xsize, float ysize, float zsiz
 
 void ManagerImplemented::CalcCulling(const Matrix44& cameraProjMat, bool isOpenGL)
 {
-	if (m_cullingWorld == NULL)
+	if (m_cullingWorld == nullptr)
 		return;
 
 	m_culledObjects.clear();
@@ -2272,20 +2297,81 @@ void ManagerImplemented::CalcCulling(const Matrix44& cameraProjMat, bool isOpenG
 	}
 
 	// sort with handle
-	std::sort(m_culledObjects.begin(), m_culledObjects.end(), [](auto const& lhs, auto const& rhs) { return lhs->Self > rhs->Self; });
+	std::sort(m_culledObjects.begin(), m_culledObjects.end(), [](DrawSet* const& lhs, DrawSet* const& rhs) { return lhs->Self < rhs->Self; });
 
 	m_culled = true;
 }
 
 void ManagerImplemented::RessignCulling()
 {
-	if (m_cullingWorld == NULL)
+	if (m_cullingWorld == nullptr)
 		return;
 
 	m_culledObjects.clear();
 	m_culledObjectSets.clear();
 
 	m_cullingWorld->Reassign();
+}
+
+void ManagerImplemented::LockRendering()
+{
+	m_renderingMutex.lock();
+}
+
+void ManagerImplemented::UnlockRendering()
+{
+	m_renderingMutex.unlock();
+}
+
+void ManagerImplemented::RequestToPlaySound(Instance* instance, const EffectNodeImplemented* node)
+{
+	if (node->Sound.WaveId >= 0)
+	{
+		InstanceGlobal* instanceGlobal = instance->GetInstanceGlobal();
+		IRandObject& rand = instance->GetRandObject();
+
+		SoundPlayer::InstanceParameter parameter;
+		parameter.Data = node->GetEffect()->GetWave(node->Sound.WaveId);
+		parameter.Volume = node->Sound.Volume.getValue(rand);
+		parameter.Pitch = node->Sound.Pitch.getValue(rand);
+		parameter.Pan = node->Sound.Pan.getValue(rand);
+
+		parameter.Mode3D = (node->Sound.PanType == ParameterSoundPanType_3D);
+		parameter.Position = ToStruct(instance->GetGlobalMatrix43().GetTranslation());
+		parameter.Distance = node->Sound.Distance;
+		parameter.UserData = instanceGlobal->GetUserData();
+
+		std::lock_guard<std::mutex> lock(m_soundMutex);
+		m_requestedSounds.emplace(static_cast<SoundTag>(instanceGlobal), parameter);
+	}
+}
+
+void ManagerImplemented::ExecuteSounds()
+{
+	if (m_requestedSounds.empty())
+	{
+		return;
+	}
+
+	std::lock_guard<std::mutex> lock(m_soundMutex);
+
+	auto player = GetSoundPlayer();
+	if (player != nullptr)
+	{
+		while (!m_requestedSounds.empty())
+		{
+			auto sound = m_requestedSounds.back();
+			player->Play(sound.first, sound.second);
+			m_requestedSounds.pop();
+		}
+	}
+	else
+	{
+		while (!m_requestedSounds.empty())
+		{
+			m_requestedSounds.pop();
+		}
+	}
 }
 
 } // namespace Effekseer

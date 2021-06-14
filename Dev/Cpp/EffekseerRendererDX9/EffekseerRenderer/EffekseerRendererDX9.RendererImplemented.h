@@ -9,42 +9,33 @@
 #include "../../EffekseerRendererCommon/EffekseerRenderer.StandardRenderer.h"
 #include "EffekseerRendererDX9.Base.h"
 #include "EffekseerRendererDX9.Renderer.h"
-
+#include "GraphicsDevice.h"
 #include <array>
-
-#ifdef _MSC_VER
-#include <xmmintrin.h>
-#endif
 
 namespace EffekseerRendererDX9
 {
 
 using Vertex = EffekseerRenderer::SimpleVertex;
-using VertexDistortion = EffekseerRenderer::VertexDistortion;
 
-/**
-	@brief	描画クラス
-	@note
-	ツール向けの描画機能。
-*/
+class RendererImplemented;
+using RendererImplementedRef = ::Effekseer::RefPtr<RendererImplemented>;
+
 class RendererImplemented : public Renderer, public ::Effekseer::ReferenceObject
 {
 	friend class DeviceObject;
 
 private:
-	LPDIRECT3DDEVICE9 m_d3d_device;
-
 	VertexBuffer* m_vertexBuffer;
 	IndexBuffer* m_indexBuffer = nullptr;
 	IndexBuffer* m_indexBufferForWireframe = nullptr;
 	int32_t m_squareMaxCount;
 
-	Shader* m_shader = nullptr;
-	Shader* m_shader_distortion = nullptr;
-	Shader* m_shader_lighting = nullptr;
-	Shader* m_shader_ad = nullptr;
-	Shader* m_shader_ad_distortion = nullptr;
-	Shader* m_shader_ad_lighting = nullptr;
+	Shader* shader_unlit_ = nullptr;
+	Shader* shader_distortion_ = nullptr;
+	Shader* shader_lit_ = nullptr;
+	Shader* shader_ad_unlit_ = nullptr;
+	Shader* shader_ad_distortion_ = nullptr;
+	Shader* shader_ad_lit_ = nullptr;
 	Shader* currentShader = nullptr;
 
 	EffekseerRenderer::StandardRenderer<RendererImplemented, Shader>* m_standardRenderer;
@@ -60,8 +51,6 @@ private:
 	::Effekseer::CoordinateSystem m_coordinateSystem;
 
 	::EffekseerRenderer::RenderStateBase* m_renderState;
-
-	::Effekseer::TextureData m_background;
 
 	std::set<DeviceObject*> m_deviceObjects;
 
@@ -98,9 +87,9 @@ private:
 	IDirect3DPixelShader9* m_state_pixelShader;
 	IDirect3DVertexDeclaration9* m_state_vertexDeclaration;
 
-	IDirect3DVertexBuffer9* m_state_streamData;
-	UINT m_state_OffsetInBytes;
-	UINT m_state_pStride;
+	std::array<IDirect3DVertexBuffer9*, 2> m_state_streamData;
+	std::array<UINT, 2> m_state_OffsetInBytes;
+	std::array<UINT, 2> m_state_pStride;
 
 	IDirect3DIndexBuffer9* m_state_IndexData;
 
@@ -113,7 +102,12 @@ private:
 
 	bool m_restorationOfStates;
 
+	Backend::GraphicsDeviceRef graphicsDevice_ = nullptr;
+	Effekseer::Backend::VertexBufferRef instancedVertexBuffer_;
+
 	EffekseerRenderer::DistortingCallback* m_distortingCallback;
+
+	::Effekseer::Backend::TextureRef m_backgroundDX9;
 
 public:
 	/**
@@ -129,12 +123,7 @@ public:
 	void OnLostDevice();
 	void OnResetDevice();
 
-	/**
-		@brief	初期化
-	*/
-	bool Initialize(LPDIRECT3DDEVICE9 device);
-
-	void Destroy();
+	bool Initialize(Backend::GraphicsDeviceRef graphicsDevice);
 
 	void SetRestorationOfStatesFlag(bool flag);
 
@@ -147,11 +136,6 @@ public:
 		@brief	描画終了
 	*/
 	bool EndRendering();
-
-	/**
-		@brief	デバイス取得
-	*/
-	LPDIRECT3DDEVICE9 GetDevice();
 
 	/**
 		@brief	頂点バッファ取得
@@ -178,49 +162,39 @@ public:
 	/**
 		@brief	スプライトレンダラーを生成する。
 	*/
-	::Effekseer::SpriteRenderer* CreateSpriteRenderer();
+	::Effekseer::SpriteRendererRef CreateSpriteRenderer();
 
 	/**
 		@brief	リボンレンダラーを生成する。
 	*/
-	::Effekseer::RibbonRenderer* CreateRibbonRenderer();
+	::Effekseer::RibbonRendererRef CreateRibbonRenderer();
 
 	/**
 		@brief	リングレンダラーを生成する。
 	*/
-	::Effekseer::RingRenderer* CreateRingRenderer();
+	::Effekseer::RingRendererRef CreateRingRenderer();
 
 	/**
 		@brief	モデルレンダラーを生成する。
 	*/
-	::Effekseer::ModelRenderer* CreateModelRenderer();
+	::Effekseer::ModelRendererRef CreateModelRenderer();
 
 	/**
 		@brief	軌跡レンダラーを生成する。
 	*/
-	::Effekseer::TrackRenderer* CreateTrackRenderer();
+	::Effekseer::TrackRendererRef CreateTrackRenderer();
 
 	/**
 		@brief	テクスチャ読込クラスを生成する。
 	*/
-	::Effekseer::TextureLoader* CreateTextureLoader(::Effekseer::FileInterface* fileInterface = NULL);
+	::Effekseer::TextureLoaderRef CreateTextureLoader(::Effekseer::FileInterface* fileInterface = nullptr);
 
 	/**
 		@brief	モデル読込クラスを生成する。
 	*/
-	::Effekseer::ModelLoader* CreateModelLoader(::Effekseer::FileInterface* fileInterface = NULL);
+	::Effekseer::ModelLoaderRef CreateModelLoader(::Effekseer::FileInterface* fileInterface = nullptr);
 
-	::Effekseer::MaterialLoader* CreateMaterialLoader(::Effekseer::FileInterface* fileInterface = nullptr) override;
-
-	/**
-	@brief	背景を取得する。
-	*/
-	Effekseer::TextureData* GetBackground() override
-	{
-		if (m_background.UserPtr == nullptr)
-			return nullptr;
-		return &m_background;
-	}
+	::Effekseer::MaterialLoaderRef CreateMaterialLoader(::Effekseer::FileInterface* fileInterface = nullptr) override;
 
 	/**
 	@brief	背景を設定する。
@@ -241,11 +215,15 @@ public:
 	void SetIndexBuffer(IndexBuffer* indexBuffer);
 	void SetIndexBuffer(IDirect3DIndexBuffer9* indexBuffer);
 
+	void SetVertexBuffer(const Effekseer::Backend::VertexBufferRef& vertexBuffer, int32_t size);
+	void SetIndexBuffer(const Effekseer::Backend::IndexBufferRef& indexBuffer);
+
 	void SetLayout(Shader* shader);
 	void DrawSprites(int32_t spriteCount, int32_t vertexOffset);
 	void DrawPolygon(int32_t vertexCount, int32_t indexCount);
+	void DrawPolygonInstanced(int32_t vertexCount, int32_t indexCount, int32_t instanceCount);
 
-	Shader* GetShader(::EffekseerRenderer::StandardRendererShaderType type) const;
+	Shader* GetShader(::EffekseerRenderer::RendererShaderType type) const;
 	void BeginShader(Shader* shader);
 	void EndShader(Shader* shader);
 
@@ -253,15 +231,15 @@ public:
 
 	void SetPixelBufferToShader(const void* data, int32_t size, int32_t dstOffset);
 
-	void SetTextures(Shader* shader, Effekseer::TextureData** textures, int32_t count);
+	void SetTextures(Shader* shader, Effekseer::Backend::TextureRef* textures, int32_t count);
 
 	void ChangeDevice(LPDIRECT3DDEVICE9 device);
 
 	void ResetRenderState();
 
-	Effekseer::TextureData* CreateProxyTexture(EffekseerRenderer::ProxyTextureType type) override;
+	Effekseer::Backend::GraphicsDeviceRef GetGraphicsDevice() const override;
 
-	void DeleteProxyTexture(Effekseer::TextureData* data) override;
+	LPDIRECT3DDEVICE9 GetDevice() override;
 
 	virtual int GetRef()
 	{

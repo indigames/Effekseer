@@ -5,30 +5,27 @@
 
 namespace efk
 {
-namespace Standard_VS
-{
-static
-#include "Shader/EffekseerRenderer.Tool_VS.h"
-} // namespace Standard_VS
 
-namespace Standard_PS
-{
-static
-#include "Shader/EffekseerRenderer.Tool_PS.h"
-} // namespace Standard_PS
+#ifdef _WIN32
 
-namespace StandardNoTexture_PS
-{
-static
-#include "Shader/EffekseerRenderer.ToolNoTexture_PS.h"
-} // namespace StandardNoTexture_PS
+using BYTE = uint8_t;
 
-LineRendererDX11::LineRendererDX11(EffekseerRenderer::Renderer* renderer)
+namespace VS
+{
+#include "../../../Shaders/HLSL_DX11_Header/line_vs.h"
+}
+
+namespace PS
+{
+#include "../../../Shaders/HLSL_DX11_Header/line_ps.h"
+}
+#endif
+
+LineRendererDX11::LineRendererDX11(const EffekseerRenderer::RendererRef& renderer)
 	: LineRenderer(renderer)
+	, renderer(EffekseerRendererDX11::RendererImplementedRef::FromPinned(renderer.Get()))
 {
 	spdlog::trace("Begin new LineRendererDX11");
-
-	this->renderer = (EffekseerRendererDX11::RendererImplemented*)renderer;
 
 	// Position(3) Color(1) UV(2)
 	D3D11_INPUT_ELEMENT_DESC decl[] = {
@@ -37,15 +34,16 @@ LineRendererDX11::LineRendererDX11(EffekseerRenderer::Renderer* renderer)
 		{"TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, sizeof(float) * 4, D3D11_INPUT_PER_VERTEX_DATA, 0},
 	};
 
-	shader = EffekseerRendererDX11::Shader::Create(this->renderer,
-												   Standard_VS::g_VS,
-												   sizeof(Standard_VS::g_VS),
-												   StandardNoTexture_PS::g_PS,
-												   sizeof(StandardNoTexture_PS::g_PS),
+	shader = EffekseerRendererDX11::Shader::Create(this->renderer.Get(),
+												   renderer->GetGraphicsDevice()->CreateShaderFromBinary(
+													   VS::g_main,
+													   sizeof(VS::g_main),
+													   PS::g_main,
+													   sizeof(PS::g_main)),
 												   "StandardRenderer No Texture",
 												   decl,
 												   3,
-												   true);
+												   false);
 
 	if (shader != nullptr)
 	{
@@ -108,7 +106,7 @@ void LineRendererDX11::Render()
 
 	shader->SetConstantBuffer();
 
-	renderer->GetRenderState()->Update(false);
+	renderer->GetRenderState()->Update(true);
 
 	renderer->SetLayout((EffekseerRendererDX11::Shader*)shader);
 

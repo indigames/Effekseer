@@ -15,7 +15,7 @@ namespace Effekseer.GUI.Dock
 
         public AdvancedRenderCommonValues()
         {
-            Label = Resources.GetString("AdvancedRenderSettings") + "###AdvancedRenderSettings";
+            Label = Icons.PanelAdvancedRenderCommon + Resources.GetString("AdvancedRenderSettings") + "###AdvancedRenderSettings";
 
             parameterList = new Component.ParameterList();
             parameterList.SetType(typeof(Data.AdvancedRenderCommonValues));
@@ -26,7 +26,10 @@ namespace Effekseer.GUI.Dock
             Core.OnAfterNew += OnAfterLoad;
             Core.OnAfterSelectNode += OnAfterSelectNode;
 
-            Read();
+			Controls.Add(candp);
+			Controls.Add(parameterList);
+
+			Read();
 
             TabToolTip = Resources.GetString("AdvancedRenderSettings");
         }
@@ -50,10 +53,6 @@ namespace Effekseer.GUI.Dock
             if (isFirstUpdate)
             {
             }
-
-            candp.Update();
-
-            parameterList.Update();
         }
 
         object GetTargetObject()

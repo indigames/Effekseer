@@ -6,7 +6,7 @@
 #include <vector>
 
 #if defined(_WIN32)
-#include <Windows.h>
+#include <windows.h>
 #endif
 
 #if defined(__EFFEKSEER_RENDERER_GLES2__)
@@ -69,7 +69,6 @@ enum class OpenGLDeviceType
 	OpenGL3,
 	OpenGLES2,
 	OpenGLES3,
-	Emscripten,
 };
 
 } // namespace EffekseerRendererGL

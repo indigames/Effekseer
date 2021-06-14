@@ -3,9 +3,9 @@
 
 #include "EffekseerTool.Base.h"
 
+#include "../Graphics/StaticMeshRenderer.h"
 #include "../RenderedEffectGenerator.h"
 #include "../efk.Base.h"
-
 #include <functional>
 #include <string>
 
@@ -18,9 +18,8 @@ private:
 	std::shared_ptr<::EffekseerRenderer::Grid> grid_;
 	std::shared_ptr<::EffekseerRenderer::Guide> guide_;
 	std::shared_ptr<::EffekseerRenderer::Culling> culling_;
-	std::shared_ptr<::EffekseerRenderer::Paste> background_;
-	Effekseer::TextureLoader* textureLoader_ = nullptr;
-	Effekseer::TextureData* backgroundData_ = nullptr;
+
+	Effekseer::TextureLoaderRef textureLoader_;
 	std::u16string backgroundPath;
 
 public:
@@ -106,7 +105,7 @@ public:
 
 	bool IsRightHand;
 
-	Effekseer::RenderMode RenderingMode;
+	Effekseer::Tool::RenderingMethodType RenderingMode;
 
 	void SetScreenSize(int32_t width, int32_t height);
 
