@@ -117,9 +117,11 @@ namespace Effekseer
 template <size_t LANE>
 SIMD4f SIMD4f::Dup()
 {
+	/// [IGE]: fix iOS argument value 2 is outside the valid range [0, 1]
 	return (LANE < 2) ?
-		vdupq_lane_f32(vget_low_f32(s), LANE) :
-		vdupq_lane_f32(vget_high_f32(s), LANE & 1);
+		vdupq_lane_f32(vget_low_f32(s), LANE ? 1 : 0) :
+		vdupq_lane_f32(vget_high_f32(s), (LANE & 1) ? 1 : 0);
+	/// [/IGE]
 }
 
 inline SIMD4f operator+(const SIMD4f& lhs, const SIMD4f& rhs)
