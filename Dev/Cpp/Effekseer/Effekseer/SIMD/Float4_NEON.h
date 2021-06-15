@@ -116,8 +116,9 @@ private:
 template <size_t LANE>
 Float4 Float4::Dup()
 {
-	vdupq_lane_f32(vget_low_f32(s), LANE & 1) :
-	vdupq_lane_f32(vget_high_f32(s), LANE & 1);
+    return (LANE < 2) ?
+        vdupq_lane_f32(vget_low_f32(s), LANE & 1) :
+        vdupq_lane_f32(vget_high_f32(s), LANE & 1);
 }
 
 inline Float4 operator+(const Float4& lhs, const Float4& rhs)
