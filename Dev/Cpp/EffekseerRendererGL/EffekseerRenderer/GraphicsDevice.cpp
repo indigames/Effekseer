@@ -483,7 +483,11 @@ bool Texture::InitInternal(const Effekseer::Backend::TextureParameter& param, in
 		else if (param.Format == Effekseer::Backend::TextureFormatType::B8G8R8A8_UNORM)
 		{
 			internalFormat = GL_RGBA;
-			format = GL_BGRA;
+#ifdef GL_BGRA
+            format = GL_BGRA;
+#else
+            format = GL_RGBA;  //not suported
+#endif
 			type = GL_UNSIGNED_BYTE;
 		}
 		else if (param.Format == Effekseer::Backend::TextureFormatType::R8G8B8A8_UNORM_SRGB)
@@ -495,7 +499,11 @@ bool Texture::InitInternal(const Effekseer::Backend::TextureParameter& param, in
 		else if (param.Format == Effekseer::Backend::TextureFormatType::B8G8R8A8_UNORM_SRGB)
 		{
 			internalFormat = GL_SRGB8_ALPHA8;
-			format = GL_BGRA;
+#ifdef GL_BGRA
+            format = GL_BGRA;
+#else
+            format = GL_RGBA;   //not suported
+#endif
 			type = GL_UNSIGNED_BYTE;
 		}
 		else if (param.Format == Effekseer::Backend::TextureFormatType::R8_UNORM)
@@ -622,8 +630,12 @@ bool Texture::Init(const Effekseer::Backend::DepthTextureParameter& param)
 	else if (param.Format == Effekseer::Backend::TextureFormatType::D32)
 	{
 		format = GL_DEPTH_COMPONENT;
+#ifdef GL_DEPTH_COMPONENT32
 		internalFormat = GL_DEPTH_COMPONENT32;
-	}
+#else
+        internalFormat = GL_DEPTH_COMPONENT24;
+#endif
+    }
 	else
 	{
 		return false;
